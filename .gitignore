@@ -1,0 +1,104 @@
+# Created by https://www.toptal.com/developers/gitignore/api/swift
+# Edit at https://www.toptal.com/developers/gitignore?templates=swift
+ 
+
+### Swift ###
+# Xcode
+#
+# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
+
+# 시스템 파일
+.DS_Store  # macOS 폴더 메타데이터 (썸네일, 정렬 정보 등)
+
+# Xcode 호환성 파일
+## compatibility with Xcode 8 and earlier (ignoring not required starting Xcode 9)
+*.xcscmblueprint  # Xcode 소스 컨트롤 블루프린트 (deprecated)
+*.xccheckout  # # Xcode 체크아웃 정보 (deprecated)
+
+# Xcode 빌드 관련
+## compatibility with Xcode 3 and earlier (ignoring not required starting Xcode 4)
+build/  # 빌드 결과물 디렉토리
+DerivedData/  # Xcode가 생성하는 캐시/인덱스 (매우 큼, 재생성 가능)
+*.moved-aside  # Xcode가 충돌 시 생성하는 백업
+*.pbxuser  # 개인 프로젝트 설정 (창 위치, 브레이크포인트 등)
+!default.pbxuser
+*.mode1v3  # Xcode 3 이하 UI 모드 설정
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3  # Xcode 3 이하 워크스페이스 레이아웃
+!default.perspectivev3
+
+# 컴파일 결과물
+## Obj-C/Swift specific
+*.hmap  # 헤더 맵 파일 (빌드 최적화용)
+
+## App packaging
+*.ipa  # iOS 앱 배포 패키지
+*.dSYM.zip  # 디버깅 심볼 (크래시 분석용, 별도 보관)
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline  # Playground 실행 타임라인
+playground.xcworkspace  # Playground 워크스페이스
+
+# Swift Package Manager (의존성 관리)
+# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
+# Packages/
+# Package.pins
+# Package.resolved
+# *.xcodeproj
+# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
+# hence it is not needed unless you have added a package configuration file to your project
+# .swiftpm  # SPM 설정 (팀 공유 필요할 수 있음)
+
+.build/  # SPM 빌드 아티팩트
+
+# CocoaPods
+# We recommend against adding the Pods directory to your .gitignore. However
+# you should judge for yourself, the pros and cons are mentioned at:
+# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
+Pods/  # 설치된 라이브러리 (Podfile.lock으로 재설치 가능)
+# Add this line if you want to avoid checking in source code from the Xcode workspace
+# *.xcworkspace
+
+# Carthage
+# Add this line if you want to avoid checking in source code from Carthage dependencies.
+# Carthage/Checkouts
+
+Carthage/Build/  # Carthage 빌드 결과물
+
+# Accio dependency management
+Dependencies/  # Accio 의존성
+.accio/  # Accio 캐시
+
+# fastlane
+# It is recommended to not store the screenshots in the git repo.
+# Instead, use fastlane to re-generate the screenshots whenever they are needed.
+# For more information about the recommended setup visit:
+# https://docs.fastlane.tools/best-practices/source-control/#source-control
+
+fastlane/report.xml  # 빌드 리포트
+fastlane/Preview.html  # 프리뷰 HTML
+fastlane/screenshots/**/*.png  # 자동 생성 스크린샷
+fastlane/test_output  # 테스트 결과
+
+# Code Injection
+# After new code Injection tools there's a generated folder /iOSInjectionProject
+# https://github.com/johnno1962/injectionforxcode
+
+iOSInjectionProject/
+
+## User settings
+xcuserdata/  # 개인 Xcode 설정 (브레이크포인트, 스킴 등)
+**/.claude/
+claude.md
+
+# Firebase config
+**/GoogleService-Info.plist
+
+## Secrets (API keys)
+**/Secrets/
+*.plist  # Property List (설정 파일)
+
+# End of https://www.toptal.com/developers/gitignore/api/swift
