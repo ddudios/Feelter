@@ -100,5 +100,6 @@ claude.md
 ## Secrets (API keys)
 **/Secrets/
 *.plist  # Property List (설정 파일)
+*.p8
 
 # End of https://www.toptal.com/developers/gitignore/api/swift
