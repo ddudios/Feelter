@@ -16,14 +16,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let scene = (scene as? UIWindowScene) else { return }
         window = UIWindow(windowScene: scene)
         
-//        let initialViewController = TabBarController()
-//        let navigationRootViewController = UINavigationController(rootViewController: OnboardingViewController())
-//
-//        if UserDefaultsHelper.nickname == UserDefaultsKey.emptyString.rawValue {
-//            window?.rootViewController = navigationRootViewController
-//        } else {
-//            window?.rootViewController = initialViewController
-//        }
         window?.rootViewController = ViewController()
         window?.makeKeyAndVisible()
     }

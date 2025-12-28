@@ -8,8 +8,22 @@
 import Foundation
 
 enum TextStyle {
-    static let title = UIFont.appBold(size: 20)
-    static let subtitle = UIFont.appMedium(size: 16)
-    static let body = UIFont.appRegular(size: 14)
-    static let caption = UIFont.appRegular(size: 12)
+    
+    enum Pretendard {
+        static let title1 = AppFont.Pretendard.bold(20)
+        
+        static let body1 = AppFont.Pretendard.medium(16)
+        static let body2 = AppFont.Pretendard.medium(14)
+        static let body3 = AppFont.Pretendard.medium(13)
+        
+        static let caption1 = AppFont.Pretendard.regular(12)
+        static let caption2 = AppFont.Pretendard.regular(10)
+        static let caption3 = AppFont.Pretendard.regular(8)
+    }
+    
+    enum Mulgyeol {
+        static let title1 = AppFont.Mulgyeol.bold(32)
+        static let body1 = AppFont.Mulgyeol.bold(20)
+        static let caption1 = AppFont.Mulgyeol.regular(14)
+    }
 }
