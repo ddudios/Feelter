@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		B056D4602EE9654C00804650 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B056D45F2EE9654C00804650 /* .gitignore */; };
 		B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B056D4662EE9691500804650 /* FirebaseMessaging */; };
+		B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153B2F0557AB00AF5A81 /* SnapKit */; };
+		B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153E2F05583100AF5A81 /* Alamofire */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,7 +44,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */,
 				B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */,
+				B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,6 +91,8 @@
 			name = Feelter;
 			packageProductDependencies = (
 				B056D4662EE9691500804650 /* FirebaseMessaging */,
+				B0CD153B2F0557AB00AF5A81 /* SnapKit */,
+				B0CD153E2F05583100AF5A81 /* Alamofire */,
 			);
 			productName = Feelter;
 			productReference = B056D4472EE9644100804650 /* Feelter.app */;
@@ -118,6 +124,8 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B056D4652EE9691500804650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				B0CD153A2F0557AB00AF5A81 /* XCRemoteSwiftPackageReference "SnapKit" */,
+				B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B056D4482EE9644100804650 /* Products */;
@@ -368,6 +376,22 @@
 				minimumVersion = 12.6.0;
 			};
 		};
+		B0CD153A2F0557AB00AF5A81 /* XCRemoteSwiftPackageReference "SnapKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SnapKit/SnapKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.7.1;
+			};
+		};
+		B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.11.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -375,6 +399,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B056D4652EE9691500804650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		B0CD153B2F0557AB00AF5A81 /* SnapKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0CD153A2F0557AB00AF5A81 /* XCRemoteSwiftPackageReference "SnapKit" */;
+			productName = SnapKit;
+		};
+		B0CD153E2F05583100AF5A81 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
