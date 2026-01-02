@@ -13,6 +13,8 @@ import FirebaseMessaging
 class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        
+        // Firebase 초기화
         FirebaseApp.configure()
         
         // 권한에 대한 세팅
@@ -26,7 +28,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         application.registerForRemoteNotifications()  // 원격 알림 쓸거야
         
-        Messaging.messaging().delegate = self  // 서버 대신
+        // Messaging delegate 설정: 서버 대신
+        Messaging.messaging().delegate = self
         
         // 현재 등록 토큰 가져오기
         Messaging.messaging().token { token, error in
