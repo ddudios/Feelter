@@ -48,7 +48,7 @@ extension UIColor {
     enum Feelter {
         static let blackTurquoise = UIColor(hex: "#1F2527")
         static let deepTurquoise = UIColor(hex: "#293235")
-        static let brightTurquoise = UIColor(hex: "#293235")
+        static let brightTurquoise = UIColor(hex: "#315C6B")
         
         static let gray0 = UIColor(hex: "#FFFFFF")
         static let gray15 = UIColor(hex: "#F9F9F9")

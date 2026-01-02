@@ -20,7 +20,7 @@ class BaseViewController: UIViewController {
     func configureHierarchy() { }
     func configureLayout() { }
     func configureView() {
-        view.backgroundColor = .Feelter.blackTurquoise
+        view.backgroundColor = .Feelter.gray100
         setNavigationBackbutton()
         setNavigationTitleStyle()
     }

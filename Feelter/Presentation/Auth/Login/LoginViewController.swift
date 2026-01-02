@@ -14,6 +14,13 @@ final class LoginViewController: BaseViewController {
     weak var coordinator: AuthCoordinator?
 
     // MARK: - UI Components
+    private let titleLabel = {
+        let label = UILabel()
+        label.text = "Feelter"
+        label.font = TextStyle.Mulgyeol.title1
+        label.textColor = .Feelter.gray0
+        return label
+    }()
     private lazy var loginButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("로그인 하기", for: .normal)
@@ -28,18 +35,21 @@ final class LoginViewController: BaseViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "로그인"
     }
 
     // MARK: - Configuration
     override func configureHierarchy() {
         super.configureHierarchy()
+        view.addSubview(titleLabel)
         view.addSubview(loginButton)
     }
 
     override func configureLayout() {
         super.configureLayout()
-        
+        titleLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(50)
+        }
         loginButton.snp.makeConstraints { make in
             make.center.equalToSuperview()
         }

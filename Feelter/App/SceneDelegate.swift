@@ -16,11 +16,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // MARK: - UIWindowSceneDelegate
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
-        
+
+        // 디버그: 등록된 폰트 확인
+//        #if DEBUG
+//        AppFont.printAvailableFonts()
+//        #endif
+
         let navigationController = UINavigationController()
         appCoordinator = AppCoordinator(navigationController: navigationController)
         appCoordinator?.start()
-        
+
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = navigationController
         window?.makeKeyAndVisible()
