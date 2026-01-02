@@ -23,6 +23,7 @@ class BaseViewController: UIViewController {
         view.backgroundColor = .Feelter.gray100
         setNavigationBackbutton()
         setNavigationTitleStyle()
+        hideKeyboardWhenTappedAround()
     }
     
     private func setNavigationBackbutton() {
@@ -33,11 +34,20 @@ class BaseViewController: UIViewController {
     
     private func setNavigationTitleStyle() {
         navigationItem.largeTitleDisplayMode = .never
-        
+
         navigationController?.navigationBar.titleTextAttributes = [
             .font: TextStyle.Mulgyeol.body1,
             .foregroundColor: UIColor.Feelter.gray60 ?? .systemGray
         ]
+    }
+
+    private func hideKeyboardWhenTappedAround() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
     }
 }
 

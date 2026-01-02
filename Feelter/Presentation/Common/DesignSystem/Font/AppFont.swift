@@ -21,21 +21,22 @@ enum AppFont {
         }
     }
     
+    //MARK: - Custom Font
     /// Pretendard 프리텐다드
     enum Pretendard {
         static func bold(_ size: CGFloat) -> UIFont {
             UIFont(name: "Pretendard-Bold", size: size)
-            ?? UIFont.systemFont(ofSize: size)
+            ?? UIFont.italicSystemFont(ofSize: size)
         }
-        
+
         static func medium(_ size: CGFloat) -> UIFont {
             UIFont(name: "Pretendard-Medium", size: size)
-            ?? UIFont.systemFont(ofSize: size)
+            ?? UIFont.italicSystemFont(ofSize: size)
         }
-        
+
         static func regular(_ size: CGFloat) -> UIFont {
             UIFont(name: "Pretendard-Regular", size: size)
-            ?? UIFont.systemFont(ofSize: size)
+            ?? UIFont.italicSystemFont(ofSize: size)
         }
     }
     
@@ -43,12 +44,12 @@ enum AppFont {
     enum Mulgyeol {
         static func bold(_ size: CGFloat) -> UIFont {
             UIFont(name: "OTHakgyoansimMulgyeolB", size: size)
-            ?? UIFont.systemFont(ofSize: size)
+            ?? UIFont.italicSystemFont(ofSize: size)
         }
-        
+
         static func regular(_ size: CGFloat) -> UIFont {
             UIFont(name: "OTHakgyoansimMulgyeolR", size: size)
-            ?? UIFont.systemFont(ofSize: size)
+            ?? UIFont.italicSystemFont(ofSize: size)
         }
     }
 }
