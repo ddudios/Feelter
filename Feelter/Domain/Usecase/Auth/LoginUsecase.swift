@@ -8,7 +8,7 @@
 import Foundation
 
 protocol LoginUsecaseProtocol {
-    func execute(email: String, password: String, deviceToken: String) async throws -> (User, AuthToken)
+    func execute(email: String, password: String) async throws -> (User, AuthToken)
 }
 
 final class LoginUsecase: LoginUsecaseProtocol {
@@ -18,8 +18,7 @@ final class LoginUsecase: LoginUsecaseProtocol {
         self.repository = repository
     }
 
-    func execute(email: String, password: String, deviceToken: String) async throws -> (User, AuthToken) {
-        // 이메일 유효성 검사
+    func execute(email: String, password: String) async throws -> (User, AuthToken) {
         guard !email.isEmpty else {
             throw ValidationError.emptyEmail
         }
@@ -28,7 +27,6 @@ final class LoginUsecase: LoginUsecaseProtocol {
             throw ValidationError.invalidEmail
         }
 
-        // 비밀번호 유효성 검사
         guard !password.isEmpty else {
             throw ValidationError.emptyPassword
         }
@@ -37,8 +35,7 @@ final class LoginUsecase: LoginUsecaseProtocol {
             throw ValidationError.invalidPassword
         }
 
-        // Repository를 통해 로그인
-        return try await repository.login(email: email, password: password, deviceToken: deviceToken)
+        return try await repository.login(email: email, password: password)
     }
 
     private func isValidEmail(_ email: String) -> Bool {

@@ -7,7 +7,6 @@
 
 import UIKit
 
-/// Auth 관련 화면 flow 관리
 final public class AuthCoordinator: Coordinator {
 
     // MARK: - Properties
@@ -33,7 +32,6 @@ final public class AuthCoordinator: Coordinator {
     }
 
     func loginDidFinish() {
-        // Auth flow 종료 → AppCoordinator에게 알림
         finishDelegate?.coordinatorDidFinish(childCoordinator: self)
     }
 }

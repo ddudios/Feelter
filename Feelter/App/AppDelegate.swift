@@ -77,14 +77,27 @@ extension AppDelegate: MessagingDelegate {
     // 디바이스 토큰 정보가 변경이 되면 알려줌
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         print("Firebase registration token: \(String(describing: fcmToken))")
-        
-        let dataDict: [String: String] = ["token": fcmToken ?? ""]
+
+        guard let token = fcmToken else { return }
+
+        // NotificationCenter로 토큰 전파 (필요시 사용)
+        let dataDict: [String: String] = ["token": token]
         NotificationCenter.default.post(
             name: Notification.Name("FCMToken"),
             object: nil,
             userInfo: dataDict
         )
-        // TODO: 필요한 경우 토큰을 애플리케이션 서버로 전송합니다.
-        // 참고: 이 콜백은 앱이 시작될 때마다 및 새 토큰이 생성될 때마다 호출됩니다.
+
+        // 토큰 변경 시 서버에 업데이트
+        Task {
+            await updateDeviceTokenToServer(token)
+        }
+    }
+
+    private func updateDeviceTokenToServer(_ token: String) async {
+        // TODO: 로그인 상태 확인 필요
+
+        // TODO: 서버에 디바이스 토큰 업데이트 API 호출
+        print("FCM 토큰 서버 업데이트 필요: \(token)")
     }
 }
