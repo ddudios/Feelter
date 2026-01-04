@@ -86,9 +86,14 @@ final class LoginViewModel: ViewModelType {
                             errorMessageSubject.send(error.errorDescription)
                         }
                     } catch {
+                        print("⚠️ 알 수 없는 에러 발생")
+                        print("에러 타입: \(type(of: error))")
+                        print("에러 내용: \(error)")
+                        print("에러 설명: \(error.localizedDescription)")
+
                         await MainActor.run {
                             isLoadingSubject.send(false)
-                            errorMessageSubject.send("알 수 없는 오류가 발생했습니다")
+                            errorMessageSubject.send("알 수 없는 오류가 발생했습니다: \(error.localizedDescription)")
                         }
                     }
                 }

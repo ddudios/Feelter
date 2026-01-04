@@ -13,6 +13,7 @@ final class LoginViewController: BaseViewController {
 
     // MARK: - Properties
     weak var coordinator: AuthCoordinator?
+    private let viewModel = LoginViewModel()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Components
@@ -79,15 +80,49 @@ final class LoginViewController: BaseViewController {
 
     override func configureView() {
         super.configureView()
-        bindButton()
+        bind()
     }
 
     // MARK: - Binding
-    private func bindButton() {
-        loginButton.tapPublisher
-            .sink { [weak self] in
+    private func bind() {
+        let input = LoginViewModel.Input(
+            email: emailTextField.textPublisher,
+            password: passwordTextField.textPublisher,
+            loginButtonTap: loginButton.tapPublisher
+        )
+
+        let output = viewModel.transform(input: input)
+
+        output.isLoginButtonEnabled
+            .assign(to: \.isEnabled, on: loginButton)
+            .store(in: &cancellables)
+
+        output.isLoading
+            .sink { [weak self] isLoading in
+                self?.loginButton.isEnabled = !isLoading
+                // TODO: 로딩 인디케이터 표시
+            }
+            .store(in: &cancellables)
+
+        output.errorMessage
+            .compactMap { $0 }
+            .sink { [weak self] message in
+                self?.showAlert(message: message)
+            }
+            .store(in: &cancellables)
+
+        output.loginSuccess
+            .sink { [weak self] user, token in
+                // TODO: 토큰 저장
+                print("로그인 성공: \(user.email)")
                 self?.coordinator?.loginDidFinish()
             }
             .store(in: &cancellables)
+    }
+
+    private func showAlert(message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        present(alert, animated: true)
     }
 }
