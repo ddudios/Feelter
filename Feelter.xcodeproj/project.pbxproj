@@ -22,7 +22,7 @@
 		B056D4592EE9644300804650 /* Exceptions for "Feelter" folder in "Feelter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				App/Info.plist,
+				App/Resources/Info.plist,
 			);
 			target = B056D4462EE9644100804650 /* Feelter */;
 		};
@@ -161,6 +161,8 @@
 /* Begin XCBuildConfiguration section */
 		B056D45B2EE9644300804650 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = B056D4492EE9644100804650 /* Feelter */;
+			baseConfigurationReferenceRelativePath = Secrets/APIKeys.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -169,7 +171,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 27A9369F66;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Feelter/App/Info.plist;
+				INFOPLIST_FILE = Feelter/App/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Feelter;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -193,6 +195,8 @@
 		};
 		B056D45C2EE9644300804650 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = B056D4492EE9644100804650 /* Feelter */;
+			baseConfigurationReferenceRelativePath = Secrets/APIKeys.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -201,7 +205,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 27A9369F66;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Feelter/App/Info.plist;
+				INFOPLIST_FILE = Feelter/App/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Feelter;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;

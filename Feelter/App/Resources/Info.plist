@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>APIKey</key>
+	<string>$(API_KEY)</string>
+	<key>BaseURL</key>
+	<string>$(BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -20,22 +24,22 @@
 		</dict>
 	</dict>
 	<key>UIBackgroundModes</key>
-    <array>
-        <string>remote-notification</string>
-    </array>
-    <key>UIAppFonts</key>
-    <array>
-        <string>HakgyoansimMulgyeolOTFB.otf</string>
-        <string>HakgyoansimMulgyeolOTFR.otf</string>
-        <string>Pretendard-Black.otf</string>
-        <string>Pretendard-Bold.otf</string>
-        <string>Pretendard-ExtraBold.otf</string>
-        <string>Pretendard-ExtraLight.otf</string>
-        <string>Pretendard-Light.otf</string>
-        <string>Pretendard-Medium.otf</string>
-        <string>Pretendard-Regular.otf</string>
-        <string>Pretendard-SemiBold.otf</string>
-        <string>Pretendard-Thin.otf</string>
-    </array>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>HakgyoansimMulgyeolOTFB.otf</string>
+		<string>HakgyoansimMulgyeolOTFR.otf</string>
+		<string>Pretendard-Black.otf</string>
+		<string>Pretendard-Bold.otf</string>
+		<string>Pretendard-ExtraBold.otf</string>
+		<string>Pretendard-ExtraLight.otf</string>
+		<string>Pretendard-Light.otf</string>
+		<string>Pretendard-Medium.otf</string>
+		<string>Pretendard-Regular.otf</string>
+		<string>Pretendard-SemiBold.otf</string>
+		<string>Pretendard-Thin.otf</string>
+	</array>
 </dict>
 </plist>

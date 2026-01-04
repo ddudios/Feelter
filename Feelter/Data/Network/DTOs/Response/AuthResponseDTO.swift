@@ -1,5 +1,5 @@
 //
-//  LoginResponse.swift
+//  AuthResponseDTO.swift
 //  Feelter
 //
 //  Created by Suji Jang on 1/2/26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct LoginResponse: Decodable {
+struct AuthResponseDTO: Decodable {
     let userId: String
     let email: String
     let nick: String

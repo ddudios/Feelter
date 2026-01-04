@@ -98,7 +98,8 @@ claude.md
 **/GoogleService-Info.plist
 
 ## Secrets (API keys)
-**/Secrets/
+**/Secrets/*.xcconfig
+!**/Secrets/*.xcconfig.template  # template 파일은 포함
 *.plist  # Property List (설정 파일)
 *.p8
 

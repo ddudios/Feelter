@@ -14,7 +14,7 @@ final class AuthRepository: AuthRepositoryProtocol {
         let deviceToken = Messaging.messaging().fcmToken ?? ""
 
         // LoginRequest 생성
-        let request = LoginRequest(
+        let request = LoginRequestDTO(
             email: email,
             password: password,
             deviceToken: deviceToken
@@ -25,6 +25,6 @@ final class AuthRepository: AuthRepositoryProtocol {
         // return (response.toUser(), response.toAuthToken())
 
         // 임시 구현 (API 구현 후 삭제)
-        throw NetworkError.requestFailed("API 미구현")
+        throw NetworkError.unknownError("API 미구현")
     }
 }
