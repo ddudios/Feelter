@@ -10,21 +10,26 @@ import FirebaseMessaging
 
 final class AuthRepository: AuthRepositoryProtocol {
 
+    private let networkManager: NetworkManagerProtocol
+
+    init(networkManager: NetworkManagerProtocol = NetworkManager()) {
+        self.networkManager = networkManager
+    }
+
     func login(email: String, password: String) async throws -> (User, AuthToken) {
         let deviceToken = Messaging.messaging().fcmToken ?? ""
 
-        // LoginRequest 생성
         let request = LoginRequestDTO(
             email: email,
             password: password,
             deviceToken: deviceToken
         )
 
-        // TODO: API 호출 구현 필요
-        // let response = try await APIService.login(request)
-        // return (response.toUser(), response.toAuthToken())
+        let response = try await networkManager.request(
+            UserRouter.login(body: request),
+            type: AuthResponseDTO.self
+        )
 
-        // 임시 구현 (API 구현 후 삭제)
-        throw NetworkError.unknownError("API 미구현")
+        return (response.toDomain(), response.toToken())
     }
 }
