@@ -12,8 +12,17 @@ import Combine
 final class LoginViewController: BaseViewController {
 
     weak var coordinator: AuthCoordinator?
-    private let viewModel = LoginViewModel()
+    private let viewModel: LoginViewModel
     private var cancellables = Set<AnyCancellable>()
+
+    init(viewModel: LoginViewModel = DIContainer.shared.resolve(LoginViewModel.self)) {
+        self.viewModel = viewModel
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     private let titleLabel = {
         let label = UILabel()

@@ -18,9 +18,7 @@ final public class ProfileCoordinator: Coordinator {
     }
     
     public func start() {
-        let repository = AuthRepository()
-        let usecase = LogoutUsecase(repository: repository)
-        let viewModel = ProfileViewModel(logoutUsecase: usecase)
+        let viewModel = DIContainer.shared.resolve(ProfileViewModel.self)
         let vc = ProfileViewController(viewModel: viewModel)
         navigationController.pushViewController(vc, animated: true)
     }

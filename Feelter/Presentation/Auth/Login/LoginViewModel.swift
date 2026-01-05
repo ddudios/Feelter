@@ -25,7 +25,7 @@ final class LoginViewModel: ViewModelProtocol {
     private let usecase: LoginUsecaseProtocol
     private var cancellables = Set<AnyCancellable>()
 
-    init(usecase: LoginUsecaseProtocol = LoginUsecase(repository: AuthRepository())) {
+    init(usecase: LoginUsecaseProtocol) {
         self.usecase = usecase
     }
 

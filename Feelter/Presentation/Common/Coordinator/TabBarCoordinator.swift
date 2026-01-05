@@ -46,12 +46,9 @@ final class TabBarCoordinator: Coordinator {
             tabType: .search
         )
 
+        let profileViewModel = DIContainer.shared.resolve(ProfileViewModel.self)
         let profileNav = createNavigationController(
-            rootViewController: ProfileViewController(
-                viewModel: ProfileViewModel(
-                    logoutUsecase: LogoutUsecase(repository: AuthRepository())
-                )
-            ),
+            rootViewController: ProfileViewController(viewModel: profileViewModel),
             tabType: .profile
         )
 
