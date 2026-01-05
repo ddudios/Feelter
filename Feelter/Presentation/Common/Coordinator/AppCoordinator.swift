@@ -9,31 +9,41 @@ import UIKit
 
 // 앱 전체 flow를 관리하는 최상위 Coordinator
 final public class AppCoordinator: Coordinator {
-    
-    // MARK: - Properties
+
     public var childCoordinators: [Coordinator] = []
     public var navigationController: UINavigationController
-    
-    // MARK: - Init
+
     public init(navigationController: UINavigationController) {
         self.navigationController = navigationController
+        setupNotifications()
     }
-    
-    // MARK: - Public Methods
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     public func start() {
         let isLoggedIn = checkLoginStatus()
-        
+
         if isLoggedIn {
             showMainFlow()
         } else {
             showAuthFlow()
         }
     }
-    
-    // MARK: - Private Methods
+
+    private func setupNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleUnauthorizedError),
+            name: .unauthorizedError,
+            object: nil
+        )
+    }
+
     private func checkLoginStatus() -> Bool {
-        // UserDefaults, Keychain 등에서 확인
-        return false
+        let accessToken = KeychainManager.shared.read(account: "accessToken")
+        return accessToken != nil
     }
     
     private func showAuthFlow() {
@@ -45,9 +55,25 @@ final public class AppCoordinator: Coordinator {
     
     private func showMainFlow() {
         let homeVC = HomeViewController()
-        
+
         // setViewControllers를 사용해 네비게이션 스택을 완전히 교체(뒤로가기 방지)
         navigationController.setViewControllers([homeVC], animated: true)
+    }
+
+    @objc private func handleUnauthorizedError() {
+        logout()
+    }
+
+    private func logout() {
+        // 키체인에서 토큰 삭제
+        KeychainManager.shared.delete(account: "accessToken")
+        KeychainManager.shared.delete(account: "refreshToken")
+
+        // 자식 코디네이터 모두 제거
+        childCoordinators.removeAll()
+
+        // 로그인 화면으로 이동
+        showAuthFlow()
     }
 }
 

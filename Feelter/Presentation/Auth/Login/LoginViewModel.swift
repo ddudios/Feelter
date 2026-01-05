@@ -55,7 +55,6 @@ final class LoginViewModel: ViewModelType {
             }
             .eraseToAnyPublisher()
 
-        // 로그인 버튼 탭 처리
         input.loginButtonTap
             .sink { [weak self] in
                 guard let self = self else { return }
@@ -71,6 +70,10 @@ final class LoginViewModel: ViewModelType {
                             email: emailText,
                             password: passwordText
                         )
+
+                        KeychainManager.shared.save(token: result.1.accessToken, account: "accessToken")
+                        KeychainManager.shared.save(token: result.1.refreshToken, account: "refreshToken")
+
                         await MainActor.run {
                             isLoadingSubject.send(false)
                             loginSuccessSubject.send(result)
@@ -86,10 +89,8 @@ final class LoginViewModel: ViewModelType {
                             errorMessageSubject.send(error.errorDescription)
                         }
                     } catch {
-                        print("⚠️ 알 수 없는 에러 발생")
                         print("에러 타입: \(type(of: error))")
-                        print("에러 내용: \(error)")
-                        print("에러 설명: \(error.localizedDescription)")
+                        print(error.localizedDescription)
 
                         await MainActor.run {
                             isLoadingSubject.send(false)

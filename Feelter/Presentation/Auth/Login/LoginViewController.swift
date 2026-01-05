@@ -11,12 +11,10 @@ import Combine
 
 final class LoginViewController: BaseViewController {
 
-    // MARK: - Properties
     weak var coordinator: AuthCoordinator?
     private let viewModel = LoginViewModel()
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - UI Components
     private let titleLabel = {
         let label = UILabel()
         label.text = "Feelter"
@@ -24,8 +22,8 @@ final class LoginViewController: BaseViewController {
         label.textColor = .Feelter.gray0
         return label
     }()
-    private let emailTextField = FeelterTextField(placeholder: "이메일")
-    private let passwordTextField = FeelterTextField(placeholder: "비밀번호", isSecure: true)
+    private let emailTextField = FeelterTextField(placeholder: "이메일", textContentType: .emailAddress)
+    private let passwordTextField = FeelterTextField(placeholder: "비밀번호", isSecure: true, textContentType: .password)
     private let loginButton = FeelterButton(title: "로그인")
     private let signUpButton = {
         let button = UIButton()
@@ -36,12 +34,10 @@ final class LoginViewController: BaseViewController {
         return button
     }()
 
-    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
     }
 
-    // MARK: - Configuration
     override func configureHierarchy() {
         super.configureHierarchy()
         view.addSubview(titleLabel)
@@ -83,7 +79,6 @@ final class LoginViewController: BaseViewController {
         bind()
     }
 
-    // MARK: - Binding
     private func bind() {
         let input = LoginViewModel.Input(
             email: emailTextField.textPublisher,
@@ -112,9 +107,7 @@ final class LoginViewController: BaseViewController {
             .store(in: &cancellables)
 
         output.loginSuccess
-            .sink { [weak self] user, token in
-                // TODO: 토큰 저장
-                print("로그인 성공: \(user.email)")
+            .sink { [weak self] _, _ in
                 self?.coordinator?.loginDidFinish()
             }
             .store(in: &cancellables)

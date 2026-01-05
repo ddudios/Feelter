@@ -42,6 +42,8 @@ final class FeelterTextField: UITextField {
     }
 
     private let isSecure: Bool
+    private let textContentTypeValue: UITextContentType?
+    private let keyboardTypeValue: UIKeyboardType
     private let iconConfig = UIImage.SymbolConfiguration(pointSize: 12, weight: .regular)
 
     override var isSecureTextEntry: Bool {
@@ -64,8 +66,15 @@ final class FeelterTextField: UITextField {
     }()
 
     // MARK: - Initialization
-    init(placeholder: String, isSecure: Bool = false) {
+    init(
+        placeholder: String,
+        isSecure: Bool = false,
+        textContentType: UITextContentType? = nil,
+        keyboardType: UIKeyboardType = .emailAddress
+    ) {
         self.isSecure = isSecure
+        self.textContentTypeValue = textContentType
+        self.keyboardTypeValue = keyboardType
         super.init(frame: .zero)
         setupTextField(placeholder: placeholder)
         addActions()
@@ -88,7 +97,8 @@ final class FeelterTextField: UITextField {
         layer.cornerRadius = Radius.s
         setBorderState(.normal)
         tintColor = .Feelter.deepTurquoise
-        keyboardType = .emailAddress
+        textContentType = textContentTypeValue
+        keyboardType = keyboardTypeValue
         leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 0))
         leftViewMode = .always
 

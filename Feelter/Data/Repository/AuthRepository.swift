@@ -32,4 +32,13 @@ final class AuthRepository: AuthRepositoryProtocol {
 
         return (response.toDomain(), response.toToken())
     }
+
+    func refreshToken(accessToken: String, refreshToken: String) async throws -> AuthToken {
+        let response = try await networkManager.request(
+            AuthRouter.refresh(accessToken: accessToken, refreshToken: refreshToken),
+            type: AuthResponseDTO.self
+        )
+
+        return response.toToken()
+    }
 }
