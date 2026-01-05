@@ -54,10 +54,9 @@ final public class AppCoordinator: Coordinator {
     }
     
     private func showMainFlow() {
-        let homeVC = HomeViewController()
-
-        // setViewControllers를 사용해 네비게이션 스택을 완전히 교체(뒤로가기 방지)
-        navigationController.setViewControllers([homeVC], animated: true)
+        let tabBarCoordinator = TabBarCoordinator(navigationController: navigationController)
+        addChildCoordinator(tabBarCoordinator)
+        tabBarCoordinator.start()
     }
 
     @objc private func handleUnauthorizedError() {

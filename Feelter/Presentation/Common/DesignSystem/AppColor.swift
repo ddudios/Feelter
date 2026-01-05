@@ -49,6 +49,7 @@ extension UIColor {
         static let blackTurquoise = UIColor(hex: "#1F2527")
         static let deepTurquoise = UIColor(hex: "#293235")
         static let brightTurquoise = UIColor(hex: "#315C6B")
+        static let shadow = UIColor(hex: "#0D0D0D")
         
         static let gray0 = UIColor(hex: "#FFFFFF")
         static let gray15 = UIColor(hex: "#F9F9F9")
