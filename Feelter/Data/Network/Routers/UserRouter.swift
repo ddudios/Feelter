@@ -11,25 +11,26 @@ import Alamofire
 enum UserRouter: BaseRouter {
 
     case login(body: LoginRequestDTO)
+    case logout
 
     var method: HTTPMethod {
         switch self {
-        case .login:
+        case .login, .logout:
             return .post
         }
     }
 
     var path: String {
         switch self {
-        case .login:
-            return "v1/users/login"
+        case .login: "v1/users/login"
+        case .logout: "v1/users/logout"
         }
     }
 
     var body: Encodable? {
         switch self {
-        case .login(let body):
-            return body
+        case .login(let body): body
+        case .logout: nil
         }
     }
 }
