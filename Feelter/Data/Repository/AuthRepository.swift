@@ -41,4 +41,23 @@ final class AuthRepository: AuthRepositoryProtocol {
 
         return response.toToken()
     }
+
+    func logout() async throws {
+        // 1. 서버에 로그아웃 요청 (실패해도 로컬 데이터는 삭제)
+        do {
+            _ = try await networkManager.request(
+                UserRouter.logout,
+                type: EmptyResponse.self
+            )
+        } catch {
+            // 서버 로그아웃 실패해도 무시 (토큰 만료 등으로 인한 401은 정상)
+            print("서버 로그아웃 요청 실패 (무시됨): \(error.localizedDescription)")
+        }
+
+        // 2. Keychain에서 토큰 삭제 (무조건 실행)
+        KeychainManager.shared.delete(account: "accessToken")
+        KeychainManager.shared.delete(account: "refreshToken")
+    }
 }
+
+struct EmptyResponse: Decodable {}

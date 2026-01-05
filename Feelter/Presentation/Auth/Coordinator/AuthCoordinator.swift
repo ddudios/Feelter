@@ -17,14 +17,16 @@ final public class AuthCoordinator: Coordinator {
         self.navigationController = navigationController
     }
 
+    @MainActor
     public func start() {
         showLogin()
     }
 
+    @MainActor
     func showLogin() {
         let loginVC = LoginViewController()
         loginVC.coordinator = self
-        navigationController.pushViewController(loginVC, animated: true)
+        navigationController.setViewControllers([loginVC], animated: true)
     }
 
     func loginDidFinish() {

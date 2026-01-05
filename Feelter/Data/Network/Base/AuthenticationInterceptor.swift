@@ -33,8 +33,19 @@ final class AuthenticationInterceptor: RequestInterceptor {
 
     // 2. 응답이 실패했을 때 재시도할지 결정하는 역할 (Retry)
     func retry(_ request: Request, for session: Session, dueTo error: Error, completion: @escaping (RetryResult) -> Void) {
-        guard let response = request.task?.response as? HTTPURLResponse,
-              response.statusCode == 401 else {
+        
+        // 1. 응답이 401(Unauthorized)인지 확인
+        guard let response = request.task?.response as? HTTPURLResponse, response.statusCode == 401 else {
+            // 401이 아니면 재시도 안 함 (다른 에러 처리)
+            completion(.doNotRetryWithError(error))
+            return
+        }
+        
+        // 2. 로그아웃 요청인지 URL 확인
+        // 로그아웃 URL이 포함되어 있다면, 토큰 갱신하지 않고 바로 실패 처리(doNotRetry)
+        if let urlString = request.request?.url?.absoluteString,
+           urlString.contains("logout") {
+            print("로그아웃 401 에러: 토큰 갱신 없이 즉시 종료합니다.")
             completion(.doNotRetry)
             return
         }

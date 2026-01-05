@@ -17,12 +17,11 @@ final class TabBarCoordinator: Coordinator {
         self.navigationController = navigationController
         self.tabBarController = CustomTabBarController()
     }
-    
+
+    @MainActor
     func start() {
         let viewControllers = createViewControllers()
         tabBarController.setViewControllers(viewControllers, animated: false)
-
-        // TabBarController를 네비게이션 스택에 설정
         navigationController.setViewControllers([tabBarController], animated: true)
     }
 
@@ -48,7 +47,11 @@ final class TabBarCoordinator: Coordinator {
         )
 
         let profileNav = createNavigationController(
-            rootViewController: ProfileViewController(),
+            rootViewController: ProfileViewController(
+                viewModel: ProfileViewModel(
+                    logoutUsecase: LogoutUsecase(repository: AuthRepository())
+                )
+            ),
             tabType: .profile
         )
 

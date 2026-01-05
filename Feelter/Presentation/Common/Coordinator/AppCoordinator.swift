@@ -22,6 +22,7 @@ final public class AppCoordinator: Coordinator {
         NotificationCenter.default.removeObserver(self)
     }
 
+    @MainActor
     public func start() {
         let isLoggedIn = checkLoginStatus()
 
@@ -46,13 +47,15 @@ final public class AppCoordinator: Coordinator {
         return accessToken != nil
     }
     
+    @MainActor
     private func showAuthFlow() {
         let authCoordinator = AuthCoordinator(navigationController: navigationController)
         authCoordinator.finishDelegate = self
         addChildCoordinator(authCoordinator)
         authCoordinator.start()
     }
-    
+
+    @MainActor
     private func showMainFlow() {
         let tabBarCoordinator = TabBarCoordinator(navigationController: navigationController)
         addChildCoordinator(tabBarCoordinator)
@@ -60,18 +63,27 @@ final public class AppCoordinator: Coordinator {
     }
 
     @objc private func handleUnauthorizedError() {
-        logout()
+        Task { @MainActor in
+            performLogout()
+        }
     }
 
-    private func logout() {
-        // 키체인에서 토큰 삭제
-        KeychainManager.shared.delete(account: "accessToken")
-        KeychainManager.shared.delete(account: "refreshToken")
+    public func logout() {
+        // 로그아웃 중복 호출 방지
+        NotificationCenter.default.removeObserver(self, name: .unauthorizedError, object: nil)
 
+        // 화면 전환만 수행 (비즈니스 로직은 ViewModel에서 이미 처리됨)
+        Task { @MainActor in
+            performLogout()
+        }
+    }
+
+    @MainActor
+    private func performLogout() {
         // 자식 코디네이터 모두 제거
         childCoordinators.removeAll()
-
-        // 로그인 화면으로 이동
+    
+        // 로그인 화면으로 완전히 교체
         showAuthFlow()
     }
 }

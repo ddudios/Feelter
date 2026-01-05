@@ -8,11 +8,12 @@
 import UIKit
 
 /// Coordinator Protocol
+@MainActor
 public protocol Coordinator: AnyObject {
-    
+
     // 메모리에서 하위 코디네이터들이 해제되지 않도록 보관하는 저장소
     var childCoordinators: [Coordinator] { get set }
-    
+
     // 앱의 전체적인 View 계층을 관리할 스택
     var navigationController: UINavigationController { get set }
 

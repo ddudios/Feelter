@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-final class LoginViewModel: ViewModelType {
+final class LoginViewModel: ViewModelProtocol {
     struct Input {
         let email: AnyPublisher<String?, Never>
         let password: AnyPublisher<String?, Never>
