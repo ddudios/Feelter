@@ -38,6 +38,11 @@ enum AppFont {
             UIFont(name: "Pretendard-Regular", size: size)
             ?? UIFont.italicSystemFont(ofSize: size)
         }
+        
+        static func semibold(_ size: CGFloat) -> UIFont {
+            UIFont(name: "Pretendard-SemiBold", size: size)
+            ?? UIFont.italicSystemFont(ofSize: size)
+        }
     }
     
     /// Mulgyeol 학교안심 물결체

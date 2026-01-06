@@ -12,66 +12,30 @@ import Kingfisher
 
 final class HomeViewController: BaseViewController {
 
+    // MARK: - Types
+    enum Section {
+        case todayFilter
+    }
+
+    enum Item: Hashable {
+        case hero(Filter)
+    }
+
     private let viewModel: HomeViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Components
-    private let backgroundImageView = {
-        let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        return imageView
+    private lazy var collectionView: UICollectionView = {
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: createLayout())
+        collectionView.backgroundColor = .clear
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.contentInsetAdjustmentBehavior = .never
+        collectionView.register(TodayFilterCell.self, forCellWithReuseIdentifier: TodayFilterCell.identifier)
+        return collectionView
     }()
 
-    private let gradientOverlay = {
-        let view = UIView()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-        return view
-    }()
-
-    private let useFilterButton = {
-        let button = UIButton()
-        button.setTitle("사용해보기", for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = TextStyle.Pretendard.body1
-        button.backgroundColor = UIColor.white.withAlphaComponent(0.2)
-        button.layer.cornerRadius = 16
-        button.layer.borderWidth = 1
-        button.layer.borderColor = UIColor.white.withAlphaComponent(0.5).cgColor
-        return button
-    }()
-
-    private let introduceLabel = {
-        let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
-        label.textColor = .white
-        return label
-    }()
-
-    private let titleLabel = {
-        let label = UILabel()
-        label.font = TextStyle.Mulgyeol.title1
-        label.textColor = .white
-        label.numberOfLines = 0
-        return label
-    }()
-
-    private let descriptionLabel = {
-        let label = UILabel()
-        label.font = TextStyle.Pretendard.body2
-        label.textColor = .white
-        label.numberOfLines = 0
-        return label
-    }()
-
-    private lazy var categoryStackView = {
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        stack.distribution = .fillEqually
-        stack.spacing = 8
-        return stack
-    }()
+    private var dataSource: UICollectionViewDiffableDataSource<Section, Item>!
 
     // MARK: - Initializer
     init(viewModel: HomeViewModel = DIContainer.shared.resolve(HomeViewModel.self)) {
@@ -86,111 +50,66 @@ final class HomeViewController: BaseViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupDataSource()
         bind()
         viewDidLoadSubject.send(())
     }
 
     override func configureHierarchy() {
         super.configureHierarchy()
-        view.addSubview(backgroundImageView)
-        view.addSubview(gradientOverlay)
-        view.addSubview(useFilterButton)
-        view.addSubview(introduceLabel)
-        view.addSubview(titleLabel)
-        view.addSubview(descriptionLabel)
-        view.addSubview(categoryStackView)
-
-        setupCategoryButtons()
+        view.addSubview(collectionView)
     }
 
     override func configureLayout() {
         super.configureLayout()
 
-        backgroundImageView.snp.makeConstraints { make in
+        collectionView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
-        }
-
-        gradientOverlay.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-
-        useFilterButton.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(16)
-            make.trailing.equalToSuperview().inset(20)
-            make.height.equalTo(32)
-            make.width.equalTo(100)
-        }
-
-        introduceLabel.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(60)
-            make.leading.equalToSuperview().offset(20)
-        }
-
-        titleLabel.snp.makeConstraints { make in
-            make.top.equalTo(introduceLabel.snp.bottom).offset(16)
-            make.leading.equalToSuperview().offset(20)
-            make.trailing.equalToSuperview().inset(20)
-        }
-
-        descriptionLabel.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(12)
-            make.leading.equalToSuperview().offset(20)
-            make.trailing.equalToSuperview().inset(20)
-        }
-
-        categoryStackView.snp.makeConstraints { make in
-            make.bottom.equalTo(view.safeAreaLayoutGuide).inset(120)
-            make.leading.trailing.equalToSuperview().inset(20)
-            make.height.equalTo(80)
         }
     }
 
     // MARK: - Private Methods
-    private func setupCategoryButtons() {
-        let categories: [(title: String, icon: UIImage?)] = [
-            ("푸드", UIImage.Category.food),
-            ("인물", UIImage.Category.people),
-            ("풍경", UIImage.Category.landscape),
-            ("야경", UIImage.Category.night),
-            ("별", UIImage.Category.star)
-        ]
+    private func createLayout() -> UICollectionViewLayout {
+        let layout = UICollectionViewCompositionalLayout { sectionIndex, environment in
+            
+            // Section 0: 화면 높이의 60%
+            let screenHeight = environment.container.contentSize.height
+            let heroHeight = screenHeight * 0.6
 
-        categories.forEach { category in
-            let button = createCategoryButton(title: category.title, icon: category.icon)
-            categoryStackView.addArrangedSubview(button)
+            let itemSize = NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1.0),
+                heightDimension: .absolute(heroHeight)
+            )
+            let item = NSCollectionLayoutItem(layoutSize: itemSize)
+
+            let groupSize = NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1.0),
+                heightDimension: .absolute(heroHeight)
+            )
+            let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
+
+            let section = NSCollectionLayoutSection(group: group)
+            return section
         }
+        return layout
     }
 
-    private func createCategoryButton(title: String, icon: UIImage?) -> UIView {
-        let containerView = UIView()
-        containerView.backgroundColor = UIColor.white.withAlphaComponent(0.15)
-        containerView.layer.cornerRadius = 12
-
-        let iconImageView = UIImageView(image: icon)
-        iconImageView.tintColor = .white
-        iconImageView.contentMode = .scaleAspectFit
-
-        let label = UILabel()
-        label.text = title
-        label.font = TextStyle.Pretendard.caption2
-        label.textColor = .white
-        label.textAlignment = .center
-
-        containerView.addSubview(iconImageView)
-        containerView.addSubview(label)
-
-        iconImageView.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.top.equalToSuperview().offset(12)
-            make.width.height.equalTo(32)
+    private func setupDataSource() {
+        dataSource = UICollectionViewDiffableDataSource<Section, Item>(
+            collectionView: collectionView
+        ) { collectionView, indexPath, item in
+            switch item {
+            case .hero(let filter):
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: TodayFilterCell.identifier,
+                    for: indexPath
+                ) as? TodayFilterCell else {
+                    return UICollectionViewCell()
+                }
+                cell.configure(with: filter)
+                return cell
+            }
         }
-
-        label.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.top.equalTo(iconImageView.snp.bottom).offset(4)
-        }
-
-        return containerView
     }
 
     private func bind() {
@@ -225,11 +144,10 @@ final class HomeViewController: BaseViewController {
     }
 
     private func updateUI(with filter: Filter) {
-        introduceLabel.text = filter.introduction
-        titleLabel.text = filter.title
-        descriptionLabel.text = filter.description
-
-        backgroundImageView.setFilterImage(with: filter.files.first)
+        var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
+        snapshot.appendSections([.todayFilter])
+        snapshot.appendItems([.hero(filter)], toSection: .todayFilter)
+        dataSource.apply(snapshot, animatingDifferences: false)
     }
 
     private func showAlert(message: String) {

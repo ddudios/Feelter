@@ -19,6 +19,8 @@ enum TextStyle {
         static let caption1 = AppFont.Pretendard.regular(12)
         static let caption2 = AppFont.Pretendard.regular(10)
         static let caption3 = AppFont.Pretendard.regular(8)
+        
+        static let semibold1 = AppFont.Pretendard.semibold(10)
     }
     
     enum Mulgyeol {

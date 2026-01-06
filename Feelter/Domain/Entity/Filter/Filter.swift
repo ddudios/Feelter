@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Filter {
+struct Filter: Hashable {
     let id: String
     let title: String
     let introduction: String
@@ -15,7 +15,7 @@ struct Filter {
     let files: [String]
     let createdAt: Date
     let updatedAt: Date
-    
+
     var formattedDate: String {
         return createdAt.formatted("yyyy.MM.dd")
     }
