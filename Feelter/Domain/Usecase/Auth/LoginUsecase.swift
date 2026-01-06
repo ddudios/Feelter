@@ -11,7 +11,7 @@ protocol LoginUsecaseProtocol {
     func execute(email: String, password: String) async throws -> (User, AuthToken)
 }
 
-final class LoginUsecase: LoginUsecaseProtocol {
+struct LoginUsecase: LoginUsecaseProtocol {
     private let repository: AuthRepositoryProtocol
 
     init(repository: AuthRepositoryProtocol) {

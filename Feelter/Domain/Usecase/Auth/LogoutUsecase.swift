@@ -11,7 +11,7 @@ protocol LogoutUsecaseProtocol {
     func execute() async throws
 }
 
-final class LogoutUsecase: LogoutUsecaseProtocol {
+struct LogoutUsecase: LogoutUsecaseProtocol {
 
     private let repository: AuthRepositoryProtocol
 

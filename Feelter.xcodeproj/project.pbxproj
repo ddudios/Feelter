@@ -11,6 +11,7 @@
 		B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B056D4662EE9691500804650 /* FirebaseMessaging */; };
 		B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153B2F0557AB00AF5A81 /* SnapKit */; };
 		B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153E2F05583100AF5A81 /* Alamofire */; };
+		B0E99F5F2F0C91280099B29B /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = B0E99F5E2F0C91280099B29B /* Kingfisher */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +46,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0E99F5F2F0C91280099B29B /* Kingfisher in Frameworks */,
 				B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */,
 				B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */,
 				B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */,
@@ -94,6 +96,7 @@
 				B056D4662EE9691500804650 /* FirebaseMessaging */,
 				B0CD153B2F0557AB00AF5A81 /* SnapKit */,
 				B0CD153E2F05583100AF5A81 /* Alamofire */,
+				B0E99F5E2F0C91280099B29B /* Kingfisher */,
 			);
 			productName = Feelter;
 			productReference = B056D4472EE9644100804650 /* Feelter.app */;
@@ -127,6 +130,7 @@
 				B056D4652EE9691500804650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				B0CD153A2F0557AB00AF5A81 /* XCRemoteSwiftPackageReference "SnapKit" */,
 				B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */,
+				B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B056D4482EE9644100804650 /* Products */;
@@ -401,6 +405,14 @@
 				minimumVersion = 5.11.0;
 			};
 		};
+		B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.6.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -418,6 +430,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
+		};
+		B0E99F5E2F0C91280099B29B /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -17,7 +17,6 @@ struct User {
     let phoneNumber: String?
     let hashTags: [String]
 
-    // MARK: - Computed Properties
     var displayName: String {
         nickname.isEmpty ? email : nickname
     }
@@ -26,7 +25,6 @@ struct User {
         profileImageURL != nil && !(profileImageURL?.isEmpty ?? true)
     }
 
-    // MARK: - Initializers
     init(
         id: String,
         email: String,

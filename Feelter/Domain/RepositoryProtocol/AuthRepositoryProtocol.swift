@@ -8,7 +8,8 @@
 import Foundation
 
 protocol AuthRepositoryProtocol {
-    func login(email: String, password: String) async throws -> (User, AuthToken)
     func refreshToken(accessToken: String, refreshToken: String) async throws -> AuthToken
+    
+    func login(email: String, password: String) async throws -> (User, AuthToken)
     func logout() async throws
 }
