@@ -23,6 +23,9 @@ func registerDependencies() {
     let filterRepository = FilterRepository(networkManager: networkManager)
     container.registerSingleton(FilterRepositoryProtocol.self, instance: filterRepository)
 
+    let bannerRepository = BannerRepository(networkManager: networkManager)
+    container.registerSingleton(BannerRepositoryProtocol.self, instance: bannerRepository)
+
     //MARK: - Usecase
     // UseCase는 매번 새로 생성 (상태를 가지지 않음)
     container.registerFactory(LoginUsecaseProtocol.self) {
@@ -40,6 +43,11 @@ func registerDependencies() {
         return FilterUsecase(repository: repository)
     }
 
+    container.registerFactory(BannerUsecaseProtocol.self) {
+        let repository = container.resolve(BannerRepositoryProtocol.self)
+        return BannerUsecase(repository: repository)
+    }
+
     //MARK: - ViewModel
     // ViewModel은 화면마다 새로 생성
     container.registerFactory(LoginViewModel.self) {
@@ -53,7 +61,8 @@ func registerDependencies() {
     }
 
     container.registerFactory(HomeViewModel.self) {
-        let usecase = container.resolve(FilterUsecaseProtocol.self)
-        return HomeViewModel(usecase: usecase)
+        let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
+        let bannerUsecase = container.resolve(BannerUsecaseProtocol.self)
+        return HomeViewModel(filterUsecase: filterUsecase, bannerUsecase: bannerUsecase)
     }
 }

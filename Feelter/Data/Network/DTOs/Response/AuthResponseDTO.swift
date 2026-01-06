@@ -23,7 +23,9 @@ struct AuthResponseDTO: Decodable {
         case accessToken
         case refreshToken
     }
-    
+}
+
+extension AuthResponseDTO {
     func toDomain() -> User {
         User(
             id: userId,

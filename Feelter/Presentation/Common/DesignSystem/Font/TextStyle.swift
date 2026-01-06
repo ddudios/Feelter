@@ -15,6 +15,7 @@ enum TextStyle {
         static let body1 = AppFont.Pretendard.medium(16)
         static let body2 = AppFont.Pretendard.medium(14)
         static let body3 = AppFont.Pretendard.medium(13)
+        static let body4 = AppFont.Pretendard.medium(10)
         
         static let caption1 = AppFont.Pretendard.regular(12)
         static let caption2 = AppFont.Pretendard.regular(10)

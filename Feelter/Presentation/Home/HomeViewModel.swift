@@ -16,20 +16,24 @@ final class HomeViewModel: ViewModelProtocol {
 
     struct Output {
         let todayFilter: AnyPublisher<Filter, Never>
+        let banners: AnyPublisher<[Banner], Never>
         let isLoading: AnyPublisher<Bool, Never>
         let errorMessage: AnyPublisher<String?, Never>
     }
 
-    private let usecase: FilterUsecaseProtocol
+    private let filterUsecase: FilterUsecaseProtocol
+    private let bannerUsecase: BannerUsecaseProtocol
     private var cancellables = Set<AnyCancellable>()
 
-    init(usecase: FilterUsecaseProtocol) {
-        self.usecase = usecase
+    init(filterUsecase: FilterUsecaseProtocol, bannerUsecase: BannerUsecaseProtocol) {
+        self.filterUsecase = filterUsecase
+        self.bannerUsecase = bannerUsecase
     }
 
     func transform(input: Input) -> Output {
         let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
         let todayFilterSubject = PassthroughSubject<Filter, Never>()
+        let bannersSubject = PassthroughSubject<[Banner], Never>()
         let errorMessageSubject = PassthroughSubject<String?, Never>()
 
         input.viewDidLoad
@@ -40,16 +44,21 @@ final class HomeViewModel: ViewModelProtocol {
 
                 Task {
                     do {
-                        let filter = try await self.usecase.fetchTodayFilter()
+                        // 오늘의 필터와 배너를 동시에 가져오기
+                        async let filter = self.filterUsecase.fetchTodayFilter()
+                        async let banners = self.bannerUsecase.fetchBanners()
+
+                        let (filterResult, bannersResult) = try await (filter, banners)
 
                         await MainActor.run {
                             isLoadingSubject.send(false)
-                            todayFilterSubject.send(filter)
+                            todayFilterSubject.send(filterResult)
+                            bannersSubject.send(bannersResult)
                         }
                     } catch {
                         await MainActor.run {
                             isLoadingSubject.send(false)
-                            errorMessageSubject.send("필터를 불러오는데 실패했습니다: \(error.localizedDescription)")
+                            errorMessageSubject.send("데이터를 불러오는데 실패했습니다: \(error.localizedDescription)")
                         }
                     }
                 }
@@ -58,6 +67,7 @@ final class HomeViewModel: ViewModelProtocol {
 
         return Output(
             todayFilter: todayFilterSubject.eraseToAnyPublisher(),
+            banners: bannersSubject.eraseToAnyPublisher(),
             isLoading: isLoadingSubject.eraseToAnyPublisher(),
             errorMessage: errorMessageSubject.eraseToAnyPublisher()
         )

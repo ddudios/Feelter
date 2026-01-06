@@ -25,7 +25,9 @@ struct FilterResponseDTO: Decodable {
         case createdAt
         case updatedAt
     }
-    
+}
+
+extension FilterResponseDTO {
     func toDomain() -> Filter {
         return Filter(
             id: filterId,

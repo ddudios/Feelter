@@ -87,10 +87,10 @@ final class TodayFilterCell: BaseCollectionViewCell {
     override func configureHierarchy() {
         contentView.addSubview(backgroundImageView)
         
-        // 3. 이미지가 로딩되기 전에도 그라데이션은 있어야 하므로 이미지 뷰 위에 얹음
+        // 이미지가 로딩되기 전에도 그라데이션은 있어야 하므로 이미지 뷰 위에 얹음
         contentView.addSubview(gradientView)
         
-        // 4. 나머지 라벨들은 그라데이션 위에 보여야 하므로 그 뒤에 추가
+        // 나머지 라벨들은 그라데이션 위에 보여야 하므로 그 뒤에 추가
         contentView.addSubview(useFilterButton)
         contentView.addSubview(sectionLabel)
         contentView.addSubview(introduceLabel)
@@ -112,8 +112,8 @@ final class TodayFilterCell: BaseCollectionViewCell {
         useFilterButton.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(65)
             make.trailing.equalToSuperview().inset(20)
-            make.height.equalTo(32)
-            make.width.equalTo(80)
+            make.height.equalTo(28)
+            make.width.equalTo(75)
         }
         
         sectionLabel.snp.makeConstraints { make in

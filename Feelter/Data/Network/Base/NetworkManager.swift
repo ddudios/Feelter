@@ -70,7 +70,7 @@ final class NetworkManager: NetworkManagerProtocol {
         guard let data = data else { return nil }
 
         do {
-            let errorResponse = try JSONDecoder().decode(ErrorResponse.self, from: data)
+            let errorResponse = try JSONDecoder().decode(ErrorResponseDTO.self, from: data)
             return errorResponse.message
         } catch {
             return nil
