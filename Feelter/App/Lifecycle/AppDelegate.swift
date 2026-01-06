@@ -8,6 +8,7 @@
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
+import Kingfisher
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -39,6 +40,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 print("FCM registration token: \(token)")  // 이게 파베가 쓰기 편한 코드임
             }
         }
+        
+        // 전역 설정: 모든 Kingfisher 요청에 이 Modifier가 적용됨
+        KingfisherManager.shared.defaultOptions = [
+            .requestModifier(AuthHeaderModifier())
+        ]
         
         return true
     }

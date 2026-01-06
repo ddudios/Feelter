@@ -229,9 +229,7 @@ final class HomeViewController: BaseViewController {
         titleLabel.text = filter.title
         descriptionLabel.text = filter.description
 
-        if let firstImageURL = filter.files.first, let url = URL(string: firstImageURL) {
-            backgroundImageView.kf.setImage(with: url)
-        }
+        backgroundImageView.setFilterImage(with: filter.files.first)
     }
 
     private func showAlert(message: String) {

@@ -50,10 +50,4 @@ final class DIContainer {
 
         fatalError("Dependency '\(type)' not registered!")
     }
-
-    // MARK: - 테스트용 초기화
-    func reset() {
-        singletons.removeAll()
-        factories.removeAll()
-    }
 }

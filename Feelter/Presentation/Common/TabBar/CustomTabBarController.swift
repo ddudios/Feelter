@@ -68,7 +68,6 @@ final class CustomTabBarController: UITabBarController {
 
         // 커스텀 탭바 설정
         view.addSubview(customTabBar)
-        customTabBar.backgroundColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5)
         customTabBar.layer.cornerRadius = 34
         customTabBar.layer.borderColor = UIColor.Feelter.gray75?.cgColor
         customTabBar.layer.borderWidth = 1
@@ -76,6 +75,18 @@ final class CustomTabBarController: UITabBarController {
         customTabBar.layer.shadowOpacity = 0.25
         customTabBar.layer.shadowOffset = CGSize(width: 0, height: 6)
         customTabBar.layer.shadowRadius = 6
+
+        // Blur 효과 추가 (더 투명하게)
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        let blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView.alpha = 0.8  // 투명도 조정
+        blurEffectView.layer.cornerRadius = 34
+        blurEffectView.clipsToBounds = true
+        customTabBar.insertSubview(blurEffectView, at: 0)
+
+        blurEffectView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
 
         customTabBar.snp.makeConstraints { make in
             make.horizontalEdges.equalToSuperview().inset(20)
