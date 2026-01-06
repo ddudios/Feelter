@@ -25,7 +25,7 @@ final class AuthenticationInterceptor: RequestInterceptor {
 
         // Keychain에서 AccessToken 가져오기
         if let accessToken = KeychainManager.shared.read(account: "accessToken") {
-            urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            urlRequest.setValue(accessToken, forHTTPHeaderField: "Authorization")
         }
 
         completion(.success(urlRequest))
@@ -52,6 +52,11 @@ final class AuthenticationInterceptor: RequestInterceptor {
 
         // Refresh 요청 자체가 실패한 경우 로그아웃 처리
         if request.request?.url?.absoluteString.contains("auth/refresh") == true {
+            print("❌ Refresh 요청 실패 (401) - 토큰 삭제")
+            // 만료된 토큰 삭제
+            KeychainManager.shared.delete(account: "accessToken")
+            KeychainManager.shared.delete(account: "refreshToken")
+
             NotificationCenter.default.post(name: .unauthorizedError, object: nil)
             completion(.doNotRetry)
             return
@@ -68,6 +73,7 @@ final class AuthenticationInterceptor: RequestInterceptor {
         // 키체인에서 토큰 가져오기
         guard let accessToken = KeychainManager.shared.read(account: "accessToken"),
               let refreshToken = KeychainManager.shared.read(account: "refreshToken") else {
+            print("❌ Keychain에 토큰 없음 - 로그아웃")
             NotificationCenter.default.post(name: .unauthorizedError, object: nil)
             isRefreshing = false
             requestsToRetry.forEach { $0(.doNotRetry) }
@@ -95,8 +101,13 @@ final class AuthenticationInterceptor: RequestInterceptor {
                     self.requestsToRetry.removeAll()
                 }
             } catch {
-                // Refresh 실패 시 로그아웃
+                // Refresh 실패 시 토큰 삭제 및 로그아웃
                 await MainActor.run {
+                    print("❌ Refresh API 호출 실패 - 토큰 삭제: \(error)")
+                    // 만료된 토큰 삭제
+                    KeychainManager.shared.delete(account: "accessToken")
+                    KeychainManager.shared.delete(account: "refreshToken")
+
                     NotificationCenter.default.post(name: .unauthorizedError, object: nil)
                     self.isRefreshing = false
                     self.requestsToRetry.forEach { $0(.doNotRetry) }

@@ -12,6 +12,7 @@ final public class AppCoordinator: Coordinator {
 
     public var childCoordinators: [Coordinator] = []
     public var navigationController: UINavigationController
+    private var isLoggingOut = false  // 로그아웃 진행 중 플래그
 
     public init(navigationController: UINavigationController) {
         self.navigationController = navigationController
@@ -63,16 +64,19 @@ final public class AppCoordinator: Coordinator {
     }
 
     @objc private func handleUnauthorizedError() {
+        guard !isLoggingOut else { return }
+        isLoggingOut = true
+
         Task { @MainActor in
             performLogout()
         }
     }
 
     public func logout() {
-        // 로그아웃 중복 호출 방지
+        guard !isLoggingOut else { return }
+        isLoggingOut = true
         NotificationCenter.default.removeObserver(self, name: .unauthorizedError, object: nil)
 
-        // 화면 전환만 수행 (비즈니스 로직은 ViewModel에서 이미 처리됨)
         Task { @MainActor in
             performLogout()
         }
@@ -80,10 +84,8 @@ final public class AppCoordinator: Coordinator {
 
     @MainActor
     private func performLogout() {
-        // 자식 코디네이터 모두 제거
+        NotificationCenter.default.removeObserver(self, name: .unauthorizedError, object: nil)
         childCoordinators.removeAll()
-    
-        // 로그인 화면으로 완전히 교체
         showAuthFlow()
     }
 }
@@ -91,11 +93,11 @@ final public class AppCoordinator: Coordinator {
 // MARK: - CoordinatorFinishDelegate
 extension AppCoordinator: CoordinatorFinishDelegate {
     public func coordinatorDidFinish(childCoordinator: Coordinator) {
-        // 1. 메모리에서 제거
         removeChildCoordinator(childCoordinator)
-        
-        // 2. 다음 Flow로 전환 (로그인 완료 -> 메인 화면)
+
         if childCoordinator is AuthCoordinator {
+            isLoggingOut = false
+            setupNotifications()
             showMainFlow()
         }
     }

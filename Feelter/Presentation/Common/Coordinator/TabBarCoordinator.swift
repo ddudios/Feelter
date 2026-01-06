@@ -22,7 +22,7 @@ final class TabBarCoordinator: Coordinator {
     func start() {
         let viewControllers = createViewControllers()
         tabBarController.setViewControllers(viewControllers, animated: false)
-        navigationController.setViewControllers([tabBarController], animated: true)
+        navigationController.setViewControllers([tabBarController], animated: false)
     }
 
     private func createViewControllers() -> [UIViewController] {

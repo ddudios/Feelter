@@ -26,7 +26,7 @@ final public class AuthCoordinator: Coordinator {
     func showLogin() {
         let loginVC = LoginViewController()
         loginVC.coordinator = self
-        navigationController.setViewControllers([loginVC], animated: true)
+        navigationController.setViewControllers([loginVC], animated: false)
     }
 
     func loginDidFinish() {

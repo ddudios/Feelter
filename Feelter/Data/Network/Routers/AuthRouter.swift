@@ -25,7 +25,7 @@ enum AuthRouter: BaseRouter {
 
         switch self {
         case .refresh(let accessToken, let refreshToken):
-            headers.add(name: "Authorization", value: "Bearer \(accessToken)")
+            headers.add(name: "Authorization", value: accessToken)
             headers.add(name: "RefreshToken", value: refreshToken)
         }
 
