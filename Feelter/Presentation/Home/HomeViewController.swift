@@ -19,7 +19,7 @@ final class HomeViewController: BaseViewController {
     }
 
     enum Item: Hashable {
-        case todayFilter(Filter)
+        case todayFilter(TodayFilter)
         case banner(Banner)
     }
 
@@ -258,7 +258,7 @@ final class HomeViewController: BaseViewController {
             .store(in: &cancellables)
     }
 
-    private func updateTodayFilter(with filter: Filter) {
+    private func updateTodayFilter(with filter: TodayFilter) {
         var snapshot = dataSource.snapshot()
 
         // Section 0이 없으면 추가
@@ -292,9 +292,10 @@ final class HomeViewController: BaseViewController {
 
         dataSource.apply(snapshot, animatingDifferences: false)
 
-        // 페이지 인디케이터 위치 업데이트
+        // 페이지 인디케이터 위치 업데이트 및 자동 스크롤 시작
         DispatchQueue.main.async {
             self.updatePageIndicatorPosition()
+            self.startBannerAutoScroll()
         }
     }
 

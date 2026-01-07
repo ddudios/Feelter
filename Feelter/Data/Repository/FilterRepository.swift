@@ -15,8 +15,8 @@ final class FilterRepository: FilterRepositoryProtocol {
         self.networkManager = networkManager
     }
     
-    func fetchTodayFilter() async throws -> Filter {
-        let response = try await networkManager.request(FilterRouter.todayFilter, type: FilterResponseDTO.self)
+    func fetchTodayFilter() async throws -> TodayFilter {
+        let response = try await networkManager.request(FilterRouter.todayFilter, type: TodayFilterResponseDTO.self)
         
         return response.toDomain()
     }

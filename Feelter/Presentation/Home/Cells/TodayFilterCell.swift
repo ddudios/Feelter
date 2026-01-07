@@ -192,11 +192,11 @@ final class TodayFilterCell: BaseCollectionViewCell {
         return containerView
     }
     
-    func configure(with filter: Filter) {
+    func configure(with filter: TodayFilter) {
         introduceLabel.text = filter.introduction
         titleLabel.text = filter.title
         descriptionLabel.text = filter.description
-        backgroundImageView.setFeelterImage(with: filter.files.first)
+        backgroundImageView.setFeelterImage(with: filter.mainImageURL)
     }
 }
 

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct FilterResponseDTO: Decodable {
+struct TodayFilterResponseDTO: Decodable {
     let filterId: String
     let title: String
     let introduction: String
@@ -27,16 +27,15 @@ struct FilterResponseDTO: Decodable {
     }
 }
 
-extension FilterResponseDTO {
-    func toDomain() -> Filter {
-        return Filter(
+extension TodayFilterResponseDTO {
+    func toDomain() -> TodayFilter {
+        return TodayFilter(
             id: filterId,
             title: title,
             introduction: introduction,
             description: description,
-            files: files,
-            createdAt: createdAt.toDate() ?? Date(),
-            updatedAt: updatedAt.toDate() ?? Date()
+            mainImageURL: files.first ?? "",
+            createdAt: createdAt.toDate() ?? Date()
         )
     }
 }

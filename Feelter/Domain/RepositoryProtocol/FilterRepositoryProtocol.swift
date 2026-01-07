@@ -8,5 +8,5 @@
 import Foundation
 
 protocol FilterRepositoryProtocol {
-    func fetchTodayFilter() async throws -> Filter
+    func fetchTodayFilter() async throws -> TodayFilter
 }

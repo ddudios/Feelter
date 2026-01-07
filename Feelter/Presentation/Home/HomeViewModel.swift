@@ -16,7 +16,7 @@ final class HomeViewModel: ViewModelProtocol {
     }
 
     struct Output {
-        let todayFilter: AnyPublisher<Filter, Never>
+        let todayFilter: AnyPublisher<TodayFilter, Never>
         let banners: AnyPublisher<[Banner], Never>
         let isLoading: AnyPublisher<Bool, Never>
         let errorMessage: AnyPublisher<String?, Never>
@@ -36,7 +36,7 @@ final class HomeViewModel: ViewModelProtocol {
 
     func transform(input: Input) -> Output {
         let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
-        let todayFilterSubject = PassthroughSubject<Filter, Never>()
+        let todayFilterSubject = PassthroughSubject<TodayFilter, Never>()
         let bannersSubject = PassthroughSubject<[Banner], Never>()
         let errorMessageSubject = PassthroughSubject<String?, Never>()
         let presentWebViewSubject = PassthroughSubject<String, Never>()

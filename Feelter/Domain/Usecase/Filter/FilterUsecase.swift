@@ -8,7 +8,7 @@
 import Foundation
 
 protocol FilterUsecaseProtocol {
-    func fetchTodayFilter() async throws -> Filter
+    func fetchTodayFilter() async throws -> TodayFilter
 }
 
 struct FilterUsecase: FilterUsecaseProtocol {
@@ -19,7 +19,7 @@ struct FilterUsecase: FilterUsecaseProtocol {
         self.repository = repository
     }
     
-    func fetchTodayFilter() async throws -> Filter {
+    func fetchTodayFilter() async throws -> TodayFilter {
         try await repository.fetchTodayFilter()
     }
 }
