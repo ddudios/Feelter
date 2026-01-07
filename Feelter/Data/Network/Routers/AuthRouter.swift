@@ -17,7 +17,7 @@ enum AuthRouter: BaseRouter {
     }
 
     var path: String {
-        return "v1/auth/refresh"
+        return "/v1/auth/refresh"
     }
 
     var headers: HTTPHeaders {

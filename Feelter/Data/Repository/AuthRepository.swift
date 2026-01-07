@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseMessaging
 
-final class AuthRepository: AuthRepositoryProtocol {
+final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
 
     private let networkManager: NetworkManagerProtocol
 
@@ -36,7 +36,7 @@ final class AuthRepository: AuthRepositoryProtocol {
     func refreshToken(accessToken: String, refreshToken: String) async throws -> AuthToken {
         let response = try await networkManager.request(
             AuthRouter.refresh(accessToken: accessToken, refreshToken: refreshToken),
-            type: AuthResponseDTO.self
+            type: RefreshTokenResponseDTO.self
         )
 
         return response.toToken()

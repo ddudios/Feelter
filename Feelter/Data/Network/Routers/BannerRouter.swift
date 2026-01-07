@@ -20,7 +20,7 @@ enum BannerRouter: BaseRouter {
 
     var path: String {
         switch self {
-        case .fetchBanners: "v1/banners/main"
+        case .fetchBanners: "/v1/banners/main"
         }
     }
 }

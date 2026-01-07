@@ -21,7 +21,7 @@ enum FilterRouter: BaseRouter {
 
     var path: String {
         switch self {
-        case .todayFilter: "v1/filters/today-filter"
+        case .todayFilter: "/v1/filters/today-filter"
         }
     }
 

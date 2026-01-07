@@ -19,6 +19,7 @@ func registerDependencies() {
     // Repository도 싱글톤으로 관리 (네트워크 레이어 공유)
     let authRepository = AuthRepository(networkManager: networkManager)
     container.registerSingleton(AuthRepositoryProtocol.self, instance: authRepository)
+    container.registerSingleton(TokenRepositoryProtocol.self, instance: authRepository)
 
     let filterRepository = FilterRepository(networkManager: networkManager)
     container.registerSingleton(FilterRepositoryProtocol.self, instance: filterRepository)
@@ -63,6 +64,7 @@ func registerDependencies() {
     container.registerFactory(HomeViewModel.self) {
         let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
         let bannerUsecase = container.resolve(BannerUsecaseProtocol.self)
-        return HomeViewModel(filterUsecase: filterUsecase, bannerUsecase: bannerUsecase)
+        let tokenRepository = container.resolve(TokenRepositoryProtocol.self)
+        return HomeViewModel(filterUsecase: filterUsecase, bannerUsecase: bannerUsecase, tokenRepository: tokenRepository)
     }
 }

@@ -13,6 +13,13 @@ final class AuthenticationInterceptor: RequestInterceptor {
     private var isRefreshing = false
     private var requestsToRetry: [(RetryResult) -> Void] = []
 
+    // Interceptor 없는 별도 Session (토큰 갱신 전용, 순환 의존성 방지)
+    private let refreshSession: Session = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        return Session(configuration: configuration)
+    }()
+
     // 1. 요청을 보낼 때마다 헤더에 토큰 등을 끼워 넣는 역할 (Adapt)
     func adapt(_ urlRequest: URLRequest, for session: Session, completion: @escaping (Result<URLRequest, Error>) -> Void) {
         var urlRequest = urlRequest
@@ -82,10 +89,11 @@ final class AuthenticationInterceptor: RequestInterceptor {
             return
         }
 
-        // RefreshToken으로 새 토큰 발급
+        // RefreshToken으로 새 토큰 발급 (순환 의존성 방지를 위해 별도 Session 사용)
         Task {
             do {
-                let repository = AuthRepository()
+                let networkManager = NetworkManager(session: refreshSession)
+                let repository = AuthRepository(networkManager: networkManager)
                 let newToken = try await repository.refreshToken(
                     accessToken: accessToken,
                     refreshToken: refreshToken

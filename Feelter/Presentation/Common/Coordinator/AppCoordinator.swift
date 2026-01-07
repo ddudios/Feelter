@@ -68,8 +68,45 @@ final public class AppCoordinator: Coordinator {
         isLoggingOut = true
 
         Task { @MainActor in
+            showLoginExpiredAlert()
+        }
+    }
+
+    @MainActor
+    private func showLoginExpiredAlert() {
+        let alert = UIAlertController(
+            title: "로그인 만료",
+            message: "로그인이 만료되었습니다.\n다시 로그인해주세요.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
+            self?.performLogout()
+        })
+
+        // 최상위 ViewController에서 알림 표시
+        if let topViewController = getTopViewController() {
+            topViewController.present(alert, animated: true)
+        } else {
             performLogout()
         }
+    }
+
+    private func getTopViewController() -> UIViewController? {
+        var topViewController = navigationController.viewControllers.first
+
+        while let presentedViewController = topViewController?.presentedViewController {
+            topViewController = presentedViewController
+        }
+
+        if let tabBarController = topViewController as? UITabBarController {
+            topViewController = tabBarController.selectedViewController
+        }
+
+        if let navigationController = topViewController as? UINavigationController {
+            topViewController = navigationController.viewControllers.last
+        }
+
+        return topViewController
     }
 
     public func logout() {

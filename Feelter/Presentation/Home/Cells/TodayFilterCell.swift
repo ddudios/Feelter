@@ -1,5 +1,5 @@
 //
-//  HomeHeroCell.swift
+//  TodayFilterCell.swift
 //  Feelter
 //
 //  Created by Suji Jang on 1/6/26.
@@ -196,7 +196,7 @@ final class TodayFilterCell: BaseCollectionViewCell {
         introduceLabel.text = filter.introduction
         titleLabel.text = filter.title
         descriptionLabel.text = filter.description
-        backgroundImageView.setFilterImage(with: filter.files.first)
+        backgroundImageView.setFeelterImage(with: filter.files.first)
     }
 }
 

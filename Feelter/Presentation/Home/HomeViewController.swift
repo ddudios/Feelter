@@ -19,12 +19,13 @@ final class HomeViewController: BaseViewController {
     }
 
     enum Item: Hashable {
-        case hero(Filter)
+        case todayFilter(Filter)
         case banner(Banner)
     }
 
     private let viewModel: HomeViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
+    private let bannerTappedSubject = PassthroughSubject<Banner, Never>()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Components
@@ -100,17 +101,17 @@ final class HomeViewController: BaseViewController {
             if sectionIndex == 0 {
                 // Section 0: TodayFilter - 화면 높이의 60%
                 let screenHeight = environment.container.effectiveContentSize.height
-                let heroHeight = screenHeight * 0.6
+                let todayFilterHeight = screenHeight * 0.6
 
                 let itemSize = NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1.0),
-                    heightDimension: .absolute(heroHeight)
+                    heightDimension: .absolute(todayFilterHeight)
                 )
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
 
                 let groupSize = NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1.0),
-                    heightDimension: .absolute(heroHeight)
+                    heightDimension: .absolute(todayFilterHeight)
                 )
                 let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
 
@@ -168,7 +169,7 @@ final class HomeViewController: BaseViewController {
             collectionView: collectionView
         ) { collectionView, indexPath, item in
             switch item {
-            case .hero(let filter):
+            case .todayFilter(let filter):
                 guard let cell = collectionView.dequeueReusableCell(
                     withReuseIdentifier: TodayFilterCell.identifier,
                     for: indexPath
@@ -185,7 +186,10 @@ final class HomeViewController: BaseViewController {
                 ) as? BannerCell else {
                     return UICollectionViewCell()
                 }
-                cell.configure(with: banner.imageURL)
+                cell.configure(with: banner)
+                cell.onTap = { [weak self] tappedBanner in
+                    self?.bannerTappedSubject.send(tappedBanner)
+                }
                 return cell
             }
         }
@@ -193,7 +197,8 @@ final class HomeViewController: BaseViewController {
 
     private func bind() {
         let input = HomeViewModel.Input(
-            viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher()
+            viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
+            bannerTapped: bannerTappedSubject.eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -227,6 +232,13 @@ final class HomeViewController: BaseViewController {
                 self?.showAlert(message: message)
             }
             .store(in: &cancellables)
+
+        output.presentWebView
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] urlString in
+                self?.presentWebViewController(urlString: urlString)
+            }
+            .store(in: &cancellables)
     }
 
     private func updateTodayFilter(with filter: Filter) {
@@ -239,7 +251,7 @@ final class HomeViewController: BaseViewController {
 
         // 기존 아이템 삭제 후 새로 추가
         snapshot.deleteItems(snapshot.itemIdentifiers(inSection: .todayFilter))
-        snapshot.appendItems([.hero(filter)], toSection: .todayFilter)
+        snapshot.appendItems([.todayFilter(filter)], toSection: .todayFilter)
 
         dataSource.apply(snapshot, animatingDifferences: false)
     }
@@ -275,6 +287,13 @@ final class HomeViewController: BaseViewController {
         present(alert, animated: true)
     }
 
+    private func presentWebViewController(urlString: String) {
+        let webViewController = WebViewController(urlString: urlString)
+        let navigationController = UINavigationController(rootViewController: webViewController)
+        navigationController.modalPresentationStyle = .fullScreen
+        present(navigationController, animated: true)
+    }
+
     private func updatePageIndicatorPosition() {
         guard pageIndicatorLabel.superview != nil, totalBannerCount > 0 else { return }
 
@@ -291,7 +310,6 @@ final class HomeViewController: BaseViewController {
             make.bottom.equalTo(view.snp.top).offset(bannerFrameInView.maxY - 10)
         }
 
-        // 완전한 캡슐형으로 만들기 위해 cornerRadius를 높이의 절반으로 설정
         pageIndicatorLabel.layoutIfNeeded()
         pageIndicatorLabel.layer.cornerRadius = pageIndicatorLabel.bounds.height / 2
     }
@@ -302,5 +320,18 @@ extension HomeViewController: UICollectionViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         // 세로 스크롤 시 페이지 인디케이터도 함께 이동
         updatePageIndicatorPosition()
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let item = dataSource.itemIdentifier(for: indexPath) else {
+            return
+        }
+
+        switch item {
+        case .banner(let banner):
+            bannerTappedSubject.send(banner)
+        case .todayFilter:
+            break
+        }
     }
 }

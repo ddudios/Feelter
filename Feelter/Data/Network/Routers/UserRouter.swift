@@ -22,8 +22,8 @@ enum UserRouter: BaseRouter {
 
     var path: String {
         switch self {
-        case .login: "v1/users/login"
-        case .logout: "v1/users/logout"
+        case .login: "/v1/users/login"
+        case .logout: "/v1/users/logout"
         }
     }
 

@@ -60,4 +60,8 @@ extension UIColor {
         static let gray90 = UIColor(hex: "#434347")
         static let gray100 = UIColor(hex: "#0B0B0B")
     }
+    
+    enum WebView {
+        static let black = UIColor(hex: "#1A1A1A")
+    }
 }
