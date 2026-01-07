@@ -337,7 +337,7 @@ final class HomeViewController: BaseViewController {
         guard totalBannerCount > 1 else { return }
         stopBannerAutoScroll()
         bannerAutoScrollTimer = Timer.scheduledTimer(
-            timeInterval: 3.0,
+            timeInterval: 5.0,
             target: self,
             selector: #selector(autoScrollBanner),
             userInfo: nil,

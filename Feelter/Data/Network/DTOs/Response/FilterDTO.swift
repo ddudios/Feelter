@@ -49,7 +49,9 @@ extension FilterDTO {
                 id: filterId,
                 category: FilterCategory(rawValue: category) ?? .unknown,
                 title: title,
+                description: description,
                 mainImageURL: files.first ?? "", // 썸네일은 첫 번째 이미지
+                creator: creator.toDomain(),
                 photographerName: creator.nick,
                 likeCount: likeCount,
                 isLiked: isLiked,

@@ -14,6 +14,7 @@ protocol BaseRouter: URLRequestConvertible {
     var path: String { get }
     var headers: HTTPHeaders { get }
     var body: Encodable? { get }
+    var queryParameters: Encodable? { get }
 }
 
 extension BaseRouter {
@@ -31,6 +32,11 @@ extension BaseRouter {
     var headers: HTTPHeaders {
         return defaultHeaders
     }
+    
+    // 기본 queryParameters (없으면 nil)
+    var queryParameters: Encodable? {
+        return nil
+    }
 
     // 기본 body (없으면 nil)
     var body: Encodable? {
@@ -42,16 +48,19 @@ extension BaseRouter {
         let url = baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.method = method
-
-        headers.forEach { header in
-            request.setValue(header.value, forHTTPHeaderField: header.name)
+        
+        headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.name) }
+        
+        if let queryParameters = queryParameters {
+            let params = queryParameters
+            request = try URLEncodedFormParameterEncoder(destination: .queryString)
+                .encode(params, into: request)
         }
-
-        // Body 인코딩 (있는 경우만)
+        
         if let body = body {
             request = try JSONParameterEncoder.default.encode(body, into: request)
         }
-
+        
         return request
     }
 }

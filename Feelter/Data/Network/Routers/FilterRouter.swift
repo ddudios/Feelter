@@ -29,7 +29,7 @@ enum FilterRouter: BaseRouter {
         }
     }
 
-    var body: Encodable? {
+    var queryParameters: Encodable? {
         switch self {
         case let .filterList(body): body
         case .filter, .todayFilter: nil

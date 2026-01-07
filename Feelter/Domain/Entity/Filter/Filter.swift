@@ -12,7 +12,9 @@ struct FilterSummary: Identifiable {
     let id: String
     let category: FilterCategory
     let title: String
+    let description: String
     let mainImageURL: String // files의 첫 번째 이미지
+    let creator: Creator
     let photographerName: String
     let likeCount: Int
     let isLiked: Bool

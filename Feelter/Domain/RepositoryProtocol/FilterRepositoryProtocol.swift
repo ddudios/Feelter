@@ -8,5 +8,13 @@
 import Foundation
 
 protocol FilterRepositoryProtocol {
+    func fetchFilterList(
+        category: FilterCategory?,
+        orderBy: FilterSortType,
+        next: String?,
+        limit: String?
+    ) async throws -> FilterList
+
+    func fetchFilter(id: String) async throws -> FilterDetail
     func fetchTodayFilter() async throws -> TodayFilter
 }
