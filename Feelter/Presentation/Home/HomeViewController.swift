@@ -56,6 +56,8 @@ final class HomeViewController: BaseViewController {
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, Item>!
     private var totalBannerCount = 0
+    private var currentBannerPage = 0
+    private var bannerAutoScrollTimer: Timer?
 
     // MARK: - Initializer
     init(viewModel: HomeViewModel = DIContainer.shared.resolve(HomeViewModel.self)) {
@@ -75,9 +77,23 @@ final class HomeViewController: BaseViewController {
         viewDidLoadSubject.send(())
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        startBannerAutoScroll()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopBannerAutoScroll()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updatePageIndicatorPosition()
+    }
+
+    deinit {
+        stopBannerAutoScroll()
     }
 
     override func configureHierarchy() {
@@ -130,14 +146,14 @@ final class HomeViewController: BaseViewController {
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
 
                 let groupSize = NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(0.9),
+                    widthDimension: .fractionalWidth(1.0),
                     heightDimension: .absolute(bannerHeight)
                 )
                 let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
+                group.contentInsets = NSDirectionalEdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20)
 
                 let section = NSCollectionLayoutSection(group: group)
-                section.orthogonalScrollingBehavior = .groupPaging
-                section.contentInsets = NSDirectionalEdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20)
+                section.orthogonalScrollingBehavior = .groupPagingCentered
                 section.interGroupSpacing = 20
 
                 // 가로 스크롤 시 페이지 업데이트
@@ -146,15 +162,16 @@ final class HomeViewController: BaseViewController {
 
                     // 스크롤 오프셋으로 현재 페이지 계산
                     let containerWidth = environment.container.contentSize.width
-                    let groupWidth = containerWidth * 0.9 // fractionalWidth(0.9)
+                    let groupWidth = containerWidth // fractionalWidth(1.0)
                     let spacing: CGFloat = 20
                     let pageWidth = groupWidth + spacing
 
-                    // 현재 페이지 번호 (1부터 시작)
-                    let currentPage = max(1, min(Int(round(scrollOffset.x / pageWidth)) + 1, self.totalBannerCount))
+                    // 현재 페이지 번호 (0부터 시작하는 인덱스)
+                    let pageIndex = max(0, min(Int(round(scrollOffset.x / pageWidth)), self.totalBannerCount - 1))
 
                     DispatchQueue.main.async {
-                        self.pageIndicatorLabel.text = "\(currentPage) / \(self.totalBannerCount)"
+                        self.currentBannerPage = pageIndex
+                        self.pageIndicatorLabel.text = "\(pageIndex + 1) / \(self.totalBannerCount)"
                     }
                 }
 
@@ -313,6 +330,67 @@ final class HomeViewController: BaseViewController {
         pageIndicatorLabel.layoutIfNeeded()
         pageIndicatorLabel.layer.cornerRadius = pageIndicatorLabel.bounds.height / 2
     }
+
+    // MARK: - Banner Auto Scroll
+    private func startBannerAutoScroll() {
+        guard totalBannerCount > 1 else { return }
+        stopBannerAutoScroll()
+        bannerAutoScrollTimer = Timer.scheduledTimer(
+            timeInterval: 3.0,
+            target: self,
+            selector: #selector(autoScrollBanner),
+            userInfo: nil,
+            repeats: true
+        )
+    }
+
+    private func stopBannerAutoScroll() {
+        bannerAutoScrollTimer?.invalidate()
+        bannerAutoScrollTimer = nil
+    }
+
+    @objc private func autoScrollBanner() {
+        guard totalBannerCount > 0 else { return }
+        currentBannerPage += 1
+        if currentBannerPage >= totalBannerCount {
+            currentBannerPage = 0
+        }
+        scrollToBannerPage(currentBannerPage, animated: true)
+    }
+
+    private func scrollToBannerPage(_ page: Int, animated: Bool) {
+        guard page < totalBannerCount else { return }
+
+        // orthogonalScrollingBehavior를 사용하는 섹션은 내부 UIScrollView를 찾아서 스크롤
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            // 섹션의 가로 스크롤 오프셋 계산
+            let containerWidth = self.collectionView.bounds.width
+            let spacing: CGFloat = 20
+            let targetX = CGFloat(page) * (containerWidth + spacing)
+
+            // orthogonal scrolling 섹션 내부의 스크롤 뷰 찾기
+            for subview in self.collectionView.subviews {
+                if let scrollView = subview as? UIScrollView,
+                   scrollView != self.collectionView {
+                    let targetOffset = CGPoint(x: targetX, y: 0)
+                    scrollView.setContentOffset(targetOffset, animated: animated)
+                    return
+                }
+            }
+        }
+    }
+
+    private func updateCurrentBannerPage() {
+        guard let visibleCell = collectionView.visibleCells.first(where: { cell in
+            guard let indexPath = collectionView.indexPath(for: cell) else { return false }
+            return indexPath.section == 1
+        }), let indexPath = collectionView.indexPath(for: visibleCell) else {
+            return
+        }
+        currentBannerPage = indexPath.item
+    }
 }
 
 // MARK: - UICollectionViewDelegate
@@ -333,5 +411,21 @@ extension HomeViewController: UICollectionViewDelegate {
         case .todayFilter:
             break
         }
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        stopBannerAutoScroll()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate {
+            updateCurrentBannerPage()
+            startBannerAutoScroll()
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        updateCurrentBannerPage()
+        startBannerAutoScroll()
     }
 }
