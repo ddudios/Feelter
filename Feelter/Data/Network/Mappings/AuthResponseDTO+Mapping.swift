@@ -13,7 +13,8 @@ extension AuthResponseDTO {
             id: userId,
             email: email,
             nickname: nick,
-            profileImageURL: profileImage
+            profileImageURL: profileImage,
+            hashTags: []
         )
     }
 
