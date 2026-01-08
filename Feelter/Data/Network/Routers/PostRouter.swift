@@ -28,13 +28,18 @@ enum PostRouter: BaseRouter {
     case getUserPosts(userId: String, query: PostListRequestDTO)
     case myLikedPosts(query: PostListRequestDTO)
 
+    // 댓글
+    case createComment(postId: String, body: CreateCommentRequestDTO)
+    case updateComment(postId: String, commentId: String, body: UpdateCommentRequestDTO)
+    case deleteComment(postId: String, commentId: String)
+
     var method: HTTPMethod {
         switch self {
-        case .uploadFiles, .createPost, .likePost:
+        case .uploadFiles, .createPost, .likePost, .createComment:
             return .post
-        case .updatePost:
+        case .updatePost, .updateComment:
             return .put
-        case .deletePost:
+        case .deletePost, .deleteComment:
             return .delete
         case .geolocationPosts, .searchPosts, .post, .getUserPosts, .myLikedPosts:
             return .get
@@ -63,6 +68,12 @@ enum PostRouter: BaseRouter {
             return "/v1/posts/users/\(userId)"
         case .myLikedPosts:
             return "/v1/posts/likes/me"
+        case .createComment(let postId, _):
+            return "/v1/posts/\(postId)/comments"
+        case .updateComment(let postId, let commentId, _):
+            return "/v1/posts/\(postId)/comments/\(commentId)"
+        case .deleteComment(let postId, let commentId):
+            return "/v1/posts/\(postId)/comments/\(commentId)"
         }
     }
 
@@ -76,7 +87,8 @@ enum PostRouter: BaseRouter {
             return query
         case .myLikedPosts(let query):
             return query
-        case .uploadFiles, .createPost, .post, .updatePost, .deletePost, .likePost:
+        case .uploadFiles, .createPost, .post, .updatePost, .deletePost, .likePost,
+             .createComment, .updateComment, .deleteComment:
             return nil
         }
     }
@@ -89,7 +101,12 @@ enum PostRouter: BaseRouter {
             return body
         case .likePost(_, let body):
             return body
-        case .uploadFiles, .geolocationPosts, .searchPosts, .post, .deletePost, .getUserPosts, .myLikedPosts:
+        case .createComment(_, let body):
+            return body
+        case .updateComment(_, _, let body):
+            return body
+        case .uploadFiles, .geolocationPosts, .searchPosts, .post, .deletePost,
+             .getUserPosts, .myLikedPosts, .deleteComment:
             return nil
         }
     }
