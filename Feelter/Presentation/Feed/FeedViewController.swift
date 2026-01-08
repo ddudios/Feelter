@@ -11,6 +11,8 @@ import SnapKit
 
 final class FeedViewController: BaseViewController {
     
+    weak var coordinator: FeedCoordinator?
+
     // MARK: - Types
     enum Section {
         case category
@@ -81,6 +83,7 @@ final class FeedViewController: BaseViewController {
     private let categorySubject = PassthroughSubject<FilterCategory, Never>()
     private let loadMoreSubject = PassthroughSubject<Void, Never>()
     private let likeButtonTappedSubject = PassthroughSubject<(filterId: String, isLiked: Bool), Never>()
+    private let filterDetailUpdatedSubject = PassthroughSubject<FilterDetailLikeUpdate, Never>()
     private var cancellables = Set<AnyCancellable>()
     
     // State
@@ -344,6 +347,9 @@ final class FeedViewController: BaseViewController {
                     return UICollectionViewCell()
                 }
                 cell.configure(with: loopItem.filter, rank: loopItem.rank)
+                cell.onTap = { [weak self] in
+                    self?.showFilterDetail(filterId: loopItem.filter.id)
+                }
                 return cell
                 
             case .filterFeed(let filter):
@@ -359,6 +365,9 @@ final class FeedViewController: BaseViewController {
                     cell.onLikeTapped = { [weak self] filterId, isLiked in
                         self?.likeButtonTappedSubject.send((filterId, isLiked))
                     }
+                    cell.onTap = { [weak self] filterId in
+                        self?.showFilterDetail(filterId: filterId)
+                    }
                     return cell
                     
                 case .block:
@@ -371,6 +380,9 @@ final class FeedViewController: BaseViewController {
                     cell.configure(with: filter)
                     cell.onLikeTapped = { [weak self] filterId, isLiked in
                         self?.likeButtonTappedSubject.send((filterId, isLiked))
+                    }
+                    cell.onTap = { [weak self] filterId in
+                        self?.showFilterDetail(filterId: filterId)
                     }
                     return cell
                 }
@@ -418,7 +430,8 @@ final class FeedViewController: BaseViewController {
             sortTypeSelected: sortTypeSubject.eraseToAnyPublisher(),
             categorySelected: categorySubject.eraseToAnyPublisher(),
             loadMore: loadMoreSubject.eraseToAnyPublisher(),
-            likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher()
+            likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher(),
+            filterDetailUpdated: filterDetailUpdatedSubject.eraseToAnyPublisher()
         )
         
         let output = viewModel.transform(input: input)
@@ -509,6 +522,18 @@ final class FeedViewController: BaseViewController {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+
+    private func showFilterDetail(filterId: String) {
+        coordinator?.showFilterDetail(filterId: filterId) { [weak self] filterId, isLiked, likeCount in
+            self?.filterDetailUpdatedSubject.send(
+                FilterDetailLikeUpdate(
+                    filterId: filterId,
+                    isLiked: isLiked,
+                    likeCount: likeCount
+                )
+            )
+        }
     }
     
     private func makeTopRankingLoopItems(from filters: [FilterSummary]) -> [TopRankingLoopItem] {
@@ -640,6 +665,18 @@ final class FeedViewController: BaseViewController {
 
 // MARK: - UICollectionViewDelegate
 extension FeedViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
+        
+        switch item {
+        case .topRanking, .category:
+            break
+        case .filterFeed:
+            break
+        }
+    }
+    
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         if scrollView == mainCollectionView {
             let offsetY = scrollView.contentOffset.y

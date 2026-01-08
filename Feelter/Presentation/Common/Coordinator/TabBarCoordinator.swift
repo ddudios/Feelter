@@ -32,10 +32,10 @@ final class TabBarCoordinator: Coordinator {
             tabType: .home
         )
 
-        let feedNav = createNavigationController(
-            rootViewController: FeedViewController(),
-            tabType: .feed
-        )
+        let feedNav = createNavigationController(tabType: .feed)
+        let feedCoordinator = FeedCoordinator(navigationController: feedNav)
+        addChildCoordinator(feedCoordinator)
+        feedCoordinator.start()
 
         let filterNav = createNavigationController(
             rootViewController: FilterViewController(),
@@ -57,10 +57,15 @@ final class TabBarCoordinator: Coordinator {
     }
 
     private func createNavigationController(
-        rootViewController: UIViewController,
+        rootViewController: UIViewController? = nil,
         tabType: CustomTabBarController.TabType
     ) -> UINavigationController {
-        let navigationController = UINavigationController(rootViewController: rootViewController)
+        let navigationController: UINavigationController
+        if let rootViewController {
+            navigationController = UINavigationController(rootViewController: rootViewController)
+        } else {
+            navigationController = UINavigationController()
+        }
         navigationController.view.backgroundColor = .Feelter.gray100
         navigationController.tabBarItem = UITabBarItem(
             title: tabType.title,

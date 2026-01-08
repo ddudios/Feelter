@@ -8,6 +8,12 @@
 import Foundation
 import Combine
 
+struct FilterDetailLikeUpdate {
+    let filterId: String
+    let isLiked: Bool
+    let likeCount: Int
+}
+
 final class FeedViewModel: ViewModelProtocol {
     
     struct Input {
@@ -16,6 +22,7 @@ final class FeedViewModel: ViewModelProtocol {
         let categorySelected: AnyPublisher<FilterCategory, Never>
         let loadMore: AnyPublisher<Void, Never>
         let likeButtonTapped: AnyPublisher<(filterId: String, isLiked: Bool), Never>
+        let filterDetailUpdated: AnyPublisher<FilterDetailLikeUpdate, Never>
     }
     
     struct Output {
@@ -234,6 +241,46 @@ final class FeedViewModel: ViewModelProtocol {
                             }
                         }
                     }
+                }
+            }
+            .store(in: &cancellables)
+
+        input.filterDetailUpdated
+            .sink { [weak self] update in
+                guard let self = self else { return }
+                let updatedFilter = { (filter: FilterSummary) in
+                    FilterSummary(
+                        id: filter.id,
+                        category: filter.category,
+                        title: filter.title,
+                        description: filter.description,
+                        mainImageURL: filter.mainImageURL,
+                        creator: filter.creator,
+                        photographerName: filter.photographerName,
+                        likeCount: update.likeCount,
+                        isLiked: update.isLiked,
+                        createdAt: filter.createdAt
+                    )
+                }
+
+                var didUpdateFeed = false
+                if let index = self.feedFilters.firstIndex(where: { $0.id == update.filterId }) {
+                    self.feedFilters[index] = updatedFilter(self.feedFilters[index])
+                    didUpdateFeed = true
+                }
+
+                var didUpdateTopRanking = false
+                if let index = self.topRankingFilters.firstIndex(where: { $0.id == update.filterId }) {
+                    self.topRankingFilters[index] = updatedFilter(self.topRankingFilters[index])
+                    didUpdateTopRanking = true
+                }
+
+                if didUpdateFeed {
+                    feedFiltersSubject.send(self.feedFilters)
+                }
+
+                if didUpdateTopRanking {
+                    topRankingSubject.send(self.topRankingFilters)
                 }
             }
             .store(in: &cancellables)

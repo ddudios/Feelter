@@ -9,10 +9,16 @@ import UIKit
 import SnapKit
 import Kingfisher
 
-final class FilterFeedCell: BaseCollectionViewCell {
+final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate {
 
+    var onTap: ((String) -> Void)?
     var onLikeTapped: ((String, Bool) -> Void)?
     private var currentFilter: FilterSummary?
+    private lazy var tapGestureRecognizer: UITapGestureRecognizer = {
+        let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        recognizer.delegate = self
+        return recognizer
+    }()
 
     private let thumbnailImageView = {
         let imageView = UIImageView()
@@ -80,6 +86,11 @@ final class FilterFeedCell: BaseCollectionViewCell {
         contentView.addSubview(descriptionLabel)
     }
 
+    override func configureView() {
+        super.configureView()
+        contentView.addGestureRecognizer(tapGestureRecognizer)
+    }
+
     override func configureLayout() {
         thumbnailImageView.snp.makeConstraints { make in
             make.leading.equalToSuperview()
@@ -117,9 +128,28 @@ final class FilterFeedCell: BaseCollectionViewCell {
         }
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onTap = nil
+        onLikeTapped = nil
+        currentFilter = nil
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if let view = touch.view, view.isDescendant(of: likeButton) {
+            return false
+        }
+        return true
+    }
+
     @objc private func likeButtonTapped() {
         guard let filter = currentFilter else { return }
         onLikeTapped?(filter.id, filter.isLiked)
+    }
+
+    @objc private func handleTap() {
+        guard let filter = currentFilter else { return }
+        onTap?(filter.id)
     }
 
     func configure(with filter: FilterSummary) {

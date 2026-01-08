@@ -11,6 +11,8 @@ import Kingfisher
 
 final class CategoryRankingCell: BaseCollectionViewCell {
 
+    var onTap: (() -> Void)?
+
     // MARK: - Layout Constants
     private enum Layout {
         static let cardTopInset: CGFloat = 10
@@ -85,6 +87,12 @@ final class CategoryRankingCell: BaseCollectionViewCell {
         label.textAlignment = .center
         return label
     }()
+
+    override func configureView() {
+        super.configureView()
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        contentView.addGestureRecognizer(tapGesture)
+    }
 
     // MARK: - Configuration
     override func configureHierarchy() {
@@ -174,6 +182,7 @@ final class CategoryRankingCell: BaseCollectionViewCell {
         // 재사용될 때 레이아웃 갱신 예약
         self.setNeedsLayout()
         filterImageView.image = nil
+        onTap = nil
     }
 
     func configure(with filter: FilterSummary, rank: Int) {
@@ -182,5 +191,9 @@ final class CategoryRankingCell: BaseCollectionViewCell {
         titleLabel.text = filter.title
         categoryLabel.text = "#\(filter.category.rawValue)"
         rankLabel.text = "\(rank)"
+    }
+
+    @objc private func handleTap() {
+        onTap?()
     }
 }
