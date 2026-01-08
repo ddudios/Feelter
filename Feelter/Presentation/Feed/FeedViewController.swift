@@ -33,6 +33,11 @@ final class FeedViewController: BaseViewController {
         
         static let sectionInsets = NSDirectionalEdgeInsets(top: 100, leading: 0, bottom: 48, trailing: 0)
     }
+
+    private enum TopRankingLoop {
+        static let multiplier = 50
+        static let edgeBufferMultiplier = 2
+    }
     
     private enum FilterFeedLayout {
         static let headerHeight: CGFloat = 30
@@ -86,6 +91,8 @@ final class FeedViewController: BaseViewController {
     private var topRankingLoopItems: [TopRankingLoopItem] = []
     private var feedFilters: [FilterSummary] = []
     private var filterFeedLayoutMode: FilterFeedLayoutMode = .list
+    private var shouldScrollTopRankingToLoopCenter = false
+    private var isAdjustingTopRankingLoop = false
     private weak var topRankingScrollView: UIScrollView?
     private var topRankingScrollOffsetObservation: NSKeyValueObservation?
     
@@ -218,6 +225,12 @@ final class FeedViewController: BaseViewController {
                         
                         item.transform = CGAffineTransform(translationX: 0, y: yOffset)
                     }
+
+                    let cellItems = items.filter { $0.representedElementCategory == .cell }
+                    guard let centeredItem = cellItems.min(by: { lhs, rhs in
+                        abs(lhs.frame.midX - visibleCenterX) < abs(rhs.frame.midX - visibleCenterX)
+                    }) else { return }
+                    self.adjustTopRankingLoopIfNeeded(centeredLoopIndex: centeredItem.indexPath.item)
                 }
                 
                 return section
@@ -439,7 +452,8 @@ final class FeedViewController: BaseViewController {
     
     private func updateTopRanking(with filters: [FilterSummary]) {
         topRankingFilters = filters
-        topRankingLoopItems = makeBasicItems(from: filters)
+        topRankingLoopItems = makeTopRankingLoopItems(from: filters)
+        shouldScrollTopRankingToLoopCenter = filters.count > 1
         
         if !filters.contains(where: { $0.category == currentCategory }),
            let firstCategory = filters.first?.category {
@@ -471,6 +485,7 @@ final class FeedViewController: BaseViewController {
         dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
             self?.findAndSetupTopRankingScrollView()
             self?.mainCollectionView.collectionViewLayout.invalidateLayout()
+            self?.scrollTopRankingToLoopCenterIfNeeded()
         }
     }
     
@@ -491,14 +506,77 @@ final class FeedViewController: BaseViewController {
         present(alert, animated: true)
     }
     
-    private func makeBasicItems(from filters: [FilterSummary]) -> [TopRankingLoopItem] {
-        return filters.enumerated().map { index, filter in
-            TopRankingLoopItem(
-                id: UUID(),
-                filter: filter,
-                sourceIndex: index,
-                rank: index + 1
-            )
+    private func makeTopRankingLoopItems(from filters: [FilterSummary]) -> [TopRankingLoopItem] {
+        guard !filters.isEmpty else { return [] }
+        guard filters.count > 1 else {
+            return [
+                TopRankingLoopItem(
+                    id: UUID(),
+                    filter: filters[0],
+                    sourceIndex: 0,
+                    rank: 1
+                )
+            ]
+        }
+
+        let repeatedCount = TopRankingLoop.multiplier
+        var items: [TopRankingLoopItem] = []
+        items.reserveCapacity(filters.count * repeatedCount)
+        for _ in 0..<repeatedCount {
+            for (index, filter) in filters.enumerated() {
+                items.append(
+                    TopRankingLoopItem(
+                        id: UUID(),
+                        filter: filter,
+                        sourceIndex: index,
+                        rank: index + 1
+                    )
+                )
+            }
+        }
+        return items
+    }
+
+    private func scrollTopRankingToLoopCenterIfNeeded() {
+        guard shouldScrollTopRankingToLoopCenter else { return }
+        shouldScrollTopRankingToLoopCenter = false
+        guard topRankingFilters.count > 1 else { return }
+        let baseCount = topRankingFilters.count
+        let middleStartIndex = (TopRankingLoop.multiplier / 2) * baseCount
+        let currentIndex = topRankingFilters.firstIndex(where: { $0.category == currentCategory }) ?? 0
+        let targetIndex = middleStartIndex + currentIndex
+        guard targetIndex < topRankingLoopItems.count else { return }
+        mainCollectionView.scrollToItem(
+            at: IndexPath(item: targetIndex, section: 0),
+            at: .centeredHorizontally,
+            animated: false
+        )
+    }
+
+    private func adjustTopRankingLoopIfNeeded(centeredLoopIndex: Int) {
+        guard topRankingFilters.count > 1 else { return }
+        guard !topRankingLoopItems.isEmpty else { return }
+        guard !isAdjustingTopRankingLoop else { return }
+        let baseCount = topRankingFilters.count
+        let loopedCount = topRankingLoopItems.count
+        let buffer = baseCount * TopRankingLoop.edgeBufferMultiplier
+        let minimumIndex = buffer
+        let maximumIndex = loopedCount - buffer - 1
+        guard centeredLoopIndex < minimumIndex || centeredLoopIndex > maximumIndex else { return }
+
+        let middleStartIndex = (TopRankingLoop.multiplier / 2) * baseCount
+        let sourceIndex = topRankingLoopItems[centeredLoopIndex].sourceIndex
+        let targetIndex = middleStartIndex + sourceIndex
+        guard targetIndex < loopedCount else { return }
+
+        isAdjustingTopRankingLoop = true
+        mainCollectionView.scrollToItem(
+            at: IndexPath(item: targetIndex, section: 0),
+            at: .centeredHorizontally,
+            animated: false
+        )
+        DispatchQueue.main.async { [weak self] in
+            self?.isAdjustingTopRankingLoop = false
         }
     }
 
