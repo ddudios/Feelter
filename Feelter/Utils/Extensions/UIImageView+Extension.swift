@@ -35,4 +35,27 @@ extension UIImageView {
             ]
         )
     }
+
+    func setFeelterImage(with path: String?, targetSize: CGSize) {
+        guard let path = path, !path.isEmpty else {
+            image = nil
+            return
+        }
+
+        let fullPath = "\(Config.baseURL)/v1\(path)"
+        guard let url = URL(string: fullPath) else { return }
+
+        let processor = ResizingImageProcessor(referenceSize: targetSize, mode: .aspectFill)
+
+        kf.indicatorType = .activity
+        kf.setImage(
+            with: url,
+            options: [
+                .processor(processor),
+                .scaleFactor(UIScreen.main.scale),
+                .transition(.fade(0.2)),
+                .cacheOriginalImage
+            ]
+        )
+    }
 }

@@ -7,8 +7,17 @@
 
 import UIKit
 import Combine
+import SnapKit
 
 final class FilterDetailViewController: BaseViewController {
+    private enum Section {
+        case preview
+    }
+
+    private enum Item: Hashable {
+        case preview(String)
+    }
+
     private let filterId: String
     private let viewModel: FilterDetailViewModel
     
@@ -17,7 +26,22 @@ final class FilterDetailViewController: BaseViewController {
     private var cancellables = Set<AnyCancellable>()
     private var currentIsLiked = false
     private var currentLikeCount: Int?
+    private var currentFilterDetail: FilterDetail?
     var onLikeStateChanged: ((String, Bool, Int) -> Void)?
+
+    private lazy var collectionView: UICollectionView = {
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: createLayout())
+        collectionView.backgroundColor = .clear
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.contentInsetAdjustmentBehavior = .never
+        collectionView.register(
+            FilterPreviewCompareCell.self,
+            forCellWithReuseIdentifier: FilterPreviewCompareCell.identifier
+        )
+        return collectionView
+    }()
+
+    private var dataSource: UICollectionViewDiffableDataSource<Section, Item>!
     
     private lazy var likeBarButtonItem: UIBarButtonItem = {
         UIBarButtonItem(
@@ -45,6 +69,7 @@ final class FilterDetailViewController: BaseViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupDataSource()
         bind()
         viewDidLoadSubject.send(filterId)
     }
@@ -59,6 +84,20 @@ final class FilterDetailViewController: BaseViewController {
     override func configureView() {
         super.configureView()
         navigationItem.rightBarButtonItem = likeBarButtonItem
+    }
+
+    override func configureHierarchy() {
+        super.configureHierarchy()
+        view.addSubview(collectionView)
+    }
+
+    override func configureLayout() {
+        super.configureLayout()
+
+        collectionView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            make.horizontalEdges.bottom.equalToSuperview()
+        }
     }
     
     private func bind() {
@@ -75,6 +114,8 @@ final class FilterDetailViewController: BaseViewController {
                 self?.title = filter.title
                 self?.currentIsLiked = filter.isLiked
                 self?.currentLikeCount = filter.likeCount
+                self?.currentFilterDetail = filter
+                self?.reconfigurePreviewSection()
             }
             .store(in: &cancellables)
         
@@ -115,5 +156,63 @@ final class FilterDetailViewController: BaseViewController {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+
+    private func createLayout() -> UICollectionViewLayout {
+        UICollectionViewCompositionalLayout { _, _ in
+            let itemSize = NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1.0),
+                heightDimension: .estimated(480)
+            )
+            let item = NSCollectionLayoutItem(layoutSize: itemSize)
+
+            let groupSize = NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1.0),
+                heightDimension: .estimated(480)
+            )
+            let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
+
+            let section = NSCollectionLayoutSection(group: group)
+            section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 0, bottom: 16, trailing: 0)
+            return section
+        }
+    }
+
+    private func setupDataSource() {
+        dataSource = UICollectionViewDiffableDataSource<Section, Item>(
+            collectionView: collectionView
+        ) { [weak self] collectionView, indexPath, item in
+            switch item {
+            case .preview:
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: FilterPreviewCompareCell.identifier,
+                    for: indexPath
+                ) as? FilterPreviewCompareCell else {
+                    return UICollectionViewCell()
+                }
+                if let filterDetail = self?.currentFilterDetail {
+                    cell.configure(previewImages: filterDetail.previewImages)
+                } else {
+                    cell.configure(previewImages: [])
+                }
+                return cell
+            }
+        }
+
+        var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
+        snapshot.appendSections([.preview])
+        snapshot.appendItems([.preview(filterId)], toSection: .preview)
+        dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func reconfigurePreviewSection() {
+        var snapshot = dataSource.snapshot()
+        let previewItem = Item.preview(filterId)
+        if snapshot.indexOfItem(previewItem) == nil {
+            snapshot.appendItems([previewItem], toSection: .preview)
+        } else {
+            snapshot.reloadItems([previewItem])
+        }
+        dataSource.apply(snapshot, animatingDifferences: false)
     }
 }
