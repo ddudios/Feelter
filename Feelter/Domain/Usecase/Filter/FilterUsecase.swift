@@ -17,6 +17,7 @@ protocol FilterUsecaseProtocol {
 
     func fetchFilter(id: String) async throws -> FilterDetail
     func fetchTodayFilter() async throws -> TodayFilter
+    func likeFilter(id: String, status: Bool) async throws -> Bool
 }
 
 struct FilterUsecase: FilterUsecaseProtocol {
@@ -47,5 +48,9 @@ struct FilterUsecase: FilterUsecaseProtocol {
 
     func fetchTodayFilter() async throws -> TodayFilter {
         try await repository.fetchTodayFilter()
+    }
+
+    func likeFilter(id: String, status: Bool) async throws -> Bool {
+        try await repository.likeFilter(id: id, status: status)
     }
 }

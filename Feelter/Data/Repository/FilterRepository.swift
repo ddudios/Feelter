@@ -56,4 +56,12 @@ final class FilterRepository: FilterRepositoryProtocol {
 
         return response.toDomain()
     }
+
+    func likeFilter(id: String, status: Bool) async throws -> Bool {
+        let response = try await networkManager.request(
+            FilterRouter.likeFilter(id: id, body: LikeRequestDTO(likeStatus: status)),
+            type: LikeResponseDTO.self
+        )
+        return response.likeStatus
+    }
 }

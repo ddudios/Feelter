@@ -26,7 +26,6 @@ final class FeedViewModel: ViewModelProtocol {
     }
     
     private let filterUsecase: FilterUsecaseProtocol
-    private let communityRepository: CommunityRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
     
     private var currentSortType: FilterSortType = .popularity
@@ -37,12 +36,8 @@ final class FeedViewModel: ViewModelProtocol {
     private var topRankingFilters: [FilterSummary] = []
     private let topRankingCategories: [FilterCategory] = FilterCategory.allCases.filter { $0 != .unknown }
     
-    init(
-        filterUsecase: FilterUsecaseProtocol,
-        communityRepository: CommunityRepositoryProtocol
-    ) {
+    init(filterUsecase: FilterUsecaseProtocol) {
         self.filterUsecase = filterUsecase
-        self.communityRepository = communityRepository
     }
     
     func transform(input: Input) -> Output {
@@ -214,10 +209,7 @@ final class FeedViewModel: ViewModelProtocol {
                     // 서버에 반영
                     Task {
                         do {
-                            _ = try await self.communityRepository.likePost(
-                                postId: filterId,
-                                status: newIsLiked
-                            )
+                            _ = try await self.filterUsecase.likeFilter(id: filterId, status: newIsLiked)
                         } catch {
                             // 실패 시 롤백
                             await MainActor.run {

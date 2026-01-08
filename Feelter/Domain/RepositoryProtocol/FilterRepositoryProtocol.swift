@@ -17,4 +17,5 @@ protocol FilterRepositoryProtocol {
 
     func fetchFilter(id: String) async throws -> FilterDetail
     func fetchTodayFilter() async throws -> TodayFilter
+    func likeFilter(id: String, status: Bool) async throws -> Bool
 }

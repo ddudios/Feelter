@@ -73,7 +73,6 @@ func registerDependencies() {
 
     container.registerFactory(FeedViewModel.self) {
         let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
-        let communityRepository = container.resolve(CommunityRepositoryProtocol.self)
-        return FeedViewModel(filterUsecase: filterUsecase, communityRepository: communityRepository)
+        return FeedViewModel(filterUsecase: filterUsecase)
     }
 }

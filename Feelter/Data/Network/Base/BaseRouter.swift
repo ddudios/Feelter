@@ -13,6 +13,7 @@ protocol BaseRouter: URLRequestConvertible {
     var method: HTTPMethod { get }
     var path: String { get }
     var headers: HTTPHeaders { get }
+    var cachePolicy: URLRequest.CachePolicy { get }
     var body: Encodable? { get }
     var queryParameters: Encodable? { get }
 }
@@ -32,6 +33,10 @@ extension BaseRouter {
     var headers: HTTPHeaders {
         return defaultHeaders
     }
+
+    var cachePolicy: URLRequest.CachePolicy {
+        return .useProtocolCachePolicy
+    }
     
     // 기본 queryParameters (없으면 nil)
     var queryParameters: Encodable? {
@@ -48,6 +53,7 @@ extension BaseRouter {
         let url = baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.method = method
+        request.cachePolicy = cachePolicy
         
         headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.name) }
         

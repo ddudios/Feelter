@@ -47,6 +47,15 @@ enum FilterRouter: BaseRouter {
         }
     }
 
+    var cachePolicy: URLRequest.CachePolicy {
+        switch self {
+        case .filterList:
+            return .reloadIgnoringLocalCacheData
+        default:
+            return .useProtocolCachePolicy
+        }
+    }
+
     var path: String {
         switch self {
         case .uploadFiles:
