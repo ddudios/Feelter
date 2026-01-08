@@ -12,6 +12,7 @@ protocol NetworkManagerProtocol {
     func request<T: Decodable, R: URLRequestConvertible>(_ endpoint: R, type: T.Type) async throws -> T
 }
 
+//TODO: uploadFiles는 multipart/form-data를 사용하므로 NetworkManager에서 별도 처리가 필요
 // 2. 구현체
 final class NetworkManager: NetworkManagerProtocol {
     

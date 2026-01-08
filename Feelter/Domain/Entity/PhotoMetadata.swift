@@ -17,10 +17,13 @@ struct PhotoMetadata {
     let resolution: String // pixelWidth x pixelHeight 조합
     let fileSize: String   // MB 단위 등으로 변환해서 저장해도 됨
     let takenDate: Date?
-    
+    let latitude: Double?
+    let longitude: Double?
+
     // 빈 객체 (상세 정보가 없을 때 사용)
     static let empty = PhotoMetadata(
         camera: "-", lensInfo: "-", focalLength: 0, aperture: 0, iso: 0,
-        shutterSpeed: "-", resolution: "-", fileSize: "-", takenDate: nil
+        shutterSpeed: "-", resolution: "-", fileSize: "-", takenDate: nil,
+        latitude: nil, longitude: nil
     )
 }

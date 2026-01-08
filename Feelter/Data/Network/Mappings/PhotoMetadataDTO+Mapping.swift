@@ -18,7 +18,9 @@ extension PhotoMetadataDTO {
             shutterSpeed: shutterSpeed,
             resolution: "\(pixelWidth) x \(pixelHeight)",
             fileSize: ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file),
-            takenDate: dateTimeOriginal.toDate() ?? Date()
+            takenDate: dateTimeOriginal.toDate() ?? Date(),
+            latitude: latitude,
+            longitude: longitude
         )
     }
 }
