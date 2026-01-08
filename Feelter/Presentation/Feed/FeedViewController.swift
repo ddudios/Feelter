@@ -93,6 +93,8 @@ final class FeedViewController: BaseViewController {
     private var filterFeedLayoutMode: FilterFeedLayoutMode = .list
     private var shouldScrollTopRankingToLoopCenter = false
     private var isAdjustingTopRankingLoop = false
+    private var pendingCategorySelectionWorkItem: DispatchWorkItem?
+    private var pendingCenteredIndex: Int?
     private weak var topRankingScrollView: UIScrollView?
     private var topRankingScrollOffsetObservation: NSKeyValueObservation?
     
@@ -231,6 +233,7 @@ final class FeedViewController: BaseViewController {
                         abs(lhs.frame.midX - visibleCenterX) < abs(rhs.frame.midX - visibleCenterX)
                     }) else { return }
                     self.adjustTopRankingLoopIfNeeded(centeredLoopIndex: centeredItem.indexPath.item)
+                    self.scheduleCenteredCategoryUpdate(centeredLoopIndex: centeredItem.indexPath.item)
                 }
                 
                 return section
@@ -454,6 +457,8 @@ final class FeedViewController: BaseViewController {
         topRankingFilters = filters
         topRankingLoopItems = makeTopRankingLoopItems(from: filters)
         shouldScrollTopRankingToLoopCenter = filters.count > 1
+        pendingCenteredIndex = nil
+        pendingCategorySelectionWorkItem?.cancel()
         
         if !filters.contains(where: { $0.category == currentCategory }),
            let firstCategory = filters.first?.category {
@@ -535,6 +540,30 @@ final class FeedViewController: BaseViewController {
             }
         }
         return items
+    }
+
+    private func scheduleCenteredCategoryUpdate(centeredLoopIndex: Int) {
+        guard !topRankingLoopItems.isEmpty else { return }
+        guard centeredLoopIndex < topRankingLoopItems.count else { return }
+        guard !isAdjustingTopRankingLoop else { return }
+        let centeredIndex = topRankingLoopItems[centeredLoopIndex].sourceIndex
+        guard centeredIndex != pendingCenteredIndex else { return }
+        pendingCenteredIndex = centeredIndex
+
+        pendingCategorySelectionWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.applyCenteredCategoryIfNeeded(index: centeredIndex)
+        }
+        pendingCategorySelectionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+    }
+
+    private func applyCenteredCategoryIfNeeded(index: Int) {
+        guard index < topRankingFilters.count else { return }
+        let category = topRankingFilters[index].category
+        guard category != currentCategory else { return }
+        currentCategory = category
+        categorySubject.send(category)
     }
 
     private func scrollTopRankingToLoopCenterIfNeeded() {

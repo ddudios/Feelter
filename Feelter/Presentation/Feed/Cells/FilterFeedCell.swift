@@ -84,8 +84,8 @@ final class FilterFeedCell: BaseCollectionViewCell {
         thumbnailImageView.snp.makeConstraints { make in
             make.leading.equalToSuperview()
             make.verticalEdges.equalToSuperview()
-            make.width.equalTo(80)
-            make.height.equalTo(100)
+            make.width.equalTo(90)
+            make.height.equalTo(110)
         }
 
         likeButton.snp.makeConstraints { make in

@@ -34,6 +34,7 @@ final class FeedViewModel: ViewModelProtocol {
     private var nextCursor: String?
     private var isLoadingMore = false
     private var feedFilters: [FilterSummary] = []
+    private var topRankingFilters: [FilterSummary] = []
     private let topRankingCategories: [FilterCategory] = FilterCategory.allCases.filter { $0 != .unknown }
     
     init(
@@ -58,6 +59,7 @@ final class FeedViewModel: ViewModelProtocol {
                         categories: topRankingCategories
                     )
                     await MainActor.run {
+                        self.topRankingFilters = filters
                         topRankingSubject.send(filters)
                     }
                 } catch {
@@ -86,6 +88,7 @@ final class FeedViewModel: ViewModelProtocol {
                         limit: "10"
                     )
                     
+                    let firstFilter = result.filters.first
                     let trimmedFilters = Array(result.filters.dropFirst())
                     
                     await MainActor.run {
@@ -93,6 +96,12 @@ final class FeedViewModel: ViewModelProtocol {
                         self.nextCursor = result.nextCursor
                         isLoadingSubject.send(false)
                         feedFiltersSubject.send(self.feedFilters)
+
+                        if let firstFilter,
+                           let index = self.topRankingFilters.firstIndex(where: { $0.category == category }) {
+                            self.topRankingFilters[index] = firstFilter
+                            topRankingSubject.send(self.topRankingFilters)
+                        }
                     }
                 } catch {
                     await MainActor.run {
