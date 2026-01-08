@@ -35,9 +35,9 @@ final class FeedViewController: BaseViewController {
     }
     
     private enum FilterFeedLayout {
-        static let headerHeight: CGFloat = 40
-        static let sectionInsets = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20)
-        static let listInterGroupSpacing: CGFloat = 12
+        static let headerHeight: CGFloat = 30
+        static let sectionInsets = NSDirectionalEdgeInsets(top: 20, leading: 20, bottom: 120, trailing: 20)
+        static let listInterGroupSpacing: CGFloat = 18
         static let blockColumnSpacing: CGFloat = 12
         static let blockItemSpacing: CGFloat = 12
         static let blockInterGroupSpacing: CGFloat = 16
@@ -86,6 +86,8 @@ final class FeedViewController: BaseViewController {
     private var topRankingLoopItems: [TopRankingLoopItem] = []
     private var feedFilters: [FilterSummary] = []
     private var filterFeedLayoutMode: FilterFeedLayoutMode = .list
+    private weak var topRankingScrollView: UIScrollView?
+    private var topRankingScrollOffsetObservation: NSKeyValueObservation?
     
     // MARK: - UI Components
     private lazy var mainCollectionView: UICollectionView = {
@@ -128,6 +130,11 @@ final class FeedViewController: BaseViewController {
         setupDataSource()
         bind()
         viewDidLoadSubject.send(())
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        findAndSetupTopRankingScrollView()
     }
     
     override func configureHierarchy() {
@@ -182,7 +189,6 @@ final class FeedViewController: BaseViewController {
                 
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 
-                // ✨ [Fixed] 실시간 가로 스크롤 반응형 애니메이션
                 section.visibleItemsInvalidationHandler = { items, offset, environment in
                     // 1. 컨테이너(화면) 너비
                     let containerWidth = environment.container.contentSize.width
@@ -462,13 +468,21 @@ final class FeedViewController: BaseViewController {
             snapshot.appendItems(items, toSection: .filterFeed)
         }
         
-        dataSource.apply(snapshot, animatingDifferences: false)
+        dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
+            self?.findAndSetupTopRankingScrollView()
+            self?.mainCollectionView.collectionViewLayout.invalidateLayout()
+        }
     }
     
     private func toggleFilterFeedLayoutMode() {
         filterFeedLayoutMode.toggle()
+        topRankingScrollOffsetObservation = nil
+        topRankingScrollView = nil
         mainCollectionView.setCollectionViewLayout(createLayout(), animated: true)
         mainCollectionView.reloadData()
+        DispatchQueue.main.async { [weak self] in
+            self?.findAndSetupTopRankingScrollView()
+        }
     }
     
     private func showAlert(message: String) {
@@ -485,6 +499,33 @@ final class FeedViewController: BaseViewController {
                 sourceIndex: index,
                 rank: index + 1
             )
+        }
+    }
+
+    private func findAndSetupTopRankingScrollView() {
+        guard topRankingScrollView == nil else { return }
+
+        func findScrollView(in view: UIView) -> UIScrollView? {
+            for subview in view.subviews {
+                if let scrollView = subview as? UIScrollView,
+                   scrollView != mainCollectionView {
+                    return scrollView
+                }
+                if let found = findScrollView(in: subview) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        if let scrollView = findScrollView(in: mainCollectionView) {
+            topRankingScrollView = scrollView
+            topRankingScrollOffsetObservation = scrollView.observe(
+                \.contentOffset,
+                options: [.new]
+            ) { [weak self] _, _ in
+                self?.mainCollectionView.collectionViewLayout.invalidateLayout()
+            }
         }
     }
     

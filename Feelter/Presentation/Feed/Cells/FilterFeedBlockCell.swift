@@ -25,16 +25,16 @@ final class FilterFeedBlockCell: BaseCollectionViewCell {
 
     private let titleLabel = {
         let label = UILabel()
-        label.font = TextStyle.Mulgyeol.body1
-        label.textColor = .Feelter.gray0
+        label.font = TextStyle.Mulgyeol.caption1
+        label.textColor = .Feelter.gray30
         label.numberOfLines = 2
         return label
     }()
 
     private let creatorNameLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.body4
-        label.textColor = .Feelter.gray60
+        label.font = TextStyle.Pretendard.caption1
+        label.textColor = .Feelter.gray90
         return label
     }()
 
@@ -80,6 +80,7 @@ final class FilterFeedBlockCell: BaseCollectionViewCell {
     override func configureLayout() {
         thumbnailImageView.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
+            make.bottom.equalTo(creatorNameLabel.snp.top).offset(-8)
         }
 
         titleLabel.snp.makeConstraints { make in

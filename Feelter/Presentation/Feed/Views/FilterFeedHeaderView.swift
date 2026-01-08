@@ -13,7 +13,6 @@ final class FilterFeedHeaderView: UICollectionReusableView {
     static let identifier = String(describing: FilterFeedHeaderView.self)
 
     private enum Layout {
-        static let horizontalInset: CGFloat = Spacing.padding
         static let buttonHeight: CGFloat = 28
     }
 
@@ -52,12 +51,12 @@ final class FilterFeedHeaderView: UICollectionReusableView {
 
     private func configureLayout() {
         titleLabel.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(Layout.horizontalInset)
+            make.leading.equalToSuperview()
             make.centerY.equalToSuperview()
         }
 
         modeButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
+            make.trailing.equalToSuperview()
             make.centerY.equalToSuperview()
             make.height.equalTo(Layout.buttonHeight)
         }

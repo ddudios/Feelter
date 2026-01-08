@@ -40,24 +40,25 @@ final class FilterFeedCell: BaseCollectionViewCell {
     }()
 
     private let categoryLabel = {
-        let label = UILabel()
-        label.font = TextStyle.Pretendard.body4
-        label.textColor = .Feelter.gray45
+        let label = CapsuleLabel()
+        label.font = TextStyle.Pretendard.caption1
+        label.textColor = .Feelter.gray60
+        label.backgroundColor = UIColor.Feelter.blackTurquoise
         return label
     }()
 
     private let creatorNameLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.body4
-        label.textColor = .Feelter.gray30
+        label.font = TextStyle.Pretendard.body1
+        label.textColor = .Feelter.gray75
         return label
     }()
 
     private let descriptionLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.body4
+        label.font = TextStyle.Pretendard.caption1
         label.textColor = .Feelter.gray60
-        label.numberOfLines = 2
+        label.numberOfLines = 3
         return label
     }()
 
@@ -81,9 +82,10 @@ final class FilterFeedCell: BaseCollectionViewCell {
 
     override func configureLayout() {
         thumbnailImageView.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(20)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(80)
+            make.leading.equalToSuperview()
+            make.verticalEdges.equalToSuperview()
+            make.width.equalTo(80)
+            make.height.equalTo(100)
         }
 
         likeButton.snp.makeConstraints { make in
@@ -93,14 +95,14 @@ final class FilterFeedCell: BaseCollectionViewCell {
         }
 
         titleLabel.snp.makeConstraints { make in
-            make.top.equalTo(thumbnailImageView.snp.top)
+            make.top.equalTo(thumbnailImageView.snp.top).offset(5)
             make.leading.equalTo(thumbnailImageView.snp.trailing).offset(16)
-            make.trailing.equalToSuperview().offset(-20)
         }
 
         categoryLabel.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(4)
-            make.leading.equalTo(titleLabel)
+            make.centerY.equalTo(titleLabel.snp.centerY)
+            make.leading.equalTo(titleLabel.snp.trailing).offset(6)
+            make.trailing.lessThanOrEqualToSuperview()
         }
 
         creatorNameLabel.snp.makeConstraints { make in
@@ -111,7 +113,7 @@ final class FilterFeedCell: BaseCollectionViewCell {
         descriptionLabel.snp.makeConstraints { make in
             make.top.equalTo(creatorNameLabel.snp.bottom).offset(4)
             make.leading.equalTo(titleLabel)
-            make.trailing.equalToSuperview().offset(-20)
+            make.trailing.equalToSuperview()
         }
     }
 
