@@ -25,8 +25,9 @@ final class FilterFeedCell: BaseCollectionViewCell {
 
     private let likeButton = {
         let button = UIButton(type: .custom)
-        button.setImage(UIImage(named: "Like_Empty"), for: .normal)
-        button.setImage(UIImage(named: "Like_Fill"), for: .selected)
+        button.tintColor = .Feelter.gray0
+        button.setImage(UIImage.Icon.likeEmpty, for: .normal)
+        button.setImage(UIImage.Icon.likeFill, for: .selected)
         return button
     }()
 
@@ -86,7 +87,7 @@ final class FilterFeedCell: BaseCollectionViewCell {
         }
 
         likeButton.snp.makeConstraints { make in
-            make.top.equalTo(thumbnailImageView.snp.top).offset(8)
+            make.bottom.equalTo(thumbnailImageView.snp.bottom).offset(-8)
             make.trailing.equalTo(thumbnailImageView.snp.trailing).offset(-8)
             make.width.height.equalTo(24)
         }

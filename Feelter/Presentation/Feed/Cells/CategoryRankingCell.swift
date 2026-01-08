@@ -13,8 +13,8 @@ final class CategoryRankingCell: BaseCollectionViewCell {
 
     // MARK: - Layout Constants
     private enum Layout {
-        static let cardTopInset: CGFloat = 16
-        static let imageSize: CGFloat = 180
+        static let cardTopInset: CGFloat = 10
+        static let imageSize: CGFloat = 200
         static let labelTopSpacing: CGFloat = 12
         static let titleTopSpacing: CGFloat = 6
         static let categoryTopSpacing: CGFloat = 8
@@ -28,6 +28,8 @@ final class CategoryRankingCell: BaseCollectionViewCell {
     private let cardView = {
         let view = UIView()
         view.backgroundColor = .Feelter.blackTurquoise
+        view.layer.borderColor = UIColor.Feelter.deepTurquoise?.cgColor
+        view.layer.borderWidth = 2
         view.clipsToBounds = true
         view.layer.cornerCurve = .continuous
         return view
