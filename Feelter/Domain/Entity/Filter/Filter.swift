@@ -8,7 +8,7 @@
 import Foundation
 
 /// 목록 조회용 (가벼운 모델)
-struct FilterSummary: Identifiable {
+struct FilterSummary: Identifiable, Hashable {
     let id: String
     let category: FilterCategory
     let title: String
@@ -41,7 +41,7 @@ struct FilterDetail: Identifiable {
     let createdAt: Date
 }
 
-enum FilterCategory: String, CaseIterable {
+enum FilterCategory: String, CaseIterable, Hashable {
     case food = "푸드"
     case portrait = "인물"
     case landscape = "풍경"

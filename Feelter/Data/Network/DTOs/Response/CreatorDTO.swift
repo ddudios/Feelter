@@ -20,16 +20,3 @@ struct CreatorDTO: Decodable {
         case nick, name, introduction, profileImage, hashTags
     }
 }
-
-extension CreatorDTO {
-    func toDomain() -> Creator {
-        return Creator(
-            id: userId,
-            nickname: nick,
-            name: name,
-            introduction: introduction ?? "",
-            profileImageURL: profileImage,
-            hashTags: hashTags ?? []
-        )
-    }
-}

@@ -19,15 +19,3 @@ struct CommentDTO: Decodable {
         case content, createdAt, creator, replies
     }
 }
-
-extension CommentDTO {
-    func toDomain() -> Comment {
-        return Comment(
-            id: commentId,
-            content: content,
-            writer: creator.toDomain(),
-            createdAt: createdAt.toDate() ?? Date(),
-            replies: replies?.map { $0.toDomain() } ?? []
-        )
-    }
-}

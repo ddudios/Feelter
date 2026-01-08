@@ -23,23 +23,3 @@ struct BannerPayloadDTO: Decodable {
     let type: String
     let value: String
 }
-
-extension BannerDTO {
-    func toDomain() -> Banner {
-        return Banner(
-            title: name,
-            // 이미지 경로 결합
-            imageURL: imageUrl,
-            linkType: convertLinkType(type: payload.type),
-            linkPath: payload.value
-        )
-    }
-    
-    // String -> Enum 변환 헬퍼
-    private func convertLinkType(type: String) -> BannerLinkType {
-        switch type.uppercased() {
-        case "WEBVIEW": return .webView
-        default: return .unknown(type)
-        }
-    }
-}

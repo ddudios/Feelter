@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Creator {
+struct Creator: Hashable, Identifiable {
     let id: String
     let nickname: String
     let name: String

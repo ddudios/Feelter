@@ -8,7 +8,7 @@
 import UIKit
 
 class BaseViewController: UIViewController {
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -27,25 +27,25 @@ class BaseViewController: UIViewController {
     }
     
     private func setNavigationBackbutton() {
-        let backbutton = UIBarButtonItem(title: "", style: .plain, target: self, action: nil)
-        backbutton.tintColor = .Feelter.gray75
-        navigationItem.backBarButtonItem = backbutton
+        guard let backImage = UIImage.Icon.chevron else { return }
+        navigationController?.navigationBar.backIndicatorImage = backImage
+        navigationController?.navigationBar.backIndicatorTransitionMaskImage = backImage
+        navigationController?.navigationBar.tintColor = .Feelter.gray75
+        navigationItem.backBarButtonItem = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
     }
     
     private func setNavigationTitleStyle() {
-        navigationItem.largeTitleDisplayMode = .never
-
         navigationController?.navigationBar.titleTextAttributes = [
             .font: TextStyle.Mulgyeol.body1,
             .foregroundColor: UIColor.Feelter.gray60 ?? .systemGray
         ]
     }
-
+    
     private func hideKeyboardWhenTappedAround() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         view.addGestureRecognizer(tap)
     }
-
+    
     @objc private func dismissKeyboard() {
         view.endEditing(true)
     }

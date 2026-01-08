@@ -27,6 +27,9 @@ func registerDependencies() {
     let bannerRepository = BannerRepository(networkManager: networkManager)
     container.registerSingleton(BannerRepositoryProtocol.self, instance: bannerRepository)
 
+    let communityRepository = CommunityRepository(networkManager: networkManager)
+    container.registerSingleton(CommunityRepositoryProtocol.self, instance: communityRepository)
+
     //MARK: - Usecase
     // UseCase는 매번 새로 생성 (상태를 가지지 않음)
     container.registerFactory(LoginUsecaseProtocol.self) {
@@ -66,5 +69,11 @@ func registerDependencies() {
         let bannerUsecase = container.resolve(BannerUsecaseProtocol.self)
         let tokenRepository = container.resolve(TokenRepositoryProtocol.self)
         return HomeViewModel(filterUsecase: filterUsecase, bannerUsecase: bannerUsecase, tokenRepository: tokenRepository)
+    }
+
+    container.registerFactory(FeedViewModel.self) {
+        let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
+        let communityRepository = container.resolve(CommunityRepositoryProtocol.self)
+        return FeedViewModel(filterUsecase: filterUsecase, communityRepository: communityRepository)
     }
 }

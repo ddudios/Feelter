@@ -11,12 +11,3 @@ struct RefreshTokenResponseDTO: Decodable {
     let accessToken: String
     let refreshToken: String
 }
-
-extension RefreshTokenResponseDTO {
-    func toToken() -> AuthToken {
-        AuthToken(
-            accessToken: accessToken,
-            refreshToken: refreshToken
-        )
-    }
-}

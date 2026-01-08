@@ -26,16 +26,3 @@ struct TodayFilterResponseDTO: Decodable {
         case updatedAt
     }
 }
-
-extension TodayFilterResponseDTO {
-    func toDomain() -> TodayFilter {
-        return TodayFilter(
-            id: filterId,
-            title: title,
-            introduction: introduction,
-            description: description,
-            mainImageURL: files.first ?? "",
-            createdAt: createdAt.toDate() ?? Date()
-        )
-    }
-}

@@ -93,6 +93,7 @@ iOSInjectionProject/
 xcuserdata/  # 개인 Xcode 설정 (브레이크포인트, 스킴 등)
 **/.claude/
 claude.md
+AGENTS.md
 
 # Firebase config
 **/GoogleService-Info.plist
