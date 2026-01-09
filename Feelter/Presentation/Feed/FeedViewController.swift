@@ -44,6 +44,7 @@ final class FeedViewController: BaseViewController {
     private enum FilterFeedLayout {
         static let headerHeight: CGFloat = 30
         static let sectionInsets = NSDirectionalEdgeInsets(top: 20, leading: 20, bottom: 120, trailing: 20)
+        static let listItemHeight: CGFloat = 110
         static let listInterGroupSpacing: CGFloat = 18
         static let blockColumnSpacing: CGFloat = 12
         static let blockItemSpacing: CGFloat = 12
@@ -264,13 +265,13 @@ final class FeedViewController: BaseViewController {
         case .list:
             let itemSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
-                heightDimension: .estimated(100)
+                heightDimension: .estimated(FilterFeedLayout.listItemHeight)
             )
             let item = NSCollectionLayoutItem(layoutSize: itemSize)
             
             let groupSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
-                heightDimension: .estimated(100)
+                heightDimension: .estimated(FilterFeedLayout.listItemHeight)
             )
             let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
             
