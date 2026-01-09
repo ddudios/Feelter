@@ -10,6 +10,12 @@ import SnapKit
 
 final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognizerDelegate {
     private let initialSliderValue: Float = 0.5
+    private static let numberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
     private let imageContainerView = UIView()
     private let compareImageView = FilterImageCompareView()
 
@@ -27,6 +33,34 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
     private let compareSlider = UISlider()
     private let sliderLineView = UIView()
     private var compareControlLeadingConstraint: Constraint?
+
+    private let priceLabel = UILabel()
+    private let coinLabel = UILabel()
+
+    private let downloadCardView = UIView()
+    private let downloadTitleLabel = UILabel()
+    private let downloadCountLabel = UILabel()
+
+    private let likeCardView = UIView()
+    private let likeTitleLabel = UILabel()
+    private let likeCountLabel = UILabel()
+    private let statsContainerView = UIView()
+
+    private lazy var downloadContentStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [downloadTitleLabel, downloadCountLabel])
+        stackView.axis = .vertical
+        stackView.alignment = .center
+        stackView.spacing = 4
+        return stackView
+    }()
+
+    private lazy var likeContentStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [likeTitleLabel, likeCountLabel])
+        stackView.axis = .vertical
+        stackView.alignment = .center
+        stackView.spacing = 4
+        return stackView
+    }()
 
     private lazy var compareControlView: UIStackView = {
         let stackView = UIStackView(arrangedSubviews: [afterLabel, compareIconContainerView, beforeLabel])
@@ -73,7 +107,14 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
         contentView.addSubview(compareGestureView)
         compareGestureView.addSubview(compareControlView)
         contentView.addSubview(sliderLineView)
+        contentView.addSubview(priceLabel)
+        contentView.addSubview(coinLabel)
+        contentView.addSubview(statsContainerView)
         compareIconContainerView.addSubview(compareIconImageView)
+        statsContainerView.addSubview(downloadCardView)
+        statsContainerView.addSubview(likeCardView)
+        downloadCardView.addSubview(downloadContentStackView)
+        likeCardView.addSubview(likeContentStackView)
     }
 
     override func configureLayout() {
@@ -108,7 +149,46 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
             make.top.equalTo(compareSlider.snp.bottom).offset(16)
             make.leading.trailing.equalTo(imageContainerView)
             make.height.equalTo(1)
+        }
+        
+        priceLabel.snp.makeConstraints { make in
+            make.leading.equalTo(sliderLineView)
+            make.top.equalTo(sliderLineView.snp.bottom).offset(16)
+        }
+        
+        coinLabel.snp.makeConstraints { make in
+            make.leading.equalTo(priceLabel.snp.trailing).offset(8)
+            make.bottom.equalTo(priceLabel.snp.bottom)
+        }
+
+        statsContainerView.snp.makeConstraints { make in
+            make.top.equalTo(priceLabel.snp.bottom).offset(12)
+            make.centerX.equalTo(imageContainerView)
+            make.width.equalTo(212)
+            make.height.equalTo(70)
             make.bottom.equalToSuperview().inset(8)
+        }
+
+        downloadCardView.snp.makeConstraints { make in
+            make.leading.equalTo(sliderLineView.snp.leading)
+            make.top.equalToSuperview()
+            make.width.equalTo(110)
+            make.height.equalTo(62)
+        }
+        
+        likeCardView.snp.makeConstraints { make in
+            make.leading.equalTo(downloadCardView.snp.trailing).offset(12)
+            make.top.equalToSuperview()
+            make.width.equalTo(110)
+            make.height.equalTo(63)
+        }
+
+        downloadContentStackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(12)
+        }
+
+        likeContentStackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(12)
         }
 
         compareIconContainerView.snp.makeConstraints { make in
@@ -160,6 +240,35 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
 
         sliderLineView.backgroundColor = .Feelter.deepTurquoise
 
+        priceLabel.font = TextStyle.Mulgyeol.title1
+        priceLabel.textColor = .Feelter.gray0
+
+        coinLabel.font = TextStyle.Mulgyeol.body1
+        coinLabel.textColor = .Feelter.gray75
+        coinLabel.text = "Coin"
+
+        downloadTitleLabel.font = TextStyle.Pretendard.semibold1
+        downloadTitleLabel.textColor = .Feelter.gray75
+        downloadTitleLabel.text = "다운로드"
+
+        downloadCountLabel.font = TextStyle.Pretendard.title1
+        downloadCountLabel.textColor = .Feelter.gray30
+
+        likeTitleLabel.font = TextStyle.Pretendard.semibold1
+        likeTitleLabel.textColor = .Feelter.gray75
+        likeTitleLabel.text = "찜하기"
+
+        likeCountLabel.font = TextStyle.Pretendard.title1
+        likeCountLabel.textColor = .Feelter.gray30
+
+        downloadCardView.backgroundColor = .Feelter.blackTurquoise
+        downloadCardView.layer.cornerRadius = 12
+        downloadCardView.layer.cornerCurve = .continuous
+
+        likeCardView.backgroundColor = .Feelter.blackTurquoise
+        likeCardView.layer.cornerRadius = 12
+        likeCardView.layer.cornerCurve = .continuous
+
         compareGestureView.backgroundColor = .clear
         compareGestureView.addGestureRecognizer(comparePanGesture)
         compareGestureView.addGestureRecognizer(compareTapGesture)
@@ -173,9 +282,12 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
         compareImageView.reset()
         compareSlider.value = initialSliderValue
         compareSlider.isEnabled = true
+        priceLabel.text = nil
+        downloadCountLabel.text = nil
+        likeCountLabel.text = nil
     }
 
-    func configure(previewImages: [String]) {
+    func configure(previewImages: [String], price: Int, likeCount: Int, buyerCount: Int) {
         let leadingImagePath = previewImages.first
         let trailingImagePath = previewImages.dropFirst().first
         compareImageView.configure(leadingImagePath: leadingImagePath, trailingImagePath: trailingImagePath)
@@ -186,6 +298,10 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
         compareSlider.value = initialSliderValue
         compareImageView.updateSliderValue(CGFloat(initialSliderValue))
         updateCompareControlPosition()
+
+        priceLabel.text = formattedNumber(price)
+        downloadCountLabel.text = "\(formattedNumber(buyerCount))+"
+        likeCountLabel.text = formattedNumber(likeCount)
     }
 
     @objc private func sliderValueChanged() {
@@ -197,6 +313,11 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
     override func layoutSubviews() {
         super.layoutSubviews()
         updateCompareControlPosition()
+    }
+
+    private func formattedNumber(_ value: Int) -> String {
+        let number = NSNumber(value: value)
+        return Self.numberFormatter.string(from: number) ?? "\(value)"
     }
 
     private func updateCompareControlPosition() {

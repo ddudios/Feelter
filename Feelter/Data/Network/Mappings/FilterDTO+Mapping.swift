@@ -38,6 +38,7 @@ extension FilterDTO {
             filterValues: filterValues?.toDomain(),
             comments: comments?.map { $0.toDomain() } ?? [],
             likeCount: likeCount,
+            buyerCount: buyerCount,
             isLiked: isLiked,
             isDownloaded: isDownloaded ?? false,
             createdAt: createdAt.toDate() ?? Date()

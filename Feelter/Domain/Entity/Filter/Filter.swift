@@ -36,6 +36,7 @@ struct FilterDetail: Identifiable {
     let comments: [Comment]
     
     let likeCount: Int
+    let buyerCount: Int
     let isLiked: Bool
     let isDownloaded: Bool
     let createdAt: Date

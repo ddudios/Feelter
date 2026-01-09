@@ -10,12 +10,20 @@ import Combine
 import SnapKit
 
 final class FilterDetailViewController: BaseViewController {
-    private enum Section {
+    private enum Layout {
+        static let customTabBarHeight: CGFloat = 72
+        static let customTabBarBottomSpacing: CGFloat = 10
+        static let bottomContentPadding: CGFloat = 12
+    }
+
+    private enum Section: Int, CaseIterable {
         case preview
+        case background
     }
 
     private enum Item: Hashable {
         case preview(String)
+        case background(String)
     }
 
     private let filterId: String
@@ -37,6 +45,10 @@ final class FilterDetailViewController: BaseViewController {
         collectionView.register(
             FilterPreviewCompareCell.self,
             forCellWithReuseIdentifier: FilterPreviewCompareCell.identifier
+        )
+        collectionView.register(
+            FilterMetadataContainerCell.self,
+            forCellWithReuseIdentifier: FilterMetadataContainerCell.identifier
         )
         return collectionView
     }()
@@ -72,6 +84,11 @@ final class FilterDetailViewController: BaseViewController {
         setupDataSource()
         bind()
         viewDidLoadSubject.send(filterId)
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateBottomInsetIfNeeded()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -159,21 +176,37 @@ final class FilterDetailViewController: BaseViewController {
     }
 
     private func createLayout() -> UICollectionViewLayout {
-        UICollectionViewCompositionalLayout { _, _ in
+        UICollectionViewCompositionalLayout { sectionIndex, _ in
+            guard let sectionType = Section(rawValue: sectionIndex) else { return nil }
+            let estimatedHeight: CGFloat
+            let topInset: CGFloat
+            let bottomInset: CGFloat
+
+            switch sectionType {
+            case .preview:
+                estimatedHeight = 560
+                topInset = 16
+                bottomInset = 0
+            case .background:
+                estimatedHeight = 140
+                topInset = 0
+                bottomInset = 16
+            }
+
             let itemSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
-                heightDimension: .estimated(480)
+                heightDimension: .estimated(estimatedHeight)
             )
             let item = NSCollectionLayoutItem(layoutSize: itemSize)
 
             let groupSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
-                heightDimension: .estimated(480)
+                heightDimension: .estimated(estimatedHeight)
             )
             let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
 
             let section = NSCollectionLayoutSection(group: group)
-            section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 0, bottom: 16, trailing: 0)
+            section.contentInsets = NSDirectionalEdgeInsets(top: topInset, leading: 0, bottom: bottomInset, trailing: 0)
             return section
         }
     }
@@ -191,17 +224,31 @@ final class FilterDetailViewController: BaseViewController {
                     return UICollectionViewCell()
                 }
                 if let filterDetail = self?.currentFilterDetail {
-                    cell.configure(previewImages: filterDetail.previewImages)
+                    cell.configure(
+                        previewImages: filterDetail.previewImages,
+                        price: filterDetail.price,
+                        likeCount: filterDetail.likeCount,
+                        buyerCount: filterDetail.buyerCount
+                    )
                 } else {
-                    cell.configure(previewImages: [])
+                    cell.configure(previewImages: [], price: 0, likeCount: 0, buyerCount: 0)
+                }
+                return cell
+            case .background:
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: FilterMetadataContainerCell.identifier,
+                    for: indexPath
+                ) as? FilterMetadataContainerCell else {
+                    return UICollectionViewCell()
                 }
                 return cell
             }
         }
 
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-        snapshot.appendSections([.preview])
+        snapshot.appendSections([.preview, .background])
         snapshot.appendItems([.preview(filterId)], toSection: .preview)
+        snapshot.appendItems([.background(filterId)], toSection: .background)
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 
@@ -214,5 +261,17 @@ final class FilterDetailViewController: BaseViewController {
             snapshot.reloadItems([previewItem])
         }
         dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func updateBottomInsetIfNeeded() {
+        let bottomInset = view.safeAreaInsets.bottom
+        + Layout.customTabBarHeight
+        + Layout.customTabBarBottomSpacing
+        + Layout.bottomContentPadding
+
+        if collectionView.contentInset.bottom != bottomInset {
+            collectionView.contentInset.bottom = bottomInset
+            collectionView.scrollIndicatorInsets.bottom = bottomInset
+        }
     }
 }
