@@ -19,11 +19,13 @@ final class FilterDetailViewController: BaseViewController {
     private enum Section: Int, CaseIterable {
         case preview
         case background
+        case presets
     }
 
     private enum Item: Hashable {
         case preview(String)
         case background(String)
+        case presets(String)
     }
 
     private let filterId: String
@@ -49,6 +51,10 @@ final class FilterDetailViewController: BaseViewController {
         collectionView.register(
             FilterMetadataCell.self,
             forCellWithReuseIdentifier: FilterMetadataCell.identifier
+        )
+        collectionView.register(
+            FilterPresetsCell.self,
+            forCellWithReuseIdentifier: FilterPresetsCell.identifier
         )
         return collectionView
     }()
@@ -134,6 +140,7 @@ final class FilterDetailViewController: BaseViewController {
                 self?.currentFilterDetail = filter
                 self?.reconfigurePreviewSection()
                 self?.reconfigureMetadataSection()
+                self?.reconfigurePresetsSection()
             }
             .store(in: &cancellables)
         
@@ -189,7 +196,11 @@ final class FilterDetailViewController: BaseViewController {
                 topInset = 16
                 bottomInset = 0
             case .background:
-                estimatedHeight = 160
+                estimatedHeight = 140
+                topInset = 0
+                bottomInset = 16
+            case .presets:
+                estimatedHeight = 200
                 topInset = 0
                 bottomInset = 16
             }
@@ -248,13 +259,27 @@ final class FilterDetailViewController: BaseViewController {
                     cell.configure(metadata: .empty)
                 }
                 return cell
+            case .presets:
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: FilterPresetsCell.identifier,
+                    for: indexPath
+                ) as? FilterPresetsCell else {
+                    return UICollectionViewCell()
+                }
+                if let filterDetail = self?.currentFilterDetail {
+                    cell.configure(values: filterDetail.filterValues)
+                } else {
+                    cell.configure(values: nil)
+                }
+                return cell
             }
         }
 
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-        snapshot.appendSections([.preview, .background])
+        snapshot.appendSections([.preview, .background, .presets])
         snapshot.appendItems([.preview(filterId)], toSection: .preview)
         snapshot.appendItems([.background(filterId)], toSection: .background)
+        snapshot.appendItems([.presets(filterId)], toSection: .presets)
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 
@@ -276,6 +301,17 @@ final class FilterDetailViewController: BaseViewController {
             snapshot.appendItems([metadataItem], toSection: .background)
         } else {
             snapshot.reloadItems([metadataItem])
+        }
+        dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func reconfigurePresetsSection() {
+        var snapshot = dataSource.snapshot()
+        let presetsItem = Item.presets(filterId)
+        if snapshot.indexOfItem(presetsItem) == nil {
+            snapshot.appendItems([presetsItem], toSection: .presets)
+        } else {
+            snapshot.reloadItems([presetsItem])
         }
         dataSource.apply(snapshot, animatingDifferences: false)
     }

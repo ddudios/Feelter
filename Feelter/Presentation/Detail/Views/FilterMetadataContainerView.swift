@@ -12,21 +12,11 @@ import CoreLocation
 
 final class FilterMetadataContainerView: UIView {
     private enum Layout {
-        static let headerHeight: CGFloat = 34
-        static let horizontalInset: CGFloat = 12
-        static let labelSpacing: CGFloat = 8
-        static let dividerHeight: CGFloat = 1
-        static let contentInset: CGFloat = 12
-        static let mapSize: CGFloat = 72
         static let contentSpacing: CGFloat = 12
         static let placeholderImageSize: CGFloat = 28
     }
 
-    private let headerView = UIView()
-    private let titleLabel = UILabel()
-    private let tagLabel = UILabel()
-    private let dividerView = UIView()
-    private let contentView = UIView()
+    private let cardView = FilterDetailCardContainerView()
     private let mapContainerView = UIView()
     private let mapView = MKMapView()
     private let mapPlaceholderView = UIView()
@@ -51,13 +41,8 @@ final class FilterMetadataContainerView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(title: String, tag: String) {
-        titleLabel.text = title
-        tagLabel.text = tag
-    }
-
     func configure(metadata: PhotoMetadata) {
-        configure(title: metadata.camera, tag: "EXIF")
+        cardView.configure(title: metadata.camera, tag: "EXIF")
         primaryInfoLabel.text = makePrimaryInfoText(metadata)
         secondaryInfoLabel.text = makeSecondaryInfoText(metadata)
         updateMapAndAddress(latitude: metadata.latitude, longitude: metadata.longitude)
@@ -72,16 +57,13 @@ final class FilterMetadataContainerView: UIView {
         primaryInfoLabel.text = nil
         secondaryInfoLabel.text = nil
         locationLabel.text = nil
+        cardView.configure(title: "-", tag: "EXIF")
     }
 
     private func configureHierarchy() {
-        addSubview(headerView)
-        addSubview(dividerView)
-        addSubview(contentView)
-        headerView.addSubview(titleLabel)
-        headerView.addSubview(tagLabel)
-        contentView.addSubview(mapContainerView)
-        contentView.addSubview(infoStackView)
+        addSubview(cardView)
+        cardView.contentView.addSubview(mapContainerView)
+        cardView.contentView.addSubview(infoStackView)
         mapContainerView.addSubview(mapView)
         mapContainerView.addSubview(mapPlaceholderView)
         mapPlaceholderView.addSubview(mapPlaceholderStackView)
@@ -93,37 +75,12 @@ final class FilterMetadataContainerView: UIView {
     }
 
     private func configureLayout() {
-        headerView.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(Layout.headerHeight)
-        }
-
-        titleLabel.snp.makeConstraints { make in
-            make.leading.equalToSuperview().inset(Layout.horizontalInset)
-            make.centerY.equalToSuperview()
-            make.trailing.lessThanOrEqualTo(tagLabel.snp.leading).offset(-Layout.labelSpacing)
-        }
-
-        tagLabel.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.centerY.equalToSuperview()
-        }
-
-        dividerView.snp.makeConstraints { make in
-            make.top.equalTo(headerView.snp.bottom)
-            make.leading.trailing.equalToSuperview()
-            make.height.equalTo(Layout.dividerHeight)
-        }
-
-        contentView.snp.makeConstraints { make in
-            make.top.equalTo(dividerView.snp.bottom).offset(Layout.contentInset)
-            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.bottom.equalToSuperview().inset(Layout.contentInset)
+        cardView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
         }
 
         mapContainerView.snp.makeConstraints { make in
-            make.leading.equalToSuperview()
-            make.top.bottom.equalToSuperview()
+            make.leading.top.bottom.equalToSuperview()
             make.width.equalTo(mapContainerView.snp.height)
         }
 
@@ -151,29 +108,13 @@ final class FilterMetadataContainerView: UIView {
     }
 
     private func configureView() {
-        backgroundColor = .Feelter.blackTurquoise
-        layer.cornerRadius = 12
-        layer.cornerCurve = .continuous
-        layer.borderWidth = 2
-        layer.borderColor = UIColor.Feelter.blackTurquoise?.cgColor
-        clipsToBounds = true
-
-        headerView.backgroundColor = .Feelter.gray100
-
-        titleLabel.font = TextStyle.Pretendard.title2
-        titleLabel.textColor = .Feelter.gray75
-
-        tagLabel.font = TextStyle.Pretendard.title2
-        tagLabel.textColor = .Feelter.gray75
-        tagLabel.text = "EXIF"
-
-        dividerView.backgroundColor = .Feelter.blackTurquoise
+        cardView.configure(title: "Apple iPhone 16 Pro", tag: "EXIF")
 
         mapContainerView.backgroundColor = .Feelter.blackTurquoise
-        mapContainerView.layer.borderColor = UIColor.Feelter.deepTurquoise?.cgColor
-        mapContainerView.layer.borderWidth = 2
         mapContainerView.layer.cornerRadius = 8
         mapContainerView.layer.cornerCurve = .continuous
+        mapContainerView.layer.borderWidth = 2
+        mapContainerView.layer.borderColor = UIColor.Feelter.deepTurquoise?.cgColor
         mapContainerView.clipsToBounds = true
 
         mapView.isUserInteractionEnabled = false
@@ -185,35 +126,32 @@ final class FilterMetadataContainerView: UIView {
         mapView.isHidden = true
 
         mapPlaceholderView.backgroundColor = .Feelter.blackTurquoise
-        mapPlaceholderView.layer.borderColor = UIColor.Feelter.deepTurquoise?.cgColor
-        mapPlaceholderView.layer.borderWidth = 2
-        mapPlaceholderView.layer.cornerRadius = 8
-        
+
         mapPlaceholderStackView.axis = .vertical
         mapPlaceholderStackView.alignment = .center
         mapPlaceholderStackView.spacing = 6
 
         mapPlaceholderImageView.contentMode = .scaleAspectFit
-        mapPlaceholderImageView.tintColor = .Feelter.deepTurquoise
+        mapPlaceholderImageView.tintColor = .Feelter.gray75
         mapPlaceholderImageView.image = UIImage.Icon.noLocation?.withRenderingMode(.alwaysTemplate)
 
-        mapPlaceholderLabel.font = TextStyle.Pretendard.semibold2
-        mapPlaceholderLabel.textColor = .Feelter.deepTurquoise
+        mapPlaceholderLabel.font = TextStyle.Pretendard.caption1
+        mapPlaceholderLabel.textColor = .Feelter.gray75
         mapPlaceholderLabel.text = "No Location"
 
         infoStackView.axis = .vertical
         infoStackView.alignment = .leading
         infoStackView.spacing = 6
 
-        primaryInfoLabel.font = TextStyle.Pretendard.semibold1
-        primaryInfoLabel.textColor = .Feelter.gray75
+        primaryInfoLabel.font = TextStyle.Pretendard.body2
+        primaryInfoLabel.textColor = .Feelter.gray60
         primaryInfoLabel.numberOfLines = 1
 
-        secondaryInfoLabel.font = TextStyle.Pretendard.semibold1
-        secondaryInfoLabel.textColor = .Feelter.gray75
+        secondaryInfoLabel.font = TextStyle.Pretendard.body2
+        secondaryInfoLabel.textColor = .Feelter.gray60
         secondaryInfoLabel.numberOfLines = 2
 
-        locationLabel.font = TextStyle.Pretendard.semibold1
+        locationLabel.font = TextStyle.Pretendard.body3
         locationLabel.textColor = .Feelter.gray75
         locationLabel.numberOfLines = 2
     }
