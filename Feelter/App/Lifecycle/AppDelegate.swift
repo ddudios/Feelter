@@ -9,6 +9,7 @@ import UIKit
 import FirebaseCore
 import FirebaseMessaging
 import Kingfisher
+import iamport_ios
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -116,5 +117,12 @@ extension AppDelegate: MessagingDelegate {
 
         // TODO: 서버에 디바이스 토큰 업데이트 API 호출
         print("FCM 토큰 서버 업데이트 필요: \(token)")
+    }
+}
+
+extension AppDelegate {
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        Iamport.shared.receivedURL(url)
+        return true
     }
 }

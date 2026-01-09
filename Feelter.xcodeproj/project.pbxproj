@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B0384ECC2F10E11500A1A962 /* iamport-ios in Frameworks */ = {isa = PBXBuildFile; productRef = B0384ECB2F10E11500A1A962 /* iamport-ios */; };
 		B056D4602EE9654C00804650 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B056D45F2EE9654C00804650 /* .gitignore */; };
 		B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B056D4662EE9691500804650 /* FirebaseMessaging */; };
 		B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153B2F0557AB00AF5A81 /* SnapKit */; };
@@ -46,6 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0384ECC2F10E11500A1A962 /* iamport-ios in Frameworks */,
 				B0E99F5F2F0C91280099B29B /* Kingfisher in Frameworks */,
 				B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */,
 				B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */,
@@ -97,6 +99,7 @@
 				B0CD153B2F0557AB00AF5A81 /* SnapKit */,
 				B0CD153E2F05583100AF5A81 /* Alamofire */,
 				B0E99F5E2F0C91280099B29B /* Kingfisher */,
+				B0384ECB2F10E11500A1A962 /* iamport-ios */,
 			);
 			productName = Feelter;
 			productReference = B056D4472EE9644100804650 /* Feelter.app */;
@@ -131,6 +134,7 @@
 				B0CD153A2F0557AB00AF5A81 /* XCRemoteSwiftPackageReference "SnapKit" */,
 				B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */,
 				B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				B0384ECA2F10E11500A1A962 /* XCRemoteSwiftPackageReference "iamport-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B056D4482EE9644100804650 /* Products */;
@@ -381,6 +385,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		B0384ECA2F10E11500A1A962 /* XCRemoteSwiftPackageReference "iamport-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/iamport/iamport-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.4.7;
+			};
+		};
 		B056D4652EE9691500804650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
@@ -416,6 +428,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B0384ECB2F10E11500A1A962 /* iamport-ios */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0384ECA2F10E11500A1A962 /* XCRemoteSwiftPackageReference "iamport-ios" */;
+			productName = "iamport-ios";
+		};
 		B056D4662EE9691500804650 /* FirebaseMessaging */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B056D4652EE9691500804650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
