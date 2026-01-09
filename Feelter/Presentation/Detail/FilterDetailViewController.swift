@@ -47,8 +47,8 @@ final class FilterDetailViewController: BaseViewController {
             forCellWithReuseIdentifier: FilterPreviewCompareCell.identifier
         )
         collectionView.register(
-            FilterMetadataContainerCell.self,
-            forCellWithReuseIdentifier: FilterMetadataContainerCell.identifier
+            FilterMetadataCell.self,
+            forCellWithReuseIdentifier: FilterMetadataCell.identifier
         )
         return collectionView
     }()
@@ -133,6 +133,7 @@ final class FilterDetailViewController: BaseViewController {
                 self?.currentLikeCount = filter.likeCount
                 self?.currentFilterDetail = filter
                 self?.reconfigurePreviewSection()
+                self?.reconfigureMetadataSection()
             }
             .store(in: &cancellables)
         
@@ -188,7 +189,7 @@ final class FilterDetailViewController: BaseViewController {
                 topInset = 16
                 bottomInset = 0
             case .background:
-                estimatedHeight = 140
+                estimatedHeight = 160
                 topInset = 0
                 bottomInset = 16
             }
@@ -236,10 +237,15 @@ final class FilterDetailViewController: BaseViewController {
                 return cell
             case .background:
                 guard let cell = collectionView.dequeueReusableCell(
-                    withReuseIdentifier: FilterMetadataContainerCell.identifier,
+                    withReuseIdentifier: FilterMetadataCell.identifier,
                     for: indexPath
-                ) as? FilterMetadataContainerCell else {
+                ) as? FilterMetadataCell else {
                     return UICollectionViewCell()
+                }
+                if let filterDetail = self?.currentFilterDetail {
+                    cell.configure(metadata: filterDetail.metadata)
+                } else {
+                    cell.configure(metadata: .empty)
                 }
                 return cell
             }
@@ -259,6 +265,17 @@ final class FilterDetailViewController: BaseViewController {
             snapshot.appendItems([previewItem], toSection: .preview)
         } else {
             snapshot.reloadItems([previewItem])
+        }
+        dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func reconfigureMetadataSection() {
+        var snapshot = dataSource.snapshot()
+        let metadataItem = Item.background(filterId)
+        if snapshot.indexOfItem(metadataItem) == nil {
+            snapshot.appendItems([metadataItem], toSection: .background)
+        } else {
+            snapshot.reloadItems([metadataItem])
         }
         dataSource.apply(snapshot, animatingDifferences: false)
     }

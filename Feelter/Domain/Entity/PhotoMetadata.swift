@@ -14,6 +14,9 @@ struct PhotoMetadata {
     let aperture: Double
     let iso: Int
     let shutterSpeed: String
+    let pixelWidth: Int
+    let pixelHeight: Int
+    let fileSizeBytes: Int
     let resolution: String // pixelWidth x pixelHeight 조합
     let fileSize: String   // MB 단위 등으로 변환해서 저장해도 됨
     let takenDate: Date?
@@ -23,7 +26,8 @@ struct PhotoMetadata {
     // 빈 객체 (상세 정보가 없을 때 사용)
     static let empty = PhotoMetadata(
         camera: "-", lensInfo: "-", focalLength: 0, aperture: 0, iso: 0,
-        shutterSpeed: "-", resolution: "-", fileSize: "-", takenDate: nil,
+        shutterSpeed: "-", pixelWidth: 0, pixelHeight: 0, fileSizeBytes: 0,
+        resolution: "-", fileSize: "-", takenDate: nil,
         latitude: nil, longitude: nil
     )
 }

@@ -6,8 +6,9 @@
 //
 
 import UIKit
+import SnapKit
 
-final class FilterMetadataContainerCell: BaseCollectionViewCell {
+final class FilterMetadataCell: BaseCollectionViewCell {
     private let cardBackgroundView = FilterMetadataContainerView()
 
     override func configureHierarchy() {
@@ -18,7 +19,16 @@ final class FilterMetadataContainerCell: BaseCollectionViewCell {
         cardBackgroundView.snp.makeConstraints { make in
             make.top.bottom.equalToSuperview()
             make.leading.trailing.equalToSuperview().inset(16)
-            make.height.equalTo(120)
+            make.height.equalTo(140)
         }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        cardBackgroundView.reset()
+    }
+
+    func configure(metadata: PhotoMetadata) {
+        cardBackgroundView.configure(metadata: metadata)
     }
 }
