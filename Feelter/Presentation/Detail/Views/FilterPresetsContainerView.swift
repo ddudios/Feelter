@@ -13,6 +13,7 @@ final class FilterPresetsContainerView: UIView {
         static let rowSpacing: CGFloat = 16
         static let itemSpacing: CGFloat = 12
         static let itemsPerRow: Int = 6
+        static let lockIconSize: CGFloat = 32
     }
 
     private enum TemperatureRange {
@@ -23,6 +24,11 @@ final class FilterPresetsContainerView: UIView {
 
     private let cardView = FilterDetailCardContainerView()
     private let rowsStackView = UIStackView()
+    private let lockOverlayView = UIView()
+    private let lockBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThickMaterialDark))
+    private let lockStackView = UIStackView()
+    private let lockIconImageView = UIImageView()
+    private let lockMessageLabel = UILabel()
     private var itemViews: [FilterPresetItemView] = []
 
     override init(frame: CGRect) {
@@ -45,16 +51,27 @@ final class FilterPresetsContainerView: UIView {
         }
     }
 
+    func setLocked(_ isLocked: Bool) {
+        lockOverlayView.isHidden = !isLocked
+        cardView.overlayView.isUserInteractionEnabled = isLocked
+    }
+
     func reset() {
         cardView.configure(title: "Filter Presets", tag: "LUT")
         for view in itemViews {
             view.configure(icon: nil, valueText: "-")
         }
+        setLocked(false)
     }
 
     private func configureHierarchy() {
         addSubview(cardView)
         cardView.contentView.addSubview(rowsStackView)
+        cardView.overlayView.addSubview(lockOverlayView)
+        lockOverlayView.addSubview(lockBlurView)
+        lockOverlayView.addSubview(lockStackView)
+        lockStackView.addArrangedSubview(lockIconImageView)
+        lockStackView.addArrangedSubview(lockMessageLabel)
 
         for _ in 0..<(Layout.itemsPerRow * 2) {
             let view = FilterPresetItemView()
@@ -85,6 +102,22 @@ final class FilterPresetsContainerView: UIView {
         rowsStackView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+
+        lockOverlayView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        lockBlurView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        lockStackView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+
+        lockIconImageView.snp.makeConstraints { make in
+            make.width.height.equalTo(Layout.lockIconSize)
+        }
     }
 
     private func configureView() {
@@ -92,6 +125,24 @@ final class FilterPresetsContainerView: UIView {
         rowsStackView.alignment = .fill
         rowsStackView.distribution = .fillEqually
         rowsStackView.spacing = Layout.rowSpacing
+
+        lockOverlayView.isHidden = true
+        lockOverlayView.backgroundColor = UIColor.Feelter.blackTurquoise?.withAlphaComponent(0.9)
+        lockBlurView.alpha = 0.95
+
+        lockStackView.axis = .vertical
+        lockStackView.alignment = .center
+        lockStackView.spacing = 12
+
+        lockIconImageView.contentMode = .scaleAspectFit
+        lockIconImageView.tintColor = .Feelter.gray45
+        lockIconImageView.image = UIImage.Icon.lock?.withRenderingMode(.alwaysTemplate)
+
+        lockMessageLabel.font = TextStyle.Pretendard.body2
+        lockMessageLabel.textColor = .Feelter.gray45
+        lockMessageLabel.textAlignment = .center
+        lockMessageLabel.numberOfLines = 2
+        lockMessageLabel.text = "결제가 필요한 유료 필터입니다"
     }
 
     private func makePresetItems(from values: FilterValues?) -> [PresetItem] {

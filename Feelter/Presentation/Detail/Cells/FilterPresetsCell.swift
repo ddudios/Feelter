@@ -28,7 +28,8 @@ final class FilterPresetsCell: BaseCollectionViewCell {
         containerView.reset()
     }
 
-    func configure(values: FilterValues?) {
+    func configure(values: FilterValues?, isLocked: Bool) {
         containerView.configure(values: values)
+        containerView.setLocked(isLocked)
     }
 }

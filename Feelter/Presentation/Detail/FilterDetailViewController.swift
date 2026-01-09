@@ -20,12 +20,14 @@ final class FilterDetailViewController: BaseViewController {
         case preview
         case background
         case presets
+        case purchase
     }
 
     private enum Item: Hashable {
         case preview(String)
         case background(String)
         case presets(String)
+        case purchase(String)
     }
 
     private let filterId: String
@@ -55,6 +57,10 @@ final class FilterDetailViewController: BaseViewController {
         collectionView.register(
             FilterPresetsCell.self,
             forCellWithReuseIdentifier: FilterPresetsCell.identifier
+        )
+        collectionView.register(
+            FilterPurchaseButtonCell.self,
+            forCellWithReuseIdentifier: FilterPurchaseButtonCell.identifier
         )
         return collectionView
     }()
@@ -141,6 +147,7 @@ final class FilterDetailViewController: BaseViewController {
                 self?.reconfigurePreviewSection()
                 self?.reconfigureMetadataSection()
                 self?.reconfigurePresetsSection()
+                self?.reconfigurePurchaseSection()
             }
             .store(in: &cancellables)
         
@@ -201,6 +208,10 @@ final class FilterDetailViewController: BaseViewController {
                 bottomInset = 16
             case .presets:
                 estimatedHeight = 200
+                topInset = 0
+                bottomInset = 16
+            case .purchase:
+                estimatedHeight = 64
                 topInset = 0
                 bottomInset = 16
             }
@@ -267,19 +278,33 @@ final class FilterDetailViewController: BaseViewController {
                     return UICollectionViewCell()
                 }
                 if let filterDetail = self?.currentFilterDetail {
-                    cell.configure(values: filterDetail.filterValues)
+                    cell.configure(
+                        values: filterDetail.filterValues,
+                        isLocked: !filterDetail.isDownloaded
+                    )
                 } else {
-                    cell.configure(values: nil)
+                    cell.configure(values: nil, isLocked: true)
                 }
+                return cell
+            case .purchase:
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: FilterPurchaseButtonCell.identifier,
+                    for: indexPath
+                ) as? FilterPurchaseButtonCell else {
+                    return UICollectionViewCell()
+                }
+                let isPurchased = self?.currentFilterDetail?.isDownloaded ?? false
+                cell.configure(isPurchased: isPurchased)
                 return cell
             }
         }
 
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-        snapshot.appendSections([.preview, .background, .presets])
+        snapshot.appendSections([.preview, .background, .presets, .purchase])
         snapshot.appendItems([.preview(filterId)], toSection: .preview)
         snapshot.appendItems([.background(filterId)], toSection: .background)
         snapshot.appendItems([.presets(filterId)], toSection: .presets)
+        snapshot.appendItems([.purchase(filterId)], toSection: .purchase)
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 
@@ -312,6 +337,17 @@ final class FilterDetailViewController: BaseViewController {
             snapshot.appendItems([presetsItem], toSection: .presets)
         } else {
             snapshot.reloadItems([presetsItem])
+        }
+        dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func reconfigurePurchaseSection() {
+        var snapshot = dataSource.snapshot()
+        let purchaseItem = Item.purchase(filterId)
+        if snapshot.indexOfItem(purchaseItem) == nil {
+            snapshot.appendItems([purchaseItem], toSection: .purchase)
+        } else {
+            snapshot.reloadItems([purchaseItem])
         }
         dataSource.apply(snapshot, animatingDifferences: false)
     }

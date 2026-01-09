@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import SnapKit
 
 final class FilterDetailCardContainerView: UIView {
     private enum Layout {
@@ -17,10 +18,15 @@ final class FilterDetailCardContainerView: UIView {
     }
 
     let contentView = UIView()
+    private let overlayContainerView = UIView()
     private let headerView = UIView()
     private let titleLabel = UILabel()
     private let tagLabel = UILabel()
     private let dividerView = UIView()
+
+    var overlayView: UIView {
+        overlayContainerView
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -42,6 +48,7 @@ final class FilterDetailCardContainerView: UIView {
         addSubview(headerView)
         addSubview(dividerView)
         addSubview(contentView)
+        addSubview(overlayContainerView)
         headerView.addSubview(titleLabel)
         headerView.addSubview(tagLabel)
     }
@@ -74,6 +81,11 @@ final class FilterDetailCardContainerView: UIView {
             make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
             make.bottom.equalToSuperview().inset(Layout.contentInset)
         }
+
+        overlayContainerView.snp.makeConstraints { make in
+            make.top.equalTo(dividerView.snp.bottom)
+            make.leading.trailing.bottom.equalToSuperview()
+        }
     }
 
     private func configureView() {
@@ -95,5 +107,7 @@ final class FilterDetailCardContainerView: UIView {
         tagLabel.numberOfLines = 1
 
         dividerView.backgroundColor = .Feelter.blackTurquoise
+
+        overlayContainerView.isUserInteractionEnabled = false
     }
 }
