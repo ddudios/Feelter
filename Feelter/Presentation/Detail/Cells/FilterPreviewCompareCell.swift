@@ -146,7 +146,7 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
         }
 
         sliderLineView.snp.makeConstraints { make in
-            make.top.equalTo(compareSlider.snp.bottom).offset(16)
+            make.top.equalTo(compareSlider.snp.bottom).offset(20)
             make.leading.trailing.equalTo(imageContainerView)
             make.height.equalTo(1)
         }
