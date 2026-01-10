@@ -69,10 +69,8 @@ final class PaymentViewModel: ViewModelProtocol {
                 guard let self else { return }
 
                 if success, let impUid = impUid {
-                    // 결제 성공 시 서버 검증 시작
                     self.validatePayment(impUid: impUid)
                 } else {
-                    // 결제 실패 (유저 취소 포함)
                     let message = errorMsg ?? "결제가 취소되었습니다."
                     self.showErrorSubject.send(message)
                 }
@@ -98,13 +96,11 @@ final class PaymentViewModel: ViewModelProtocol {
         Task { [weak self] in
             guard let self else { return }
             do {
-                // UseCase 호출 (Entity 반환됨)
                 let orderInfo = try await self.usecase.createOrder(
                     filterId: self.filterId,
                     price: self.price
                 )
 
-                // 성공 시 VC에게 아임포트 실행 신호 보냄
                 await MainActor.run {
                     self.requestIamportPaymentSubject.send(orderInfo)
                     self.isLoadingSubject.send(false)
@@ -133,24 +129,18 @@ final class PaymentViewModel: ViewModelProtocol {
         Task { [weak self] in
             guard let self else { return }
             do {
-                // UseCase 호출 (Entity 반환됨)
                 let result = try await self.usecase.validatePayment(impUid: impUid)
 
-                // 성공 시 최종 완료 신호 보냄 (Coordinator가 처리)
                 await MainActor.run {
                     self.paymentDidFinishSubject.send(result)
                     self.isLoadingSubject.send(false)
                 }
             } catch let error as NetworkError {
-                // 네트워크 에러 (서버 검증 실패 등)
                 await MainActor.run {
-                    self.showErrorSubject.send(
-                        error.errorDescription
-                    )
+                    self.showErrorSubject.send(error.errorDescription)
                     self.isLoadingSubject.send(false)
                 }
             } catch {
-                // 기타 에러
                 await MainActor.run {
                     self.showErrorSubject.send("결제 검증 실패: \(error.localizedDescription)")
                     self.isLoadingSubject.send(false)

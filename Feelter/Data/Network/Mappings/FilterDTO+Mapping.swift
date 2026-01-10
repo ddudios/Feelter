@@ -18,12 +18,12 @@ extension FilterDTO {
             mainImageURL: files.first ?? "", // 썸네일은 첫 번째 이미지
             creator: creator.toDomain(),
             photographerName: creator.nick,
-            likeCount: likeCount,
-            isLiked: isLiked,
+            likeCount: likeCount ?? 0,
+            isLiked: isLiked ?? false,
             createdAt: createdAt.toDate() ?? Date()
         )
     }
-    
+
     // DTO -> 상세형 Entity 변환
     func toDetailDomain() -> FilterDetail {
         return FilterDetail(
@@ -37,9 +37,9 @@ extension FilterDTO {
             metadata: photoMetadata?.toDomain() ?? .empty,
             filterValues: filterValues?.toDomain(),
             comments: comments?.map { $0.toDomain() } ?? [],
-            likeCount: likeCount,
-            buyerCount: buyerCount,
-            isLiked: isLiked,
+            likeCount: likeCount ?? 0,
+            buyerCount: buyerCount ?? 0,
+            isLiked: isLiked ?? false,
             isDownloaded: isDownloaded ?? false,
             createdAt: createdAt.toDate() ?? Date()
         )

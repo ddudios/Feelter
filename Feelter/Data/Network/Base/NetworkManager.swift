@@ -44,19 +44,16 @@ final class NetworkManager: NetworkManagerProtocol {
 
     // 4. 에러 파싱 (Alamofire 에러 -> Custom Error)
     private func parseError(_ error: AFError, response: HTTPURLResponse?, data: Data?) -> NetworkError {
-        if case .responseSerializationFailed(let reason) = error {
-            print("디코딩 에러 발생: \(reason)")
+        if case .responseSerializationFailed = error {
             return .decodingError
         }
 
         guard let statusCode = response?.statusCode else {
-            print("HTTP 응답 없음: \(error.localizedDescription)")
             return .unknownError(error.localizedDescription)
         }
 
         switch statusCode {
         case 400..<500:
-            // 서버에서 보낸 에러 메시지 파싱 시도
             let serverMessage = parseErrorMessage(from: data)
             return .clientError(statusCode: statusCode, message: serverMessage)
         case 500...:

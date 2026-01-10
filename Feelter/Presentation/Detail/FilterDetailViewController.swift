@@ -165,7 +165,7 @@ final class FilterDetailViewController: BaseViewController {
                 self?.currentIsLiked = filter.isLiked
                 self?.currentLikeCount = filter.likeCount
                 self?.currentFilterDetail = filter
-                
+
                 self?.reconfigurePreviewSection()
                 self?.reconfigureMetadataSection()
                 self?.reconfigurePresetsSection()
@@ -326,7 +326,8 @@ final class FilterDetailViewController: BaseViewController {
             case .presets:
                 guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FilterPresetsCell.identifier, for: indexPath) as? FilterPresetsCell else { return UICollectionViewCell() }
                 if let filterDetail = self?.currentFilterDetail {
-                    cell.configure(values: filterDetail.filterValues, isLocked: !filterDetail.isDownloaded)
+                    let isLocked = !filterDetail.isDownloaded
+                    cell.configure(values: filterDetail.filterValues, isLocked: isLocked)
                 } else {
                     cell.configure(values: nil, isLocked: true)
                 }
@@ -424,24 +425,19 @@ final class FilterDetailViewController: BaseViewController {
     // MARK: - Payment Handling (KG Inicis + WebView)
 
     private func launchIamportPayment(orderInfo: OrderInfo) {
-        // ✅ 내 가맹점 식별코드 (INIpayTest 설정 완료된 상태)
-        let userCode = "imp10391932"
+        // ✅ 내 가맹점 식별코드
+        let userCode = "imp14511373"
 
-        var payment = IamportPayment(
+        // 결제 정보 생성 (다른 앱과 동일한 방식)
+        let payment = IamportPayment(
             pg: PG.html5_inicis.makePgRawName(pgId: "INIpayTest"),
             merchant_uid: orderInfo.orderCode,
             amount: "\(orderInfo.totalPrice)"
         )
-        
         payment.pay_method = PayMethod.card.rawValue
         payment.name = currentFilterDetail?.title ?? "필터 구매"
-        payment.buyer_name = "홍길동"
-        payment.buyer_email = "test@feelter.com"
+        payment.buyer_name = "장수지"
         payment.app_scheme = "feelter"
-
-        print("📱 KG이니시스 결제 요청 (UserCode: \(userCode))")
-        print("주문번호: \(orderInfo.orderCode)")
-        print("금액: \(orderInfo.totalPrice)원")
 
         // 1. WebView 매번 새로 생성
         let paymentWebView = WKWebView()
@@ -451,7 +447,7 @@ final class FilterDetailViewController: BaseViewController {
         let webViewController = UIViewController()
         webViewController.view = paymentWebView
         webViewController.title = "결제"
-        
+
         // ✨ [Full Screen] 결제창을 풀스크린으로 띄움
         webViewController.modalPresentationStyle = .fullScreen
         self.present(webViewController, animated: true)
@@ -467,9 +463,6 @@ final class FilterDetailViewController: BaseViewController {
             // ✨ [Full Screen] 닫기 (dismiss)
             webViewController?.dismiss(animated: true)
 
-            print("📱 아임포트 결제 응답: success=\(response?.success ?? false)")
-            print("Message: \(response?.error_msg ?? "No Error Message")")
-
             if let success = response?.success, success {
                 self.iamportResponseSubject.send((true, response?.imp_uid, nil))
             } else {
@@ -481,7 +474,7 @@ final class FilterDetailViewController: BaseViewController {
     private func handlePaymentSuccess(result: PaymentValidationResult) {
         let alert = UIAlertController(
             title: "결제 완료",
-            message: "필터 구매가 완료되었습니다!\n이제 필터를 다운로드하여 사용할 수 있습니다.",
+            message: "필터 구매가 완료되었습니다.",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
