@@ -11,6 +11,8 @@ import SnapKit
 final class FilterPurchaseButtonCell: BaseCollectionViewCell {
     private let purchaseButton = FeelterButton(title: "결제하기")
 
+    var onPurchaseButtonTapped: (() -> Void)?
+
     override func configureHierarchy() {
         contentView.addSubview(purchaseButton)
     }
@@ -23,14 +25,24 @@ final class FilterPurchaseButtonCell: BaseCollectionViewCell {
         }
     }
 
+    override func configureView() {
+        super.configureView()
+        purchaseButton.addTarget(self, action: #selector(purchaseButtonTapped), for: .touchUpInside)
+    }
+
     override func prepareForReuse() {
         super.prepareForReuse()
         configure(isPurchased: false)
+        onPurchaseButtonTapped = nil
+    }
+
+    @objc private func purchaseButtonTapped() {
+        onPurchaseButtonTapped?()
     }
 
     func configure(isPurchased: Bool) {
         purchaseButton.titleLabel?.font = TextStyle.Pretendard.title1
-        
+
         if isPurchased {
             purchaseButton.setTitle("구매완료", for: .normal)
             purchaseButton.isEnabled = false

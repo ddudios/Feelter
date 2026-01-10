@@ -1,0 +1,161 @@
+//
+//  PaymentViewModel.swift
+//  Feelter
+//
+//  Created by Suji Jang on 1/10/26.
+//
+
+import Foundation
+import Combine
+
+final class PaymentViewModel: ViewModelProtocol {
+
+    // MARK: - Input & Output
+
+    struct Input {
+        /// "구매하기" 버튼 탭 이벤트
+        let didTapPurchaseButton: AnyPublisher<Void, Never>
+
+        /// 아임포트(포트원) 결제 모듈이 닫힌 후 결과 수신 (성공여부, imp_uid, 에러메시지)
+        let iamportResponseReceived: AnyPublisher<(success: Bool, impUid: String?, errorMsg: String?), Never>
+    }
+
+    struct Output {
+        /// 로딩 인디케이터 표시 여부
+        let isLoading: AnyPublisher<Bool, Never>
+
+        /// 에러 메시지 표시 (Alert용)
+        let showError: AnyPublisher<String, Never>
+
+        /// [Step 1 성공] 아임포트 SDK 실행 요청 (주문정보 전달)
+        let requestIamportPayment: AnyPublisher<OrderInfo, Never>
+
+        /// [Step 3 성공] 최종 결제 및 검증 완료 (다음 화면으로 이동)
+        let paymentDidFinish: AnyPublisher<PaymentValidationResult, Never>
+    }
+
+    // MARK: - Properties
+    private let usecase: PaymentUsecaseProtocol
+    private let filterId: String
+    private let price: Int
+
+    private var cancellables = Set<AnyCancellable>()
+
+    private let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
+    private let showErrorSubject = PassthroughSubject<String, Never>()
+    private let requestIamportPaymentSubject = PassthroughSubject<OrderInfo, Never>()
+    private let paymentDidFinishSubject = PassthroughSubject<PaymentValidationResult, Never>()
+
+    // MARK: - Initializer
+    init(usecase: PaymentUsecaseProtocol, filterId: String, price: Int) {
+        self.usecase = usecase
+        self.filterId = filterId
+        self.price = price
+    }
+
+    // MARK: - Transform
+    func transform(input: Input) -> Output {
+
+        // 1. 구매 버튼 탭 -> 주문 생성(Create Order) 요청
+        input.didTapPurchaseButton
+            .sink { [weak self] in
+                self?.createOrder()
+            }
+            .store(in: &cancellables)
+
+        // 2. 아임포트 결과 수신 -> 검증 로직 또는 에러 처리
+        input.iamportResponseReceived
+            .sink { [weak self] (success, impUid, errorMsg) in
+                guard let self else { return }
+
+                if success, let impUid = impUid {
+                    // 결제 성공 시 서버 검증 시작
+                    self.validatePayment(impUid: impUid)
+                } else {
+                    // 결제 실패 (유저 취소 포함)
+                    let message = errorMsg ?? "결제가 취소되었습니다."
+                    self.showErrorSubject.send(message)
+                }
+            }
+            .store(in: &cancellables)
+
+        return Output(
+            isLoading: isLoadingSubject.eraseToAnyPublisher(),
+            showError: showErrorSubject.eraseToAnyPublisher(),
+            requestIamportPayment: requestIamportPaymentSubject.eraseToAnyPublisher(),
+            paymentDidFinish: paymentDidFinishSubject.eraseToAnyPublisher()
+        )
+    }
+
+    // MARK: - Private Logic
+
+    /// [Step 1] 주문 번호 생성 요청
+    /// - 서버에 필터 구매 주문을 생성하고 orderCode(merchant_uid)를 발급받습니다
+    /// - 성공 시 아임포트 SDK 실행 요청을 보냅니다
+    private func createOrder() {
+        isLoadingSubject.send(true)
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                // UseCase 호출 (Entity 반환됨)
+                let orderInfo = try await self.usecase.createOrder(
+                    filterId: self.filterId,
+                    price: self.price
+                )
+
+                // 성공 시 VC에게 아임포트 실행 신호 보냄
+                await MainActor.run {
+                    self.requestIamportPaymentSubject.send(orderInfo)
+                    self.isLoadingSubject.send(false)
+                }
+            } catch let error as NetworkError {
+                await MainActor.run {
+                    self.showErrorSubject.send(error.errorDescription)
+                    self.isLoadingSubject.send(false)
+                }
+            } catch {
+                await MainActor.run {
+                    self.showErrorSubject.send("주문 생성 실패: \(error.localizedDescription)")
+                    self.isLoadingSubject.send(false)
+                }
+            }
+        }
+    }
+
+    /// [Step 3] 결제 영수증 검증 요청
+    /// - 아임포트에서 받은 imp_uid를 서버로 전송하여 실제 결제 금액과 주문 금액이 일치하는지 검증합니다
+    /// - 검증 성공 시 필터 잠금 해제 및 다운로드가 가능해집니다
+    /// - 검증 실패 시 결제는 되었지만 서버에서 확인되지 않은 상태이므로 고객센터 안내가 필요할 수 있습니다
+    private func validatePayment(impUid: String) {
+        isLoadingSubject.send(true)
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                // UseCase 호출 (Entity 반환됨)
+                let result = try await self.usecase.validatePayment(impUid: impUid)
+
+                // 성공 시 최종 완료 신호 보냄 (Coordinator가 처리)
+                await MainActor.run {
+                    self.paymentDidFinishSubject.send(result)
+                    self.isLoadingSubject.send(false)
+                }
+            } catch let error as NetworkError {
+                // 네트워크 에러 (서버 검증 실패 등)
+                await MainActor.run {
+                    self.showErrorSubject.send(
+                        error.errorDescription
+                    )
+                    self.isLoadingSubject.send(false)
+                }
+            } catch {
+                // 기타 에러
+                await MainActor.run {
+                    self.showErrorSubject.send("결제 검증 실패: \(error.localizedDescription)")
+                    self.isLoadingSubject.send(false)
+                }
+            }
+        }
+    }
+}

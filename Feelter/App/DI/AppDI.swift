@@ -30,6 +30,9 @@ func registerDependencies() {
     let communityRepository = CommunityRepository(networkManager: networkManager)
     container.registerSingleton(CommunityRepositoryProtocol.self, instance: communityRepository)
 
+    let paymentRepository = PaymentRepository(networkManager: networkManager)
+    container.registerSingleton(PaymentRepositoryProtocol.self, instance: paymentRepository)
+
     //MARK: - Usecase
     // UseCase는 매번 새로 생성 (상태를 가지지 않음)
     container.registerFactory(LoginUsecaseProtocol.self) {
@@ -50,6 +53,11 @@ func registerDependencies() {
     container.registerFactory(BannerUsecaseProtocol.self) {
         let repository = container.resolve(BannerRepositoryProtocol.self)
         return BannerUsecase(repository: repository)
+    }
+
+    container.registerFactory(PaymentUsecaseProtocol.self) {
+        let repository = container.resolve(PaymentRepositoryProtocol.self)
+        return PaymentUsecase(repository: repository)
     }
 
     //MARK: - ViewModel
