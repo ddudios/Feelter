@@ -16,8 +16,6 @@ final class TopRankingHeaderView: UICollectionReusableView {
         static let horizontalInset: CGFloat = Spacing.padding
         static let labelToStackSpacing: CGFloat = 10
         static let buttonHeight: CGFloat = 28
-        static let buttonHorizontalPadding: CGFloat = 12
-        static let buttonVerticalPadding: CGFloat = 6
         static let stackSpacing: CGFloat = 8
         static let topInset: CGFloat = 4
     }
@@ -81,26 +79,11 @@ final class TopRankingHeaderView: UICollectionReusableView {
         backgroundColor = .clear
     }
 
-    private func createSortButton(title: String, sortType: FilterSortType) -> UIButton {
-        let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.layer.cornerRadius = Layout.buttonHeight / 2
-        button.contentEdgeInsets = UIEdgeInsets(
-            top: Layout.buttonVerticalPadding,
-            left: Layout.buttonHorizontalPadding,
-            bottom: Layout.buttonVerticalPadding,
-            right: Layout.buttonHorizontalPadding
-        )
-        button.snp.makeConstraints { make in
-            make.height.equalTo(Layout.buttonHeight)
-        }
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        button.setContentCompressionResistancePriority(.required, for: .horizontal)
-
+    private func createSortButton(title: String, sortType: FilterSortType) -> SelectableCapsuleButton {
+        let button = SelectableCapsuleButton(title: title)
         button.addAction(UIAction { [weak self] _ in
             self?.sortButtonTapped(sortType)
         }, for: .touchUpInside)
-
         return button
     }
 
@@ -110,20 +93,8 @@ final class TopRankingHeaderView: UICollectionReusableView {
     }
 
     private func updateSortButtons(selected sortType: FilterSortType) {
-        updateSortButtonStyle(popularityButton, isSelected: sortType == .popularity)
-        updateSortButtonStyle(purchaseButton, isSelected: sortType == .purchase)
-        updateSortButtonStyle(latestButton, isSelected: sortType == .latest)
-    }
-
-    private func updateSortButtonStyle(_ button: UIButton, isSelected: Bool) {
-        if isSelected {
-            button.backgroundColor = .Feelter.brightTurquoise
-            button.titleLabel?.font = TextStyle.Pretendard.title2
-            button.setTitleColor(.Feelter.gray0, for: .normal)
-        } else {
-            button.backgroundColor = .Feelter.blackTurquoise
-            button.titleLabel?.font = TextStyle.Pretendard.body2
-            button.setTitleColor(.Feelter.gray75, for: .normal)
-        }
+        popularityButton.isSelected = sortType == .popularity
+        purchaseButton.isSelected = sortType == .purchase
+        latestButton.isSelected = sortType == .latest
     }
 }
