@@ -191,6 +191,21 @@ final class CustomTabBarController: UITabBarController {
             }
         }
     }
+
+    func setCustomTabBarHidden(_ hidden: Bool, animated: Bool) {
+        let updateVisibility = {
+            self.customTabBar.alpha = hidden ? 0 : 1
+        }
+
+        if animated {
+            UIView.animate(withDuration: 0.2, animations: updateVisibility) { _ in
+                self.customTabBar.isHidden = hidden
+            }
+        } else {
+            customTabBar.isHidden = hidden
+            updateVisibility()
+        }
+    }
 }
 
 // MARK: - UIImage Extension
