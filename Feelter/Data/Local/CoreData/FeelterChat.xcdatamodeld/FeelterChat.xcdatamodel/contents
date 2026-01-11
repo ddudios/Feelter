@@ -20,6 +20,9 @@
     <entity name="ChatRoomEntity" representedClassName="ChatRoomEntity" syncable="YES" codeGenerationType="class">
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="lastReadAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="opponentNick" attributeType="String"/>
+        <attribute name="opponentProfileImage" optional="YES" attributeType="String"/>
+        <attribute name="opponentUserId" attributeType="String"/>
         <attribute name="roomId" attributeType="String"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="messages" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ChatMessageEntity" inverseName="chatRoom" inverseEntity="ChatMessageEntity"/>

@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then-primary.dia",
+    "emit-module-dependencies" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then-primary-emit-module.dia",
+    "pch" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then-primary.swiftdeps"
+  },
+  "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/Sources/Then/Then.swift" : {
+    "const-values" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.swiftconstvalues",
+    "dependencies" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.d",
+    "diagnostics" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.dia",
+    "index-unit-output-path" : "/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.o",
+    "llvm-bc" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.bc",
+    "object" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.o",
+    "swift-dependencies" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then.swiftdeps",
+    "swiftmodule" : "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/Then/build/Then.build/Debug-iphoneos/Then.build/Objects-normal/arm64/Then~partial.swiftmodule"
+  }
+}

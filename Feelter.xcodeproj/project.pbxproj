@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B0384ECC2F10E11500A1A962 /* iamport-ios in Frameworks */ = {isa = PBXBuildFile; productRef = B0384ECB2F10E11500A1A962 /* iamport-ios */; };
+		B03CCA642F14092700CD207E /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = B03CCA632F14092700CD207E /* SocketIO */; };
 		B056D4602EE9654C00804650 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B056D45F2EE9654C00804650 /* .gitignore */; };
 		B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B056D4662EE9691500804650 /* FirebaseMessaging */; };
 		B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153B2F0557AB00AF5A81 /* SnapKit */; };
@@ -52,6 +53,7 @@
 				B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */,
 				B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */,
 				B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */,
+				B03CCA642F14092700CD207E /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,6 +102,7 @@
 				B0CD153E2F05583100AF5A81 /* Alamofire */,
 				B0E99F5E2F0C91280099B29B /* Kingfisher */,
 				B0384ECB2F10E11500A1A962 /* iamport-ios */,
+				B03CCA632F14092700CD207E /* SocketIO */,
 			);
 			productName = Feelter;
 			productReference = B056D4472EE9644100804650 /* Feelter.app */;
@@ -135,6 +138,7 @@
 				B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */,
 				B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				B0384ECA2F10E11500A1A962 /* XCRemoteSwiftPackageReference "iamport-ios" */,
+				B03CCA622F14092700CD207E /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B056D4482EE9644100804650 /* Products */;
@@ -393,6 +397,14 @@
 				minimumVersion = 1.4.7;
 			};
 		};
+		B03CCA622F14092700CD207E /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.0.0;
+			};
+		};
 		B056D4652EE9691500804650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
@@ -432,6 +444,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B0384ECA2F10E11500A1A962 /* XCRemoteSwiftPackageReference "iamport-ios" */;
 			productName = "iamport-ios";
+		};
+		B03CCA632F14092700CD207E /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B03CCA622F14092700CD207E /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
 		};
 		B056D4662EE9691500804650 /* FirebaseMessaging */ = {
 			isa = XCSwiftPackageProductDependency;

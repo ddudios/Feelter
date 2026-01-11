@@ -1,0 +1,4 @@
+module GoogleUtilities_Logger {
+umbrella "/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/GoogleUtilities/GoogleUtilities/Logger/Public"
+export *
+}

@@ -1,0 +1,14 @@
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/build/Firebase.build/Debug-iphoneos/FirebaseCoreInternal.build/DerivedSources/resource_bundle_accessor.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/Heartbeat.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatController.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatLoggingTestUtils.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatStorage.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatsBundle.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/HeartbeatsPayload.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/RingBuffer.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/Storage.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/StorageFactory.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/WeakContainer.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/_ObjC_HeartbeatController.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/HeartbeatLogging/_ObjC_HeartbeatsPayload.swift
+/Users/suji/Library/Developer/Xcode/DerivedData/Feelter-dxhkayphdacednbxknqegebrncfn/SourcePackages/checkouts/firebase-ios-sdk/FirebaseCore/Internal/Sources/Utilities/UnfairLock.swift
