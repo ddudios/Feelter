@@ -27,7 +27,9 @@ final public class ProfileCoordinator: Coordinator {
     }
 
     func showChatRoomList() {
-        let chatRoomListViewController = ChatRoomListViewController()
+        // DIContainer에서 ViewModel 주입
+        let viewModel = DIContainer.shared.resolve(ChatRoomListViewModel.self)
+        let chatRoomListViewController = ChatRoomListViewController(viewModel: viewModel)
         navigationController.pushViewController(chatRoomListViewController, animated: true)
     }
 

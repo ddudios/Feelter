@@ -49,7 +49,7 @@ final class CoreDataManager {
 
             // 로드 성공 시 로그 (개발 중에만)
             #if DEBUG
-            print("✅ CoreData Store 로드 성공: \(storeDescription.url?.absoluteString ?? "")")
+            print("CoreData Store 로드 성공: \(storeDescription.url?.absoluteString ?? "")")
             #endif
         }
 
@@ -95,12 +95,9 @@ final class CoreDataManager {
 
         do {
             try contextToSave.save()
-            #if DEBUG
-            print("✅ CoreData 저장 성공")
-            #endif
         } catch {
             #if DEBUG
-            print("❌ CoreData 저장 실패: \(error.localizedDescription)")
+            print("CoreData 저장 실패: \(error.localizedDescription)")
             #endif
             throw error
         }
@@ -145,7 +142,7 @@ extension CoreDataManager {
             let results = try viewContext.fetch(fetchRequest)
             return results.first?.createdAt
         } catch {
-            print("❌ 마지막 메시지 시간 조회 실패: \(error)")
+            print("마지막 메시지 시간 조회 실패: \(error)")
             return nil
         }
     }

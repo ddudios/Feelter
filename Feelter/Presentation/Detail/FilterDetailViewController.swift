@@ -401,6 +401,9 @@ final class FilterDetailViewController: BaseViewController {
                 guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FilterCreatorInfoCell.identifier, for: indexPath) as? FilterCreatorInfoCell else { return UICollectionViewCell() }
                 if let filterDetail = self?.currentFilterDetail {
                     cell.configure(creator: filterDetail.creator, description: filterDetail.description)
+                    cell.onMessageTapped = { [weak self] creatorId in
+                        self?.handleMessageButtonTapped(creatorId: creatorId)
+                    }
                 }
                 return cell
             }
@@ -552,5 +555,68 @@ final class FilterDetailViewController: BaseViewController {
         loadingOverlay.isHidden = true
         activityIndicator.stopAnimating()
         view.isUserInteractionEnabled = true
+    }
+
+    // MARK: - Chat Room Navigation
+
+    /// 메시지 버튼 탭 시 채팅방 생성 또는 조회 후 이동
+    ///
+    /// 동작:
+    /// 1. CreateChatRoomUsecase로 채팅방 생성/조회
+    /// 2. 성공 시 ChatRoomViewController로 이동
+    /// 3. 실패 시 에러 알럿 표시
+    ///
+    private func handleMessageButtonTapped(creatorId: String) {
+        // 로딩 표시
+        showLoadingIndicator(message: "채팅방을 불러오는 중...")
+
+        Task {
+            do {
+                // DIContainer에서 CreateChatRoomUsecase 주입
+                let createChatRoomUsecase = DIContainer.shared.resolve(CreateChatRoomUsecase.self)
+
+                // 채팅방 생성 또는 조회
+                let chatRoom = try await createChatRoomUsecase.execute(opponentId: creatorId)
+
+                await MainActor.run {
+                    hideLoadingIndicator()
+                    navigateToChatRoom(chatRoom)
+                }
+            } catch {
+                await MainActor.run {
+                    hideLoadingIndicator()
+                    let errorMessage: String
+                    if let createError = error as? CreateChatRoomUsecase.CreateChatRoomError {
+                        errorMessage = createError.errorDescription ?? "채팅방 생성에 실패했습니다."
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
+                    showAlert(message: errorMessage)
+                }
+            }
+        }
+    }
+
+    /// ChatRoomViewController로 이동
+    private func navigateToChatRoom(_ chatRoom: ChatRoom) {
+        // DIContainer에서 의존성 주입
+        let repository = DIContainer.shared.resolve(ChatRepositoryProtocol.self)
+        let fetchChatHistoryUsecase = DIContainer.shared.resolve(FetchChatHistoryUsecase.self)
+        let sendMessageUsecase = DIContainer.shared.resolve(SendMessageUsecase.self)
+
+        // ChatRoomViewModel은 roomId 파라미터가 필요하므로 직접 생성
+        let chatRoomViewModel = ChatRoomViewModel(
+            roomId: chatRoom.roomId,
+            fetchChatHistoryUsecase: fetchChatHistoryUsecase,
+            sendMessageUsecase: sendMessageUsecase,
+            repository: repository
+        )
+
+        let chatRoomViewController = ChatRoomViewController(
+            chatRoom: chatRoom,
+            viewModel: chatRoomViewModel
+        )
+
+        navigationController?.pushViewController(chatRoomViewController, animated: true)
     }
 }

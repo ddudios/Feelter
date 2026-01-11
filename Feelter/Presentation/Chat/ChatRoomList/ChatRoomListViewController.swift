@@ -7,6 +7,7 @@
 
 import UIKit
 import SnapKit
+import Combine
 
 final class ChatRoomListViewController: BaseViewController {
 
@@ -21,10 +22,21 @@ final class ChatRoomListViewController: BaseViewController {
         static let emptyStateHorizontalInset: CGFloat = 40
     }
 
+    // MARK: - Properties
+
+    private let viewModel: ChatRoomListViewModel
+    private var cancellables = Set<AnyCancellable>()
+
     private let chatRoomTableView = UITableView(frame: .zero, style: .plain)
+    private let refreshControl = UIRefreshControl()
     private let emptyStateView = UIView()
     private let emptyStateImageView = UIImageView()
     private let emptyStateLabel = UILabel()
+
+    // Subjects for Input
+    private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
+    private let refreshSubject = PassthroughSubject<Void, Never>()
+    private let chatRoomSelectedSubject = PassthroughSubject<IndexPath, Never>()
 
     private var chatRooms: [ChatRoom] = [] {
         didSet {
@@ -33,12 +45,27 @@ final class ChatRoomListViewController: BaseViewController {
         }
     }
 
+    // MARK: - Initialization
+
+    init(viewModel: ChatRoomListViewModel) {
+        self.viewModel = viewModel
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         setupTableView()
         configureEmptyStateView()
         updateEmptyState()
+        bind()
+
+        // 초기 로드 트리거
+        viewDidLoadSubject.send()
     }
 
     override func configureHierarchy() {
@@ -86,6 +113,94 @@ final class ChatRoomListViewController: BaseViewController {
         chatRoomTableView.register(ChatRoomCell.self, forCellReuseIdentifier: ChatRoomCell.identifier)
         chatRoomTableView.tableFooterView = UIView()
         chatRoomTableView.backgroundView = emptyStateView
+
+        // Pull-to-Refresh 설정
+        refreshControl.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
+        chatRoomTableView.refreshControl = refreshControl
+    }
+
+    @objc private func handleRefresh() {
+        refreshSubject.send()
+    }
+
+    /// ViewModel과 바인딩
+    private func bind() {
+        // Input 생성
+        let input = ChatRoomListViewModel.Input(
+            viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
+            refreshTrigger: refreshSubject.eraseToAnyPublisher(),
+            chatRoomSelected: chatRoomSelectedSubject.eraseToAnyPublisher()
+        )
+
+        // Output 구독
+        let output = viewModel.transform(input: input)
+
+        // 채팅방 목록 업데이트
+        output.chatRooms
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] chatRooms in
+                self?.updateChatRooms(chatRooms)
+            }
+            .store(in: &cancellables)
+
+        // 로딩 상태
+        output.isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                if !isLoading {
+                    self?.refreshControl.endRefreshing()
+                }
+            }
+            .store(in: &cancellables)
+
+        // 에러 처리
+        output.error
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] errorMessage in
+                self?.showErrorAlert(message: errorMessage)
+            }
+            .store(in: &cancellables)
+
+        // 채팅방 선택 시 화면 이동
+        output.selectedChatRoom
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] chatRoom in
+                self?.navigateToChatRoom(chatRoom)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(
+            title: "오류",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        present(alert, animated: true)
+    }
+
+    private func navigateToChatRoom(_ chatRoom: ChatRoom) {
+        // DIContainer에서 의존성 주입
+        let repository = DIContainer.shared.resolve(ChatRepositoryProtocol.self)
+        let fetchChatHistoryUsecase = DIContainer.shared.resolve(FetchChatHistoryUsecase.self)
+        let sendMessageUsecase = DIContainer.shared.resolve(SendMessageUsecase.self)
+
+        // ChatRoomViewModel은 roomId 파라미터가 필요하므로 직접 생성
+        let chatRoomViewModel = ChatRoomViewModel(
+            roomId: chatRoom.roomId,
+            fetchChatHistoryUsecase: fetchChatHistoryUsecase,
+            sendMessageUsecase: sendMessageUsecase,
+            repository: repository
+        )
+
+        let chatRoomViewController = ChatRoomViewController(
+            chatRoom: chatRoom,
+            viewModel: chatRoomViewModel
+        )
+
+        navigationController?.pushViewController(chatRoomViewController, animated: true)
     }
 
     private func configureEmptyStateView() {
@@ -164,8 +279,7 @@ extension ChatRoomListViewController: UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        let chatRoom = chatRooms[indexPath.row]
-        let chatRoomViewController = ChatRoomViewController(chatRoom: chatRoom)
-        navigationController?.pushViewController(chatRoomViewController, animated: true)
+        // ViewModel에게 선택 이벤트 전달
+        chatRoomSelectedSubject.send(indexPath)
     }
 }

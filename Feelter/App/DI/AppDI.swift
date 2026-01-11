@@ -33,6 +33,14 @@ func registerDependencies() {
     let paymentRepository = PaymentRepository(networkManager: networkManager)
     container.registerSingleton(PaymentRepositoryProtocol.self, instance: paymentRepository)
 
+    // Chat Repository는 CoreData와 Socket.IO도 필요
+    let chatRepository = ChatRepository(
+        networkManager: networkManager,
+        coreDataManager: CoreDataManager.shared,
+        socketManager: SocketIOManager.shared
+    )
+    container.registerSingleton(ChatRepositoryProtocol.self, instance: chatRepository)
+
     //MARK: - Usecase
     // UseCase는 매번 새로 생성 (상태를 가지지 않음)
     container.registerFactory(LoginUsecaseProtocol.self) {
@@ -60,6 +68,26 @@ func registerDependencies() {
         return PaymentUsecase(repository: repository)
     }
 
+    container.registerFactory(FetchChatRoomsUsecase.self) {
+        let repository = container.resolve(ChatRepositoryProtocol.self)
+        return FetchChatRoomsUsecase(repository: repository)
+    }
+
+    container.registerFactory(FetchChatHistoryUsecase.self) {
+        let repository = container.resolve(ChatRepositoryProtocol.self)
+        return FetchChatHistoryUsecase(repository: repository)
+    }
+
+    container.registerFactory(SendMessageUsecase.self) {
+        let repository = container.resolve(ChatRepositoryProtocol.self)
+        return SendMessageUsecase(repository: repository)
+    }
+
+    container.registerFactory(CreateChatRoomUsecase.self) {
+        let repository = container.resolve(ChatRepositoryProtocol.self)
+        return CreateChatRoomUsecase(repository: repository)
+    }
+
     //MARK: - ViewModel
     // ViewModel은 화면마다 새로 생성
     container.registerFactory(LoginViewModel.self) {
@@ -82,5 +110,14 @@ func registerDependencies() {
     container.registerFactory(FeedViewModel.self) {
         let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
         return FeedViewModel(filterUsecase: filterUsecase)
+    }
+
+    container.registerFactory(ChatRoomListViewModel.self) {
+        let fetchChatRoomsUsecase = container.resolve(FetchChatRoomsUsecase.self)
+        let repository = container.resolve(ChatRepositoryProtocol.self)
+        return ChatRoomListViewModel(
+            fetchChatRoomsUsecase: fetchChatRoomsUsecase,
+            repository: repository
+        )
     }
 }

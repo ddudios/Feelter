@@ -158,8 +158,8 @@ final class SocketIOManager {
     /// Socket 에러를 Observable로 제공
     ///
     /// Repository/ViewModel에서 subscribe하여 에러 처리
-    /// - 인증 에러 (.noToken, .authenticationFailed) → 재로그인 처리
-    /// - 연결 에러 (.connectionFailed, .disconnected) → 사용자에게 알림
+    /// - 인증 에러 (.noToken, .authenticationFailed) -> 재로그인 처리
+    /// - 연결 에러 (.connectionFailed, .disconnected) -> 사용자에게 알림
     ///
     /// - Returns: SocketError Publisher
     func observeErrors() -> AnyPublisher<SocketError, Never> {
@@ -264,9 +264,7 @@ final class SocketIOManager {
     }
 
     /// 액세스 토큰 가져오기
-    ///
     /// Socket.IO 연결 시 인증을 위해 사용
-    ///
     /// - Returns: 액세스 토큰 (없으면 nil)
     private func getAccessToken() -> String? {
         // KeychainManager에서 accessToken 가져오기

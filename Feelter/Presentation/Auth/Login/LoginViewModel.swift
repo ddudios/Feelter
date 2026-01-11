@@ -73,6 +73,7 @@ final class LoginViewModel: ViewModelProtocol {
 
                         KeychainManager.shared.save(token: result.1.accessToken, account: "accessToken")
                         KeychainManager.shared.save(token: result.1.refreshToken, account: "refreshToken")
+                        KeychainManager.shared.save(token: result.0.id, account: "userId")
 
                         await MainActor.run {
                             isLoadingSubject.send(false)

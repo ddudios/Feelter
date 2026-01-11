@@ -54,9 +54,10 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
             print("서버 로그아웃 요청 실패 (무시됨): \(error.localizedDescription)")
         }
 
-        // 2. Keychain에서 토큰 삭제 (무조건 실행)
+        // 2. Keychain에서 토큰 및 사용자 정보 삭제 (무조건 실행)
         KeychainManager.shared.delete(account: "accessToken")
         KeychainManager.shared.delete(account: "refreshToken")
+        KeychainManager.shared.delete(account: "userId")
     }
 }
 

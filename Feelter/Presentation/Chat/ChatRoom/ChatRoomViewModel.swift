@@ -8,4 +8,239 @@
 import Foundation
 import Combine
 
-// TODO: 채팅방 ViewModel 구현 (Input/Output + Socket 연동)
+final class ChatRoomViewModel {
+
+    // MARK: - Input/Output
+
+    struct Input {
+        /// 화면 진입 (viewDidLoad)
+        let viewDidLoad: AnyPublisher<Void, Never>
+
+        /// 화면 벗어남 (viewWillDisappear)
+        let viewWillDisappear: AnyPublisher<Void, Never>
+
+        /// 메시지 전송 버튼 탭
+        let sendButtonTapped: AnyPublisher<Void, Never>
+
+        /// 입력 중인 메시지 텍스트
+        let messageText: AnyPublisher<String, Never>
+    }
+
+    struct Output {
+        /// 메시지 목록
+        let messages: AnyPublisher<[ChatMessage], Never>
+
+        /// 로딩 상태
+        let isLoading: AnyPublisher<Bool, Never>
+
+        /// 전송 중 상태
+        let isSending: AnyPublisher<Bool, Never>
+
+        /// 에러 메시지
+        let error: AnyPublisher<String?, Never>
+
+        /// 스크롤 트리거 (새 메시지 추가 시)
+        let scrollToBottom: AnyPublisher<Void, Never>
+
+        /// 전송 버튼 활성화 상태
+        let isSendButtonEnabled: AnyPublisher<Bool, Never>
+    }
+
+    // MARK: - Dependencies
+
+    private let roomId: String
+    private let fetchChatHistoryUsecase: FetchChatHistoryUsecase
+    private let sendMessageUsecase: SendMessageUsecase
+    private let repository: ChatRepositoryProtocol
+
+    // MARK: - State
+
+    /// 현재 메시지 목록
+    private let messagesSubject = CurrentValueSubject<[ChatMessage], Never>([])
+
+    /// Cancellables
+    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Initialization
+
+    init(
+        roomId: String,
+        fetchChatHistoryUsecase: FetchChatHistoryUsecase,
+        sendMessageUsecase: SendMessageUsecase,
+        repository: ChatRepositoryProtocol
+    ) {
+        self.roomId = roomId
+        self.fetchChatHistoryUsecase = fetchChatHistoryUsecase
+        self.sendMessageUsecase = sendMessageUsecase
+        self.repository = repository
+
+        // Repository의 실시간 업데이트 구독
+        setupRealtimeUpdates()
+    }
+
+    // MARK: - Transform
+
+    func transform(input: Input) -> Output {
+        let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
+        let isSendingSubject = CurrentValueSubject<Bool, Never>(false)
+        let errorSubject = PassthroughSubject<String?, Never>()
+        let scrollToBottomSubject = PassthroughSubject<Void, Never>()
+
+        // 입력 텍스트 상태 저장
+        let messageTextSubject = CurrentValueSubject<String, Never>("")
+        input.messageText
+            .assign(to: \.value, on: messageTextSubject)
+            .store(in: &cancellables)
+
+        // 전송 버튼 활성화 상태
+        let isSendButtonEnabled = messageTextSubject
+            .map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .eraseToAnyPublisher()
+
+        // viewDidLoad: 채팅 내역 로드 + Socket 연결
+        input.viewDidLoad
+            .sink { [weak self] in
+                guard let self = self else { return }
+
+                // 1. 채팅 내역 로드
+                self.loadChatHistory(
+                    isLoadingSubject: isLoadingSubject,
+                    errorSubject: errorSubject
+                )
+
+                // 2. Socket 연결
+                self.repository.connectSocket(roomId: self.roomId)
+
+                // 3. 마지막 읽은 시간 업데이트
+                try? self.repository.updateLastReadDate(roomId: self.roomId)
+            }
+            .store(in: &cancellables)
+
+        // viewWillDisappear: Socket 연결 해제
+        input.viewWillDisappear
+            .sink { [weak self] in
+                self?.repository.disconnectSocket()
+            }
+            .store(in: &cancellables)
+
+        // sendButtonTapped: 메시지 전송
+        input.sendButtonTapped
+            .sink { [weak self] in
+                guard let self = self else { return }
+                let text = messageTextSubject.value
+
+                self.sendMessage(
+                    text: text,
+                    isSendingSubject: isSendingSubject,
+                    errorSubject: errorSubject,
+                    scrollToBottomSubject: scrollToBottomSubject
+                )
+
+                // 입력창 초기화
+                messageTextSubject.send("")
+            }
+            .store(in: &cancellables)
+
+        return Output(
+            messages: messagesSubject.eraseToAnyPublisher(),
+            isLoading: isLoadingSubject.eraseToAnyPublisher(),
+            isSending: isSendingSubject.eraseToAnyPublisher(),
+            error: errorSubject.eraseToAnyPublisher(),
+            scrollToBottom: scrollToBottomSubject.eraseToAnyPublisher(),
+            isSendButtonEnabled: isSendButtonEnabled
+        )
+    }
+
+    // MARK: - Private Methods
+
+    /// 채팅 내역 로드
+    ///
+    /// 동작:
+    /// 1. 로딩 시작
+    /// 2. UseCase 호출
+    /// 3. Subject 업데이트
+    /// 4. 로딩 종료
+    ///
+    private func loadChatHistory(
+        isLoadingSubject: CurrentValueSubject<Bool, Never>,
+        errorSubject: PassthroughSubject<String?, Never>
+    ) {
+        isLoadingSubject.send(true)
+
+        Task {
+            do {
+                let messages = try await fetchChatHistoryUsecase.execute(roomId: roomId)
+
+                await MainActor.run {
+                    messagesSubject.send(messages)
+                    isLoadingSubject.send(false)
+                }
+            } catch {
+                await MainActor.run {
+                    isLoadingSubject.send(false)
+                    errorSubject.send(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    /// 메시지 전송
+    ///
+    /// 동작:
+    /// 1. 전송 중 상태 시작
+    /// 2. UseCase 호출 (Optimistic Update는 Repository에서 처리)
+    /// 3. 성공: 스크롤
+    /// 4. 실패: 에러 표시
+    /// 5. 전송 중 상태 종료
+    ///
+    private func sendMessage(
+        text: String,
+        isSendingSubject: CurrentValueSubject<Bool, Never>,
+        errorSubject: PassthroughSubject<String?, Never>,
+        scrollToBottomSubject: PassthroughSubject<Void, Never>
+    ) {
+        isSendingSubject.send(true)
+
+        Task {
+            do {
+                _ = try await sendMessageUsecase.execute(
+                    roomId: roomId,
+                    content: text,
+                    files: []
+                )
+
+                await MainActor.run {
+                    isSendingSubject.send(false)
+                    scrollToBottomSubject.send()
+                }
+            } catch {
+                await MainActor.run {
+                    isSendingSubject.send(false)
+
+                    // SendMessageError의 errorDescription 사용
+                    if let sendError = error as? SendMessageUsecase.SendMessageError {
+                        errorSubject.send(sendError.errorDescription)
+                    } else {
+                        errorSubject.send(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Repository의 실시간 업데이트 구독
+    ///
+    /// Repository가 observeMessages() Publisher를 제공
+    /// - Socket.IO로 새 메시지 수신 시
+    /// - CoreData 변경 시
+    /// → 자동으로 messagesSubject 업데이트
+    ///
+    private func setupRealtimeUpdates() {
+        repository.observeMessages(roomId: roomId)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] messages in
+                self?.messagesSubject.send(messages)
+            }
+            .store(in: &cancellables)
+    }
+}

@@ -19,6 +19,7 @@ final class APIEventLogger: EventMonitor {
             switch response.result {
             case .success:
                 print("✅ [\(statusCode)] \(url)")
+                break
             case .failure(let error):
                 print("❌ [\(statusCode)] \(url)")
                 if let data = response.data, let errorMessage = String(data: data, encoding: .utf8) {
