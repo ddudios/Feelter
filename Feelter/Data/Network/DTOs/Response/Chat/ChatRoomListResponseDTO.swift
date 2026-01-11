@@ -7,4 +7,8 @@
 
 import Foundation
 
-// TODO: 채팅방 목록 Response DTO 구현
+struct ChatRoomListResponseDTO: Decodable {
+
+    /// 채팅방 배열 (updatedAt 기준 최신순)
+    let data: [ChatRoomResponseDTO]
+}
