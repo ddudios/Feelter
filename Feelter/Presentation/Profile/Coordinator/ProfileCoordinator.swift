@@ -19,8 +19,16 @@ final public class ProfileCoordinator: Coordinator {
     
     public func start() {
         let viewModel = DIContainer.shared.resolve(ProfileViewModel.self)
-        let vc = ProfileViewController(viewModel: viewModel)
-        navigationController.pushViewController(vc, animated: true)
+        let profileViewController = ProfileViewController(viewModel: viewModel)
+        profileViewController.onChatListTapped = { [weak self] in
+            self?.showChatRoomList()
+        }
+        navigationController.pushViewController(profileViewController, animated: true)
+    }
+
+    func showChatRoomList() {
+        let chatRoomListViewController = ChatRoomListViewController()
+        navigationController.pushViewController(chatRoomListViewController, animated: true)
     }
 
     func finish() {

@@ -7,4 +7,11 @@
 
 import Foundation
 
-// TODO: 채팅방 생성 Request DTO 구현
+struct CreateChatRoomRequestDTO: Encodable {
+    /// 채팅 상대방 User ID
+    let opponentId: String
+    
+    enum CodingKeys: String, CodingKey {
+        case opponentId = "opponent_id" // Swift(Camel) -> JSON(Snake) 변환
+    }
+}

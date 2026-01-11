@@ -11,11 +11,20 @@ import Combine
 
 final class ProfileViewController: BaseViewController {
 
+    var onChatListTapped: (() -> Void)?
+
+    private let chatListButton = {
+        let button = FeelterButton(title: "채팅")
+        return button
+    }()
+
     private let logoutButton = {
         let button = FeelterButton(title: "로그아웃")
         button.backgroundColor = .Feelter.deepTurquoise
         return button
     }()
+
+    private let actionStackView = UIStackView()
     
     private let viewModel: ProfileViewModel
     private let logoutConfirmSubject = PassthroughSubject<Void, Never>()
@@ -37,20 +46,30 @@ final class ProfileViewController: BaseViewController {
 
     override func configureHierarchy() {
         super.configureHierarchy()
-        view.addSubview(logoutButton)
+        view.addSubview(actionStackView)
+        actionStackView.addArrangedSubview(chatListButton)
+        actionStackView.addArrangedSubview(logoutButton)
     }
 
     override func configureLayout() {
         super.configureLayout()
-        logoutButton.snp.makeConstraints { make in
+        actionStackView.snp.makeConstraints { make in
             make.centerX.centerY.equalToSuperview()
             make.horizontalEdges.equalToSuperview().inset(40)
-            make.height.equalTo(44)
+        }
+
+        [chatListButton, logoutButton].forEach { button in
+            button.snp.makeConstraints { make in
+                make.height.equalTo(44)
+            }
         }
     }
 
     override func configureView() {
         super.configureView()
+        actionStackView.axis = .vertical
+        actionStackView.spacing = 16
+        actionStackView.alignment = .fill
 
         let input = ProfileViewModel.Input(
             logoutButtonTapped: logoutButton.tapPublisher,
@@ -70,6 +89,13 @@ final class ProfileViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 self?.performLogout()
+            }
+            .store(in: &cancellables)
+
+        chatListButton.tapPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.onChatListTapped?()
             }
             .store(in: &cancellables)
     }

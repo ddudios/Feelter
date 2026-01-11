@@ -47,11 +47,10 @@ final class TabBarCoordinator: Coordinator {
             tabType: .search
         )
 
-        let profileViewModel = DIContainer.shared.resolve(ProfileViewModel.self)
-        let profileNav = createNavigationController(
-            rootViewController: ProfileViewController(viewModel: profileViewModel),
-            tabType: .profile
-        )
+        let profileNav = createNavigationController(tabType: .profile)
+        let profileCoordinator = ProfileCoordinator(navigationController: profileNav)
+        addChildCoordinator(profileCoordinator)
+        profileCoordinator.start()
 
         return [homeNav, feedNav, filterNav, searchNav, profileNav]
     }
