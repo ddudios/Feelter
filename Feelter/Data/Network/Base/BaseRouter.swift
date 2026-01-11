@@ -14,6 +14,7 @@ protocol BaseRouter: URLRequestConvertible {
     var path: String { get }
     var headers: HTTPHeaders { get }
     var cachePolicy: URLRequest.CachePolicy { get }
+    var timeoutInterval: TimeInterval { get }
     var body: Encodable? { get }
     var queryParameters: Encodable? { get }
 }
@@ -37,7 +38,12 @@ extension BaseRouter {
     var cachePolicy: URLRequest.CachePolicy {
         return .useProtocolCachePolicy
     }
-    
+
+    // 기본 타임아웃 (30초)
+    var timeoutInterval: TimeInterval {
+        return 30
+    }
+
     // 기본 queryParameters (없으면 nil)
     var queryParameters: Encodable? {
         return nil
@@ -54,7 +60,8 @@ extension BaseRouter {
         var request = URLRequest(url: url)
         request.method = method
         request.cachePolicy = cachePolicy
-        
+        request.timeoutInterval = timeoutInterval
+
         headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.name) }
         
         if let queryParameters = queryParameters {

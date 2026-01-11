@@ -10,6 +10,25 @@ import Combine
 
 final class PaymentViewModel: ViewModelProtocol {
 
+    // MARK: - Loading State
+
+    enum LoadingState {
+        case idle
+        case creatingOrder
+        case validatingPayment
+
+        var message: String {
+            switch self {
+            case .idle:
+                return ""
+            case .creatingOrder:
+                return "주문 생성 중..."
+            case .validatingPayment:
+                return "결제 확인 중..."
+            }
+        }
+    }
+
     // MARK: - Input & Output
 
     struct Input {
@@ -21,8 +40,8 @@ final class PaymentViewModel: ViewModelProtocol {
     }
 
     struct Output {
-        /// 로딩 인디케이터 표시 여부
-        let isLoading: AnyPublisher<Bool, Never>
+        /// 로딩 상태 (메시지 포함)
+        let loadingState: AnyPublisher<LoadingState, Never>
 
         /// 에러 메시지 표시 (Alert용)
         let showError: AnyPublisher<String, Never>
@@ -41,10 +60,13 @@ final class PaymentViewModel: ViewModelProtocol {
 
     private var cancellables = Set<AnyCancellable>()
 
-    private let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
+    private let loadingStateSubject = CurrentValueSubject<LoadingState, Never>(.idle)
     private let showErrorSubject = PassthroughSubject<String, Never>()
     private let requestIamportPaymentSubject = PassthroughSubject<OrderInfo, Never>()
     private let paymentDidFinishSubject = PassthroughSubject<PaymentValidationResult, Never>()
+
+    // 결제 진행 상태 관리 (중복 결제 방지)
+    private var isPaymentInProgress = false
 
     // MARK: - Initializer
     init(usecase: PaymentUsecaseProtocol, filterId: String, price: Int) {
@@ -71,14 +93,15 @@ final class PaymentViewModel: ViewModelProtocol {
                 if success, let impUid = impUid {
                     self.validatePayment(impUid: impUid)
                 } else {
-                    let message = errorMsg ?? "결제가 취소되었습니다."
+                    let message = PaymentErrorMapper.paymentCancelledMessage(reason: errorMsg)
                     self.showErrorSubject.send(message)
+                    self.isPaymentInProgress = false
                 }
             }
             .store(in: &cancellables)
 
         return Output(
-            isLoading: isLoadingSubject.eraseToAnyPublisher(),
+            loadingState: loadingStateSubject.eraseToAnyPublisher(),
             showError: showErrorSubject.eraseToAnyPublisher(),
             requestIamportPayment: requestIamportPaymentSubject.eraseToAnyPublisher(),
             paymentDidFinish: paymentDidFinishSubject.eraseToAnyPublisher()
@@ -91,7 +114,13 @@ final class PaymentViewModel: ViewModelProtocol {
     /// - 서버에 필터 구매 주문을 생성하고 orderCode(merchant_uid)를 발급받습니다
     /// - 성공 시 아임포트 SDK 실행 요청을 보냅니다
     private func createOrder() {
-        isLoadingSubject.send(true)
+        // 중복 결제 방지
+        guard !isPaymentInProgress else {
+            return
+        }
+
+        isPaymentInProgress = true
+        loadingStateSubject.send(.creatingOrder)
 
         Task { [weak self] in
             guard let self else { return }
@@ -102,18 +131,29 @@ final class PaymentViewModel: ViewModelProtocol {
                 )
 
                 await MainActor.run {
+                    // 주문 생성 성공 시 상태 저장 (앱 종료 대비)
+                    PaymentStateManager.shared.savePendingPayment(
+                        filterId: self.filterId,
+                        orderCode: orderInfo.orderCode,
+                        totalPrice: orderInfo.totalPrice
+                    )
+
                     self.requestIamportPaymentSubject.send(orderInfo)
-                    self.isLoadingSubject.send(false)
+                    self.loadingStateSubject.send(.idle)
                 }
             } catch let error as NetworkError {
                 await MainActor.run {
-                    self.showErrorSubject.send(error.errorDescription)
-                    self.isLoadingSubject.send(false)
+                    let userMessage = PaymentErrorMapper.mapToUserFriendlyMessage(error)
+                    self.showErrorSubject.send(userMessage)
+                    self.loadingStateSubject.send(.idle)
+                    self.isPaymentInProgress = false
                 }
             } catch {
                 await MainActor.run {
-                    self.showErrorSubject.send("주문 생성 실패: \(error.localizedDescription)")
-                    self.isLoadingSubject.send(false)
+                    let userMessage = PaymentErrorMapper.mapToUserFriendlyMessage(error)
+                    self.showErrorSubject.send(userMessage)
+                    self.loadingStateSubject.send(.idle)
+                    self.isPaymentInProgress = false
                 }
             }
         }
@@ -124,7 +164,7 @@ final class PaymentViewModel: ViewModelProtocol {
     /// - 검증 성공 시 필터 잠금 해제 및 다운로드가 가능해집니다
     /// - 검증 실패 시 결제는 되었지만 서버에서 확인되지 않은 상태이므로 고객센터 안내가 필요할 수 있습니다
     private func validatePayment(impUid: String) {
-        isLoadingSubject.send(true)
+        loadingStateSubject.send(.validatingPayment)
 
         Task { [weak self] in
             guard let self else { return }
@@ -132,18 +172,26 @@ final class PaymentViewModel: ViewModelProtocol {
                 let result = try await self.usecase.validatePayment(impUid: impUid)
 
                 await MainActor.run {
+                    // 결제 검증 완료 시 저장된 상태 삭제
+                    PaymentStateManager.shared.clearPendingPayment()
+
                     self.paymentDidFinishSubject.send(result)
-                    self.isLoadingSubject.send(false)
+                    self.loadingStateSubject.send(.idle)
+                    self.isPaymentInProgress = false
                 }
             } catch let error as NetworkError {
                 await MainActor.run {
-                    self.showErrorSubject.send(error.errorDescription)
-                    self.isLoadingSubject.send(false)
+                    let userMessage = PaymentErrorMapper.mapToUserFriendlyMessage(error)
+                    self.showErrorSubject.send(userMessage)
+                    self.loadingStateSubject.send(.idle)
+                    self.isPaymentInProgress = false
                 }
             } catch {
                 await MainActor.run {
-                    self.showErrorSubject.send("결제 검증 실패: \(error.localizedDescription)")
-                    self.isLoadingSubject.send(false)
+                    let userMessage = PaymentErrorMapper.mapToUserFriendlyMessage(error)
+                    self.showErrorSubject.send(userMessage)
+                    self.loadingStateSubject.send(.idle)
+                    self.isPaymentInProgress = false
                 }
             }
         }

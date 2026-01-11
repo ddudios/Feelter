@@ -62,8 +62,37 @@ final class FilterDetailViewController: BaseViewController {
     private var isPaymentViewModelBound = false
     var onLikeStateChanged: ((String, Bool, Int) -> Void)?
 
+    // MARK: - Loading Indicator
+    private lazy var loadingOverlay: UIView = {
+        let overlay = UIView()
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        overlay.isHidden = true
+        return overlay
+    }()
+
+    private lazy var loadingContainerView: UIView = {
+        let container = UIView()
+        container.backgroundColor = .Feelter.gray100
+        container.layer.cornerRadius = 16
+        return container
+    }()
+
+    private lazy var activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.color = .Feelter.gray30
+        return indicator
+    }()
+
+    private lazy var loadingMessageLabel: UILabel = {
+        let label = UILabel()
+        label.font = TextStyle.Pretendard.body1
+        label.textColor = .Feelter.gray30
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        return label
+    }()
+
     // MARK: - UI Components
-    
     private lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: createLayout())
         collectionView.backgroundColor = .clear
@@ -138,6 +167,12 @@ final class FilterDetailViewController: BaseViewController {
     override func configureHierarchy() {
         super.configureHierarchy()
         view.addSubview(collectionView)
+
+        // Loading overlay setup
+        view.addSubview(loadingOverlay)
+        loadingOverlay.addSubview(loadingContainerView)
+        loadingContainerView.addSubview(activityIndicator)
+        loadingContainerView.addSubview(loadingMessageLabel)
     }
 
     override func configureLayout() {
@@ -145,6 +180,27 @@ final class FilterDetailViewController: BaseViewController {
         collectionView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
             make.horizontalEdges.bottom.equalToSuperview()
+        }
+
+        // Loading overlay layout
+        loadingOverlay.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        loadingContainerView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.equalTo(200)
+            make.height.equalTo(120)
+        }
+
+        activityIndicator.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalToSuperview().offset(24)
+        }
+
+        loadingMessageLabel.snp.makeConstraints { make in
+            make.top.equalTo(activityIndicator.snp.bottom).offset(16)
+            make.horizontalEdges.equalToSuperview().inset(16)
         }
     }
     
@@ -211,13 +267,14 @@ final class FilterDetailViewController: BaseViewController {
 
         let output = paymentViewModel.transform(input: input)
 
-        output.isLoading
+        output.loadingState
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoading in
-                if isLoading {
-                    self?.showLoadingIndicator()
-                } else {
+            .sink { [weak self] state in
+                switch state {
+                case .idle:
                     self?.hideLoadingIndicator()
+                case .creatingOrder, .validatingPayment:
+                    self?.showLoadingIndicator(message: state.message)
                 }
             }
             .store(in: &cancellables)
@@ -484,11 +541,16 @@ final class FilterDetailViewController: BaseViewController {
         present(alert, animated: true)
     }
 
-    private func showLoadingIndicator() {
+    private func showLoadingIndicator(message: String = "처리 중...") {
+        loadingMessageLabel.text = message
+        loadingOverlay.isHidden = false
+        activityIndicator.startAnimating()
         view.isUserInteractionEnabled = false
     }
 
     private func hideLoadingIndicator() {
+        loadingOverlay.isHidden = true
+        activityIndicator.stopAnimating()
         view.isUserInteractionEnabled = true
     }
 }

@@ -38,4 +38,16 @@ enum PaymentRouter: BaseRouter {
         case .fetchMyOrders, .fetchReceipt: nil
         }
     }
+
+    // 타임아웃
+    var timeoutInterval: TimeInterval {
+        switch self {
+        case .createOrder:
+            return 300 // 주문 생성
+        case .validatePayment:
+            return 300 // 결제 검증 (PG사 통신 고려)
+        case .fetchMyOrders, .fetchReceipt:
+            return 30 // 기본 타임아웃
+        }
+    }
 }

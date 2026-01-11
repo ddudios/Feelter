@@ -34,8 +34,27 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        // Called when the scene has moved from an inactive state to an active state.
-        // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+        // 앱이 활성화될 때 미완료 결제 확인
+        checkForPendingPayment()
+    }
+
+    /// 미완료 결제 확인 및 알림
+    private func checkForPendingPayment() {
+        guard let pendingPayment = PaymentStateManager.shared.getPendingPayment() else {
+            return
+        }
+
+        // 미완료 결제가 있으면 알림 발송
+        // 앱의 다른 부분에서 이 노티피케이션을 수신하여 적절히 처리할 수 있음
+        NotificationCenter.default.post(
+            name: .pendingPaymentDetected,
+            object: nil,
+            userInfo: [
+                "filterId": pendingPayment.filterId,
+                "orderCode": pendingPayment.orderCode,
+                "totalPrice": pendingPayment.totalPrice
+            ]
+        )
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
