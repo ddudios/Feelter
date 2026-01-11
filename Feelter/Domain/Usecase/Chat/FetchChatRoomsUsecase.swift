@@ -7,4 +7,16 @@
 
 import Foundation
 
-// TODO: 채팅방 목록 조회 UseCase 구현
+/// 채팅방 목록 조회 UseCase
+final class FetchChatRoomsUsecase {
+
+    private let repository: ChatRepositoryProtocol
+
+    init(repository: ChatRepositoryProtocol) {
+        self.repository = repository
+    }
+
+    func execute() async throws -> [ChatRoom] {
+        return try await repository.fetchChatRooms()
+    }
+}
