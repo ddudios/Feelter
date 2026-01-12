@@ -45,6 +45,11 @@ final class FeelterTextField: UITextField {
     private let textContentTypeValue: UITextContentType?
     private let keyboardTypeValue: UIKeyboardType
     private let iconConfig = UIImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+    var rightViewWidth: CGFloat? {
+        didSet {
+            setNeedsLayout()
+        }
+    }
 
     override var isSecureTextEntry: Bool {
         didSet {
@@ -121,6 +126,18 @@ final class FeelterTextField: UITextField {
     // MARK: - Public Methods
     func setBorderState(_ state: BorderState) {
         layer.borderColor = state.color?.cgColor
+    }
+
+    override func rightViewRect(forBounds bounds: CGRect) -> CGRect {
+        guard let width = rightViewWidth, width > 0, rightView != nil else {
+            return super.rightViewRect(forBounds: bounds)
+        }
+        return CGRect(
+            x: bounds.width - width,
+            y: 0,
+            width: width,
+            height: bounds.height
+        )
     }
 
     private func updateSecureIcon() {

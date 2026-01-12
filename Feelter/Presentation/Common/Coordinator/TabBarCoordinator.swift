@@ -38,7 +38,7 @@ final class TabBarCoordinator: Coordinator {
         feedCoordinator.start()
 
         let filterNav = createNavigationController(
-            rootViewController: FilterViewController(),
+            rootViewController: FilterMakeViewController(),
             tabType: .filter
         )
 

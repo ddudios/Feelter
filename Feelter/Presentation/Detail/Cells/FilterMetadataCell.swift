@@ -18,7 +18,7 @@ final class FilterMetadataCell: BaseCollectionViewCell {
     override func configureLayout() {
         cardBackgroundView.snp.makeConstraints { make in
             make.top.bottom.equalToSuperview()
-            make.leading.trailing.equalToSuperview().inset(16)
+            make.leading.trailing.equalToSuperview()
             make.height.equalTo(140)
         }
     }
