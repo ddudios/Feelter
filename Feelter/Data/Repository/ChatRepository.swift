@@ -93,6 +93,9 @@ final class ChatRepository: ChatRepositoryProtocol {
 
         // 3. CoreData에 저장
         try saveChatRoomToCoreData(chatRoom)
+        if let lastMessage = chatRoom.lastMessage {
+            try saveMessageToCoreData(lastMessage)
+        }
 
         // 4. Subject 업데이트 (채팅방 목록 갱신)
         await refreshChatRoomsFromCoreData()
@@ -124,6 +127,9 @@ final class ChatRepository: ChatRepositoryProtocol {
         // 3. CoreData에 저장
         for chatRoom in chatRooms {
             try saveChatRoomToCoreData(chatRoom)
+            if let lastMessage = chatRoom.lastMessage {
+                try saveMessageToCoreData(lastMessage)
+            }
         }
 
         // 4. Subject 업데이트

@@ -269,6 +269,11 @@ extension CoreDataManager {
         message.senderProfileImage = senderProfileImage
         message.files = files
         message.status = status
+        let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
+        chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
+        if let chatRoom = try contextToUse.fetch(chatRoomFetchRequest).first {
+            message.chatRoom = chatRoom
+        }
 
         return message
     }

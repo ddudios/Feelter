@@ -160,6 +160,8 @@ final class ChatRoomCell: UITableViewCell {
         timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         messageLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         unreadBadgeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        messageLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        unreadBadgeLabel.setContentHuggingPriority(.required, for: .horizontal)
     }
 
     private func formattedTimestamp(from date: Date, referenceDate: Date = Date()) -> String {

@@ -100,13 +100,7 @@ final class ChatRoomListViewController: BaseViewController {
     // MARK: - Private Methods
     private func setupTableView() {
         chatRoomTableView.backgroundColor = .clear
-        chatRoomTableView.separatorColor = .Feelter.gray90
-        chatRoomTableView.separatorInset = UIEdgeInsets(
-            top: 0,
-            left: Layout.separatorLeftInset,
-            bottom: 0,
-            right: Layout.separatorRightInset
-        )
+        chatRoomTableView.separatorStyle = .none
         chatRoomTableView.rowHeight = Layout.rowHeight
         chatRoomTableView.dataSource = self
         chatRoomTableView.delegate = self
