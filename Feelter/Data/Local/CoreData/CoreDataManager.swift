@@ -175,7 +175,6 @@ extension CoreDataManager {
 extension CoreDataManager {
 
     /// 채팅방 저장 또는 업데이트 (UPSERT)
-    ///
     /// Unique Constraint 덕분에 roomId가 중복이면 자동으로 업데이트
     ///
     /// - Parameters:

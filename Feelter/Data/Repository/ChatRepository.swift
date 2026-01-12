@@ -211,7 +211,7 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// 동작:
     /// 1. Optimistic Update: 로컬에 .sending 상태로 저장
     /// 2. API 전송: POST /v1/chats/{room_id}
-    /// 3. 성공: .sent 상태로 업데이트
+    /// 3. 성공: 로컬 임시 메시지 삭제 후 서버 응답 저장
     /// 4. 실패: .failed 상태로 업데이트
     ///
     /// - Parameters:
@@ -242,7 +242,10 @@ final class ChatRepository: ChatRepositoryProtocol {
             let router = ChatRouter.sendMessage(roomId: roomId, content: content, files: files.isEmpty ? nil : files)
             let responseDTO = try await networkManager.request(router, type: ChatMessageResponseDTO.self)
 
-            // 4. 성공: 서버 응답으로 업데이트
+            // 4. 성공: 로컬 임시 메시지 삭제
+            try deleteMessageFromCoreData(chatId: localMessage.chatId)
+
+            // 5. 서버 응답으로 저장
             let sentMessage = responseDTO.toDomain()
             try saveMessageToCoreData(sentMessage)
             await refreshMessagesFromCoreData(roomId: roomId)
@@ -250,7 +253,7 @@ final class ChatRepository: ChatRepositoryProtocol {
             return sentMessage
 
         } catch {
-            // 5. 실패: .failed 상태로 업데이트
+            // 6. 실패: .failed 상태로 업데이트
             let failedMessage = localMessage.with(status: .failed)
             try saveMessageToCoreData(failedMessage)
             await refreshMessagesFromCoreData(roomId: roomId)
@@ -423,6 +426,21 @@ final class ChatRepository: ChatRepositoryProtocol {
         )
 
         try coreDataManager.saveContext()
+    }
+
+    /// CoreData에서 메시지 삭제
+    ///
+    /// - Parameter chatId: 삭제할 메시지의 chatId
+    private func deleteMessageFromCoreData(chatId: String) throws {
+        let fetchRequest = ChatMessageEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "chatId == %@", chatId)
+
+        let results = try coreDataManager.viewContext.fetch(fetchRequest)
+
+        if let messageToDelete = results.first {
+            coreDataManager.viewContext.delete(messageToDelete)
+            try coreDataManager.saveContext()
+        }
     }
 
     /// CoreData에서 채팅방 목록 갱신

@@ -139,7 +139,10 @@ final class ChatMessageCell: UITableViewCell {
         messageLabel.font = TextStyle.Pretendard.body2
         messageLabel.textColor = .Feelter.gray0
         messageLabel.numberOfLines = 0
+        messageLabel.lineBreakMode = .byWordWrapping
         messageLabel.padding = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        messageLabel.setContentHuggingPriority(.required, for: .vertical)
 
         timeLabel.font = TextStyle.Pretendard.caption1
         timeLabel.textColor = .Feelter.gray60
