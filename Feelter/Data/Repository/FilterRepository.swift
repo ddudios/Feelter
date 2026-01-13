@@ -77,6 +77,7 @@ final class FilterRepository: FilterRepositoryProtocol {
     func uploadFiles(_ imageData: [Data]) async throws -> [String] {
         return try await networkManager.uploadFiles(
             imageData,
+            config: .filter,  // ✅ 필터 설정 (jpg, png, jpeg / 2MB / 2개)
             endpoint: FilterRouter.uploadFiles(imageData: imageData)
         )
     }

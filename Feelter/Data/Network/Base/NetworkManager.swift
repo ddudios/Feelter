@@ -11,15 +11,11 @@ import Alamofire
 protocol NetworkManagerProtocol {
     func request<T: Decodable, R: URLRequestConvertible>(_ endpoint: R, type: T.Type) async throws -> T
 
-    // 설정 기반 파일 업로드 (새 버전)
+    // 설정 기반 파일 업로드
     func uploadFiles(_ dataList: [Data], config: FileUploadConfig, endpoint: URLRequestConvertible) async throws -> [String]
 
     // 프로필 이미지 전용 업로드
     func uploadProfileImage(_ imageData: Data, endpoint: URLRequestConvertible) async throws -> String
-
-    // 기존 메서드 (하위 호환성)
-    @available(*, deprecated, message: "uploadFiles(_:config:endpoint:) 사용 권장")
-    func uploadFiles(_ imageData: [Data], endpoint: URLRequestConvertible) async throws -> [String]
 }
 
 // 2. 구현체
@@ -179,13 +175,5 @@ final class NetworkManager: NetworkManagerProtocol {
                 }
             }
         }
-    }
-
-    // 6-3. 기존 파일 업로드 메서드 (하위 호환성)
-    /// - 내부적으로 새 메서드 호출
-    @available(*, deprecated, message: "uploadFiles(_:config:endpoint:) 사용 권장")
-    func uploadFiles(_ imageData: [Data], endpoint: URLRequestConvertible) async throws -> [String] {
-        // 기본 설정으로 호출 (Filter/Post/Chat에서 사용)
-        return try await uploadFiles(imageData, config: .post, endpoint: endpoint)
     }
 }
