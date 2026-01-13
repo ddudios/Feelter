@@ -18,9 +18,9 @@ extension ChatRoomResponseDTO {
     /// 4. lastChat이 있으면 ChatMessage로 변환
     ///
     /// - Parameter currentUserId: 현재 로그인한 사용자 ID
-    /// - Returns: ChatRoom (Domain Entity)
-    /// - Note: 상대방을 찾지 못하면 fatalError (1:1 채팅이므로 항상 있어야 함)
-    func toDomain(currentUserId: String) -> ChatRoom {
+    /// - Returns: ChatRoom? (상대방을 찾지 못하면 nil - 자기 자신과의 채팅방인 경우)
+    /// - Note: 자기 자신과의 채팅방은 nil을 반환하여 필터링됨
+    func toDomain(currentUserId: String) -> ChatRoom? {
         // 1. 날짜 변환
         let createdDate = ISO8601DateParser.date(from: createdAt)
         let updatedDate = ISO8601DateParser.date(from: updatedAt)
@@ -29,8 +29,9 @@ extension ChatRoomResponseDTO {
         // participants = [나, 상대방]
         // 내 ID를 제외한 사람이 상대방
         guard let opponentDTO = participants.first(where: { $0.userId != currentUserId }) else {
-            // 1:1 채팅이므로 상대방은 항상 있어야 함
-            fatalError("ChatRoom participants에서 상대방을 찾을 수 없습니다. participants: \(participants)")
+            // 자기 자신과의 채팅방인 경우 nil 반환 (필터링)
+            print("자기 자신과의 채팅방 감지, 필터링: roomId=\(roomId)")
+            return nil
         }
 
         // 3. CreatorDTO -> ChatRoom.Opponent 변환

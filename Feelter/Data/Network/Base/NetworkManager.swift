@@ -10,9 +10,9 @@ import Alamofire
 // 1. 프로토콜 정의 (의존성 관리)
 protocol NetworkManagerProtocol {
     func request<T: Decodable, R: URLRequestConvertible>(_ endpoint: R, type: T.Type) async throws -> T
+    func uploadFiles(_ imageData: [Data], endpoint: URLRequestConvertible) async throws -> [String]
 }
 
-//TODO: uploadFiles는 multipart/form-data를 사용하므로 NetworkManager에서 별도 처리가 필요
 // 2. 구현체
 final class NetworkManager: NetworkManagerProtocol {
     
@@ -72,6 +72,35 @@ final class NetworkManager: NetworkManagerProtocol {
             return errorResponse.message
         } catch {
             return nil
+        }
+    }
+
+    // 6. Multipart/form-data 파일 업로드
+    func uploadFiles(_ imageData: [Data], endpoint: URLRequestConvertible) async throws -> [String] {
+        return try await withCheckedThrowingContinuation { continuation in
+            session.upload(
+                multipartFormData: { multipartFormData in
+                    for (index, data) in imageData.enumerated() {
+                        multipartFormData.append(
+                            data,
+                            withName: "files",
+                            fileName: "image_\(index)_\(Date().timeIntervalSince1970).jpg",
+                            mimeType: "image/jpeg"
+                        )
+                    }
+                },
+                with: endpoint
+            )
+            .validate()
+            .responseDecodable(of: FileUploadResponseDTO.self) { response in
+                switch response.result {
+                case .success(let value):
+                    continuation.resume(returning: value.files)
+                case .failure(let error):
+                    let networkError = self.parseError(error, response: response.response, data: response.data)
+                    continuation.resume(throwing: networkError)
+                }
+            }
         }
     }
 }

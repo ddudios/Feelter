@@ -400,7 +400,11 @@ final class FilterDetailViewController: BaseViewController {
             case .creator:
                 guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FilterCreatorInfoCell.identifier, for: indexPath) as? FilterCreatorInfoCell else { return UICollectionViewCell() }
                 if let filterDetail = self?.currentFilterDetail {
-                    cell.configure(creator: filterDetail.creator, description: filterDetail.description)
+                    // 현재 사용자 ID 가져오기
+                    let currentUserId = KeychainManager.shared.read(account: "userId")
+                    let isOwnFilter = currentUserId == filterDetail.creator.id
+
+                    cell.configure(creator: filterDetail.creator, description: filterDetail.description, isOwnFilter: isOwnFilter)
                     cell.onMessageTapped = { [weak self] creatorId in
                         self?.handleMessageButtonTapped(creatorId: creatorId)
                     }

@@ -106,26 +106,31 @@ final class FilterCreatorInfoCell: BaseCollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        profileImageView.image = UIImage.TabBar.profileFill
+        profileImageView.image = UIImage(named: "appIcon")
         nameLabel.text = nil
         nicknameLabel.text = nil
         descriptionLabel.text = nil
         tagWrapView.configure(tags: [])
         currentCreatorId = nil
         onMessageTapped = nil
+        messageButton.isHidden = false
     }
 
-    func configure(creator: Creator, description: String) {
+    func configure(creator: Creator, description: String, isOwnFilter: Bool = false) {
         currentCreatorId = creator.id
         nameLabel.text = creator.name
         nicknameLabel.text = creator.nickname
         descriptionLabel.text = description
         tagWrapView.configure(tags: creator.hashTags)
 
-        profileImageView.image = UIImage.TabBar.profileFill
+        profileImageView.image = UIImage(named: "appIcon")
+        profileImageView.backgroundColor = .clear
         if let path = creator.profileImageURL, !path.isEmpty {
             profileImageView.setFeelterImage(with: path)
         }
+
+        // 본인의 필터인 경우 메시지 버튼 숨김
+        messageButton.isHidden = isOwnFilter
     }
 
     @objc private func messageButtonTapped() {

@@ -108,6 +108,7 @@ final class FilterMakeViewController: BaseViewController {
     private var categoryButtons: [SelectableCapsuleButton] = []
     private weak var activeTextField: UITextField?
     private var selectedPhotoImage: UIImage?
+    private var currentPhotoMetadata: PhotoMetadata?
     private var photoUploadButtonHeightConstraint: Constraint?
     private var photoUploadButtonSquareConstraint: NSLayoutConstraint?
     private var baseScrollBottomInset: CGFloat = 0
@@ -307,7 +308,77 @@ final class FilterMakeViewController: BaseViewController {
         categoryButtons.forEach { $0.isSelected = ($0 == sender) }
     }
 
-    @objc private func saveButtonTapped() { }
+    @objc private func saveButtonTapped() {
+        // 1. Validate inputs
+        let validationResult = validateInputs()
+
+        switch validationResult {
+        case .success(let validatedInput):
+            createFilter(with: validatedInput)
+
+        case .failure(let error):
+            showAlert(message: error.message)
+        }
+    }
+
+    private func createFilter(with input: ValidatedFilterInput) {
+        // Show loading state
+        navigationItem.rightBarButtonItem?.isEnabled = false
+
+        Task {
+            do {
+                // 1. Convert UIImage to Data (JPEG)
+                guard let imageData = input.photo.jpegData(compressionQuality: 0.8) else {
+                    throw NSError(domain: "FilterMakeViewController", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "이미지 변환에 실패했습니다."
+                    ])
+                }
+
+                // 2. Upload files (original and filtered - same image for now)
+                let repository = DIContainer.shared.resolve(FilterRepositoryProtocol.self)
+                let fileURLs = try await repository.uploadFiles([imageData, imageData])
+
+                // 3. Map PhotoMetadata to DTO
+                let photoMetadataDTO = input.metadata.toDTO()
+
+                // 4. Use default filter values (FilterEditViewController not implemented yet)
+                let filterValues = FilterValues.default
+                let filterValuesDTO = filterValues.toDTO()
+
+                // 5. Create request DTO
+                let requestDTO = CreateFilterRequestDTO(
+                    category: input.category,
+                    title: input.title,
+                    price: input.price,
+                    description: input.description,
+                    files: fileURLs,
+                    photoMetadata: photoMetadataDTO,
+                    filterValues: filterValuesDTO
+                )
+
+                // 6. Call API
+                let createdFilter = try await repository.createFilter(requestDTO: requestDTO)
+
+                // 7. Handle success - Navigate to FilterDetailViewController
+                await MainActor.run {
+                    navigationItem.rightBarButtonItem?.isEnabled = true
+                    navigateToFilterDetail(filterId: createdFilter.id)
+                }
+
+            } catch {
+                // 8. Handle error
+                await MainActor.run {
+                    navigationItem.rightBarButtonItem?.isEnabled = true
+                    showAlert(message: "필터 생성에 실패했습니다.\n\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func navigateToFilterDetail(filterId: String) {
+        let filterDetailVC = FilterDetailViewController(filterId: filterId)
+        navigationController?.pushViewController(filterDetailVC, animated: true)
+    }
 
     @objc private func photoUploadButtonTapped() {
         var configuration = PHPickerConfiguration()
@@ -410,7 +481,93 @@ final class FilterMakeViewController: BaseViewController {
 
     @MainActor
     private func updatePhotoMetadata(_ metadata: PhotoMetadata) {
+        currentPhotoMetadata = metadata
         metadataCell.configure(metadata: metadata)
+    }
+
+    // MARK: - Validation
+    private enum FilterValidationError: Error {
+        case emptyFilterName
+        case noSelectedCategory
+        case emptyDescription
+        case invalidPrice
+        case noPhotoSelected
+
+        var message: String {
+            switch self {
+            case .emptyFilterName:
+                return "필터 이름을 입력해주세요."
+            case .noSelectedCategory:
+                return "카테고리를 선택해주세요."
+            case .emptyDescription:
+                return "필터 소개를 입력해주세요."
+            case .invalidPrice:
+                return "가격은 1,000원 이상이어야 합니다."
+            case .noPhotoSelected:
+                return "대표 사진을 선택해주세요."
+            }
+        }
+    }
+
+    private struct ValidatedFilterInput {
+        let title: String
+        let category: String
+        let description: String
+        let price: Int
+        let photo: UIImage
+        let metadata: PhotoMetadata
+    }
+
+    private func validateInputs() -> Result<ValidatedFilterInput, FilterValidationError> {
+        // 1. Filter name validation
+        guard let filterName = filterNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !filterName.isEmpty else {
+            return .failure(.emptyFilterName)
+        }
+
+        // 2. Category validation
+        guard let selectedCategory = categoryButtons.first(where: { $0.isSelected })?.titleLabel?.text else {
+            return .failure(.noSelectedCategory)
+        }
+
+        // 3. Description validation
+        guard let description = descriptionTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !description.isEmpty else {
+            return .failure(.emptyDescription)
+        }
+
+        // 4. Price validation
+        guard let priceText = priceTextField.text?.filter({ $0.isNumber }),
+              !priceText.isEmpty,
+              let price = Int(priceText),
+              price >= 1000 else {
+            return .failure(.invalidPrice)
+        }
+
+        // 5. Photo validation
+        guard let photo = selectedPhotoImage else {
+            return .failure(.noPhotoSelected)
+        }
+
+        // 6. Metadata (use .empty if not extracted)
+        let metadata = currentPhotoMetadata ?? .empty
+
+        return .success(ValidatedFilterInput(
+            title: filterName,
+            category: selectedCategory,
+            description: description,
+            price: price,
+            photo: photo,
+            metadata: metadata
+        ))
+    }
+
+    private func showAlert(message: String, completion: (() -> Void)? = nil) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in
+            completion?()
+        })
+        present(alert, animated: true)
     }
 }
 

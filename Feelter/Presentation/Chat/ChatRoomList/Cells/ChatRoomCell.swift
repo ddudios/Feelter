@@ -71,7 +71,7 @@ final class ChatRoomCell: UITableViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        profileImageView.image = UIImage.TabBar.profileFill
+        profileImageView.image = UIImage(named: "appIcon")
         nameLabel.text = nil
         timeLabel.text = nil
         messageLabel.text = nil
@@ -85,7 +85,7 @@ final class ChatRoomCell: UITableViewCell {
         unreadBadgeLabel.text = "N"
         unreadBadgeLabel.isHidden = !chatRoom.hasUnreadMessage
 
-        profileImageView.image = UIImage.TabBar.profileFill
+        profileImageView.image = UIImage(named: "appIcon")
         if chatRoom.opponent.hasProfileImage {
             profileImageView.setFeelterImage(with: chatRoom.opponent.profileImage)
         }
@@ -118,8 +118,7 @@ final class ChatRoomCell: UITableViewCell {
         profileImageView.contentMode = .scaleAspectFill
         profileImageView.clipsToBounds = true
         profileImageView.layer.cornerRadius = Layout.profileSize / 2
-        profileImageView.backgroundColor = .Feelter.gray90
-        profileImageView.tintColor = .Feelter.gray60
+        profileImageView.backgroundColor = .clear
 
         nameLabel.font = TextStyle.Pretendard.body1
         nameLabel.textColor = .Feelter.gray15

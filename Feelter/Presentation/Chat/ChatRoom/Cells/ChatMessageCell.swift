@@ -32,6 +32,7 @@ final class ChatMessageCell: UITableViewCell {
         static let stackSpacing: CGFloat = 8
         static let bubbleSpacing: CGFloat = 6
         static let bubbleCornerRadius: CGFloat = Radius.l
+        static let statusIconSize: CGFloat = 16
     }
 
     private let profileImageView = UIImageView()
@@ -40,11 +41,16 @@ final class ChatMessageCell: UITableViewCell {
     private let messageLabel = PaddingLabel()
     private let imageGridView = ChatImageGridView()
     private let timeLabel = UILabel()
+    private let readCountLabel = UILabel()
+    private let timeStackView = UIStackView()
     private let statusLabel = UILabel()
+    private let statusIconImageView = UIImageView()
     private let retryButton = UIButton(type: .system)
     private let statusStackView = UIStackView()
     private let horizontalStackView = UIStackView()
     private let spacerView = UIView()
+    private var bubbleMaxWidthConstraint: Constraint?
+    private var currentIsOutgoing = false
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -67,17 +73,21 @@ final class ChatMessageCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         onRetryTapped = nil
-        profileImageView.image = UIImage.TabBar.profileFill
+        currentIsOutgoing = false
         messageLabel.text = nil
         timeLabel.text = nil
+        readCountLabel.text = nil
+        readCountLabel.isHidden = true
         statusLabel.text = nil
+        statusIconImageView.image = nil
         retryButton.isHidden = true
     }
 
     func configure(with item: ChatMessageViewItem, opponentProfileImagePath: String?) {
+        currentIsOutgoing = item.isOutgoing
         configureMessageContent(text: item.text, images: item.images)
         configureTimeLabel(date: item.date, showsTime: item.showsTime)
-        configureStatus(for: item.status, showsTime: item.showsTime)
+        configureStatus(for: item.status, showsTime: item.showsTime, isOutgoing: item.isOutgoing)
         configureLayoutDirection(isOutgoing: item.isOutgoing)
         configureColors(isOutgoing: item.isOutgoing)
 
@@ -86,7 +96,7 @@ final class ChatMessageCell: UITableViewCell {
         } else if let path = opponentProfileImagePath, !path.isEmpty {
             profileImageView.setFeelterImage(with: path)
         } else {
-            profileImageView.image = UIImage.TabBar.profileFill
+            profileImageView.image = UIImage(named: "appIcon")
         }
     }
 
@@ -95,6 +105,9 @@ final class ChatMessageCell: UITableViewCell {
         bubbleContainerView.addSubview(bubbleStackView)
         bubbleStackView.addArrangedSubview(imageGridView)
         bubbleStackView.addArrangedSubview(messageLabel)
+        timeStackView.addArrangedSubview(readCountLabel)
+        timeStackView.addArrangedSubview(timeLabel)
+        statusStackView.addArrangedSubview(statusIconImageView)
         statusStackView.addArrangedSubview(statusLabel)
         statusStackView.addArrangedSubview(retryButton)
     }
@@ -113,8 +126,12 @@ final class ChatMessageCell: UITableViewCell {
             make.edges.equalToSuperview()
         }
 
+        statusIconImageView.snp.makeConstraints { make in
+            make.width.height.equalTo(Layout.statusIconSize)
+        }
+
         retryButton.snp.makeConstraints { make in
-            make.width.height.equalTo(18)
+            make.width.height.equalTo(10)
         }
     }
 
@@ -126,7 +143,7 @@ final class ChatMessageCell: UITableViewCell {
         profileImageView.contentMode = .scaleAspectFill
         profileImageView.clipsToBounds = true
         profileImageView.layer.cornerRadius = Layout.profileSize / 2
-        profileImageView.backgroundColor = .Feelter.gray90
+        profileImageView.backgroundColor = .clear
 
         bubbleContainerView.layer.cornerRadius = Layout.bubbleCornerRadius
         bubbleContainerView.clipsToBounds = true
@@ -144,14 +161,28 @@ final class ChatMessageCell: UITableViewCell {
         messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
         messageLabel.setContentHuggingPriority(.required, for: .vertical)
 
+        readCountLabel.font = TextStyle.Pretendard.caption2
+        readCountLabel.textColor = .Feelter.gray60
+        readCountLabel.textAlignment = .right
+        readCountLabel.isHidden = true
+
+        timeStackView.axis = .vertical
+        timeStackView.spacing = 2
+        timeStackView.alignment = .trailing
+
         timeLabel.font = TextStyle.Pretendard.caption1
         timeLabel.textColor = .Feelter.gray60
 
         statusLabel.font = TextStyle.Pretendard.caption2
         statusLabel.textColor = .Feelter.gray60
 
+        statusIconImageView.contentMode = .scaleAspectFit
+        statusIconImageView.tintColor = .Feelter.gray60
+        statusIconImageView.isHidden = true
+
         retryButton.tintColor = .Feelter.gray60
         retryButton.setImage(UIImage(systemName: "arrow.clockwise"), for: .normal)
+        retryButton.setTitle(nil, for: .normal)
         retryButton.addTarget(self, action: #selector(retryButtonTapped), for: .touchUpInside)
 
         statusStackView.axis = .horizontal
@@ -183,19 +214,60 @@ final class ChatMessageCell: UITableViewCell {
     private func configureTimeLabel(date: Date, showsTime: Bool) {
         timeLabel.text = Self.timeFormatter.string(from: date)
         timeLabel.isHidden = !showsTime
+        timeStackView.isHidden = !showsTime
     }
 
-    private func configureStatus(for status: MessageSendStatus, showsTime: Bool) {
+    private func configureStatus(for status: MessageSendStatus, showsTime: Bool, isOutgoing: Bool) {
         let shouldShowStatus = showsTime && status != .sent
         statusStackView.isHidden = !shouldShowStatus
 
-        if shouldShowStatus {
-            statusLabel.text = status.displayText
-        } else {
-            statusLabel.text = nil
+        statusLabel.text = nil
+        statusLabel.isHidden = true
+        statusIconImageView.isHidden = true
+        retryButton.isHidden = true
+
+        switch status {
+        case .sending:
+            statusIconImageView.image = UIImage.Icon.message
+            statusIconImageView.isHidden = !shouldShowStatus
+        case .failed:
+            retryButton.isHidden = !shouldShowStatus
+            retryButton.tintColor = .systemRed
+        case .sent:
+            break
         }
 
-        retryButton.isHidden = !showsTime || status != .failed
+        let shouldShowReadCount = isOutgoing && showsTime && status == .sent
+        readCountLabel.text = shouldShowReadCount ? "1" : nil
+        readCountLabel.isHidden = !shouldShowReadCount
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateBubbleMaxWidth()
+    }
+
+    private func updateBubbleMaxWidth() {
+        guard bubbleMaxWidthConstraint != nil else { return }
+        let horizontalWidth = horizontalStackView.bounds.width
+        guard horizontalWidth > 0 else { return }
+
+        let visibleSubviews = horizontalStackView.arrangedSubviews.filter { !$0.isHidden }
+        let spacingCount = max(visibleSubviews.count - 1, 0)
+        let totalSpacing = CGFloat(spacingCount) * Layout.stackSpacing
+
+        let profileWidth = currentIsOutgoing ? 0 : profileImageView.bounds.width
+        let timeWidth = timeStackView.isHidden
+            ? 0
+            : timeStackView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width
+        let statusWidth = (currentIsOutgoing && !statusStackView.isHidden)
+            ? statusStackView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width
+            : 0
+        let fixedWidth = profileWidth + timeWidth + statusWidth
+
+        let maxWidth = max(0, horizontalWidth - fixedWidth - totalSpacing)
+        let offset = maxWidth - horizontalWidth
+        bubbleMaxWidthConstraint?.update(offset: offset)
     }
 
     private func configureLayoutDirection(isOutgoing: Bool) {
@@ -203,21 +275,31 @@ final class ChatMessageCell: UITableViewCell {
             horizontalStackView.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
+        bubbleMaxWidthConstraint?.deactivate()
+        bubbleMaxWidthConstraint = nil
 
         if isOutgoing {
             horizontalStackView.addArrangedSubview(spacerView)
             horizontalStackView.addArrangedSubview(statusStackView)
-            horizontalStackView.addArrangedSubview(timeLabel)
+            horizontalStackView.addArrangedSubview(timeStackView)
             horizontalStackView.addArrangedSubview(bubbleContainerView)
         } else {
             horizontalStackView.addArrangedSubview(profileImageView)
             horizontalStackView.addArrangedSubview(bubbleContainerView)
-            horizontalStackView.addArrangedSubview(timeLabel)
+            horizontalStackView.addArrangedSubview(timeStackView)
             horizontalStackView.addArrangedSubview(spacerView)
         }
 
-        timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-        timeLabel.setContentHuggingPriority(.required, for: .horizontal)
+        bubbleContainerView.snp.makeConstraints { make in
+            bubbleMaxWidthConstraint = make.width.lessThanOrEqualTo(horizontalStackView.snp.width).constraint
+        }
+
+        timeStackView.alignment = isOutgoing ? .trailing : .leading
+        timeLabel.textAlignment = isOutgoing ? .right : .left
+        readCountLabel.textAlignment = isOutgoing ? .right : .left
+
+        timeStackView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        timeStackView.setContentHuggingPriority(.required, for: .horizontal)
         statusStackView.setContentCompressionResistancePriority(.required, for: .horizontal)
         statusStackView.setContentHuggingPriority(.required, for: .horizontal)
         spacerView.setContentHuggingPriority(.defaultLow, for: .horizontal)

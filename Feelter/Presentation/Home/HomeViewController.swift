@@ -80,6 +80,7 @@ final class HomeViewController: BaseViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         startBannerAutoScroll()
+        printAccessToken()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -179,6 +180,11 @@ final class HomeViewController: BaseViewController {
             }
         }
         return layout
+    }
+
+    private func printAccessToken() {
+        let token = KeychainManager.shared.read(account: "accessToken")
+        print("AccessToken: \(token ?? "nil")")
     }
 
     private func setupDataSource() {

@@ -89,7 +89,11 @@ final class ChatRepository: ChatRepositoryProtocol {
         guard let userId = currentUserId else {
             throw RepositoryError.userNotLoggedIn
         }
-        let chatRoom = responseDTO.toDomain(currentUserId: userId)
+
+        guard let chatRoom = responseDTO.toDomain(currentUserId: userId) else {
+            // 자기 자신과의 채팅방인 경우
+            throw RepositoryError.invalidChatRoom
+        }
 
         // 3. CoreData에 저장
         try saveChatRoomToCoreData(chatRoom)
@@ -121,8 +125,8 @@ final class ChatRepository: ChatRepositoryProtocol {
         let router = ChatRouter.fetchChatRooms
         let responseDTO = try await networkManager.request(router, type: ChatRoomListResponseDTO.self)
 
-        // 2. DTO -> Domain Entity 변환
-        let chatRooms = responseDTO.data.map { $0.toDomain(currentUserId: userId) }
+        // 2. DTO -> Domain Entity 변환 (자기 자신과의 채팅방 필터링)
+        let chatRooms = responseDTO.data.compactMap { $0.toDomain(currentUserId: userId) }
 
         // 3. CoreData에 저장
         for chatRoom in chatRooms {
@@ -478,6 +482,7 @@ enum RepositoryError: LocalizedError {
     case userNotLoggedIn
     case messageNotFound
     case invalidResponse
+    case invalidChatRoom
 
     var errorDescription: String? {
         switch self {
@@ -487,6 +492,8 @@ enum RepositoryError: LocalizedError {
             return "메시지를 찾을 수 없습니다."
         case .invalidResponse:
             return "잘못된 응답입니다."
+        case .invalidChatRoom:
+            return "유효하지 않은 채팅방입니다."
         }
     }
 }

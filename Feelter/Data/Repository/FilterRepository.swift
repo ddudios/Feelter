@@ -64,4 +64,20 @@ final class FilterRepository: FilterRepositoryProtocol {
         )
         return response.likeStatus
     }
+
+    func createFilter(requestDTO: CreateFilterRequestDTO) async throws -> FilterDetail {
+        let response = try await networkManager.request(
+            FilterRouter.createFilter(body: requestDTO),
+            type: FilterDTO.self
+        )
+
+        return response.toDetailDomain()
+    }
+
+    func uploadFiles(_ imageData: [Data]) async throws -> [String] {
+        return try await networkManager.uploadFiles(
+            imageData,
+            endpoint: FilterRouter.uploadFiles(imageData: imageData)
+        )
+    }
 }

@@ -15,10 +15,11 @@ final class ChatRoomViewController: BaseViewController {
     private enum Layout {
         static let inputBarHeight: CGFloat = 56
         static let inputHorizontalInset: CGFloat = 16
-        static let inputVerticalInset: CGFloat = 8
-        static let inputButtonSize: CGFloat = 32
+        static let inputVerticalInset: CGFloat = 0
+        static let inputButtonSize: CGFloat = 28
         static let textFieldHeight: CGFloat = 40
         static let messageSpacing: CGFloat = 8
+        static let messageBottomInset: CGFloat = 8
     }
 
     private enum Item {
@@ -46,6 +47,7 @@ final class ChatRoomViewController: BaseViewController {
         }
     }
     private var pendingImages: [ChatImageSource] = []
+    private var didScrollToBottomOnAppear = false
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -86,6 +88,8 @@ final class ChatRoomViewController: BaseViewController {
 
         setupInputBar()
 
+        setupKeyboardDismissGesture()
+
         setupKeyboardObservers()
 
         updateSendButtonState()
@@ -107,12 +111,26 @@ final class ChatRoomViewController: BaseViewController {
         setCustomTabBarHidden(true)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !didScrollToBottomOnAppear {
+            didScrollToBottomOnAppear = true
+            messageTableView.layoutIfNeeded()
+            scrollToBottom(animated: false)
+        }
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         setCustomTabBarHidden(false)
 
         // Socket 연결 해제 트리거
         viewWillDisappearSubject.send()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateMessageTableInsets()
     }
 
     override func configureHierarchy() {
@@ -142,6 +160,13 @@ final class ChatRoomViewController: BaseViewController {
         configureNavigationBar()
     }
 
+    private func setupKeyboardDismissGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        tapGesture.delegate = self
+        view.addGestureRecognizer(tapGesture)
+    }
+
     private func setupTableView() {
         messageTableView.backgroundColor = .clear
         messageTableView.separatorStyle = .none
@@ -156,9 +181,9 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     private func setupInputBar() {
-        inputContainerView.backgroundColor = .Feelter.gray100
+        inputContainerView.backgroundColor = .clear
 
-        inputSeparatorView.backgroundColor = .Feelter.gray90
+        inputSeparatorView.backgroundColor = .Feelter.blackTurquoise
         inputContainerView.addSubview(inputSeparatorView)
 
         inputStackView.axis = .horizontal
@@ -166,17 +191,18 @@ final class ChatRoomViewController: BaseViewController {
         inputStackView.alignment = .center
         inputContainerView.addSubview(inputStackView)
 
-        attachmentButton.tintColor = .Feelter.gray60
+        attachmentButton.tintColor = .Feelter.blackTurquoise
         attachmentButton.setImage(UIImage.Icon.add, for: .normal)
         attachmentButton.addTarget(self, action: #selector(attachmentButtonTapped), for: .touchUpInside)
 
         messageTextField.font = TextStyle.Pretendard.body2
         messageTextField.textColor = .Feelter.gray0
-        messageTextField.backgroundColor = .Feelter.deepTurquoise
+        messageTextField.tintColor = .Feelter.gray100
+        messageTextField.backgroundColor = .Feelter.blackTurquoise
         messageTextField.layer.cornerRadius = Radius.m
         messageTextField.attributedPlaceholder = NSAttributedString(
             string: "메시지 입력",
-            attributes: [.foregroundColor: UIColor.Feelter.gray75 ?? .gray]
+            attributes: [.foregroundColor: UIColor.Feelter.gray100 ?? .gray]
         )
         messageTextField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         messageTextField.leftViewMode = .always
@@ -184,7 +210,6 @@ final class ChatRoomViewController: BaseViewController {
         messageTextField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
         messageTextField.delegate = self
 
-        sendButton.tintColor = .Feelter.gray75
         sendButton.setImage(UIImage.Icon.message, for: .normal)
         sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
 
@@ -299,7 +324,7 @@ final class ChatRoomViewController: BaseViewController {
             .sink { [weak self] isEnabled in
                 guard let self = self else { return }
                 self.sendButton.isEnabled = isEnabled
-                self.sendButton.tintColor = isEnabled ? .Feelter.gray30 : .Feelter.gray75
+                self.sendButton.tintColor = isEnabled ? .Feelter.brightTurquoise : .Feelter.blackTurquoise
             }
             .store(in: &cancellables)
     }
@@ -387,7 +412,7 @@ final class ChatRoomViewController: BaseViewController {
         let hasText = !(messageTextField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasImages = !pendingImages.isEmpty
         sendButton.isEnabled = hasText || hasImages
-        sendButton.tintColor = sendButton.isEnabled ? .Feelter.gray30 : .Feelter.gray75
+        sendButton.tintColor = sendButton.isEnabled ? .Feelter.brightTurquoise : .Feelter.blackTurquoise
     }
 
     private func scrollToBottom(animated: Bool) {
@@ -413,6 +438,15 @@ final class ChatRoomViewController: BaseViewController {
             name: UIResponder.keyboardWillHideNotification,
             object: nil
         )
+    }
+
+    private func updateMessageTableInsets() {
+        let bottomInset = Layout.messageBottomInset
+        let newInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+        if messageTableView.contentInset != newInsets {
+            messageTableView.contentInset = newInsets
+            messageTableView.scrollIndicatorInsets = newInsets
+        }
     }
 
     @objc private func keyboardWillShow(_ notification: Notification) {
@@ -522,8 +556,18 @@ extension ChatRoomViewController: UITableViewDelegate {
 // MARK: - UITextFieldDelegate
 extension ChatRoomViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        let hasText = !(messageTextField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasImages = !pendingImages.isEmpty
+        guard hasText || hasImages else { return false }
         sendButtonTapped()
         return true
+    }
+}
+
+// MARK: - UIGestureRecognizerDelegate
+extension ChatRoomViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        return !(touch.view?.isDescendant(of: inputContainerView) ?? false)
     }
 }
 

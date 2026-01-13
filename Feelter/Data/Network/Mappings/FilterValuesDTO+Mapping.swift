@@ -8,6 +8,7 @@
 import Foundation
 
 extension FilterValuesDTO {
+    /// FilterValuesDTO (DTO) → FilterValues (Domain) 변환
     func toDomain() -> FilterValues {
         return FilterValues(
             brightness: brightness,
@@ -22,6 +23,26 @@ extension FilterValuesDTO {
             shadows: shadows ?? 0,
             temperature: temperature ?? 0,
             blackPoint: blackPoint ?? 0
+        )
+    }
+}
+
+extension FilterValues {
+    /// FilterValues (Domain) → FilterValuesDTO (DTO) 변환
+    func toDTO() -> FilterValuesDTO {
+        return FilterValuesDTO(
+            brightness: brightness,
+            exposure: exposure,
+            contrast: contrast,
+            saturation: saturation,
+            sharpness: sharpness,
+            blur: blur,
+            vignette: vignette,
+            noiseReduction: noiseReduction,
+            highlights: highlights,
+            shadows: shadows,
+            temperature: temperature,
+            blackPoint: blackPoint
         )
     }
 }
