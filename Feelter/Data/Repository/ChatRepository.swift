@@ -154,42 +154,46 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// 채팅 내역 조회
     ///
     /// 동작:
-    /// 1. CoreData에서 기존 메시지 가져오기
-    /// 2. API로 최신 메시지 요청 (next 파라미터 사용)
-    /// 3. CoreData에 저장
-    /// 4. Subject 업데이트
+    /// 1. API로 전체 메시지 요청 (next=nil로 시작)
+    /// 2. CoreData에 저장
+    /// 3. Subject 업데이트
     ///
     /// - Parameters:
     ///   - roomId: 채팅방 ID
-    ///   - next: 페이지네이션용 날짜 (옵셔널)
     /// - Returns: [ChatMessage] (Domain Entity 배열)
     func fetchChatHistory(roomId: String) async throws -> [ChatMessage] {
-        // 1. CoreData에서 마지막 메시지 시간 조회
-        let lastMessageDate = coreDataManager.fetchLastMessageDate(for: roomId)
+        print("📥 [Repository] 채팅 내역 조회 시작: roomId=\(roomId)")
 
-        // 2. ISO 8601 String으로 변환 (next 파라미터)
-        let next = lastMessageDate.map { ISO8601DateParser.string(from: $0) }
+        // API 호출 (next=nil: 전체 내역 조회)
+        let router = ChatRouter.fetchChatHistory(roomId: roomId, next: nil)
 
-        // 3. API 호출
-        let router = ChatRouter.fetchChatHistory(roomId: roomId, next: next)
-        let responseDTO = try await networkManager.request(router, type: ChatRoomListResponseDTO.self)
+        do {
+            let responseDTO = try await networkManager.request(router, type: ChatHistoryResponseDTO.self)
+            print("✅ [Repository] API 응답 성공: data.count=\(responseDTO.data.count)")
 
-        // 4. DTO -> Domain Entity 변환
-        let messages = responseDTO.data.compactMap { chatRoomDTO in
-            chatRoomDTO.lastChat?.toDomain()
+            // DTO -> Domain Entity 변환
+            let messages = responseDTO.data.map { $0.toDomain() }
+            print("📦 [Repository] 메시지 변환 완료: messages.count=\(messages.count)")
+
+            // CoreData에 저장
+            for message in messages {
+                try saveMessageToCoreData(message)
+            }
+
+            // Subject 업데이트
+            await refreshMessagesFromCoreData(roomId: roomId)
+
+            // CoreData에서 전체 메시지 반환
+            let allEntities = try coreDataManager.fetchMessages(for: roomId)
+            print("✅ [Repository] 전체 메시지 반환: count=\(allEntities.count)")
+            return allEntities.map { $0.toDomain() }
+
+        } catch {
+            print("❌ [Repository] 채팅 내역 조회 실패: \(error)")
+            print("   - Error Type: \(type(of: error))")
+            print("   - Error Description: \(error.localizedDescription)")
+            throw error
         }
-
-        // 5. CoreData에 저장
-        for message in messages {
-            try saveMessageToCoreData(message)
-        }
-
-        // 6. Subject 업데이트
-        await refreshMessagesFromCoreData(roomId: roomId)
-
-        // 7. CoreData에서 전체 메시지 반환
-        let allEntities = try coreDataManager.fetchMessages(for: roomId)
-        return allEntities.map { $0.toDomain() }
     }
 
     /// 특정 채팅방의 메시지 실시간 감지
