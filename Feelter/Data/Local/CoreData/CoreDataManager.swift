@@ -238,7 +238,7 @@ extension CoreDataManager {
         senderNick: String,
         senderProfileImage: String?,
         createdAt: Date,
-        files: String?,
+        files: [String]?,  // ✅ String? → [String]? (Transformable)
         status: String,
         context: NSManagedObjectContext? = nil
     ) throws -> ChatMessageEntity {
@@ -266,7 +266,7 @@ extension CoreDataManager {
         message.senderId = senderId
         message.senderNick = senderNick
         message.senderProfileImage = senderProfileImage
-        message.files = files
+        message.files = files  // ✅ [String]? → NSArray? (CoreData는 NS 타입 사용)
         message.status = status
         let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
         chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)

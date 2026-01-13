@@ -283,14 +283,16 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///   - imageData: 업로드할 이미지/파일 데이터 배열
     /// - Returns: 업로드된 파일 URL 배열
     func uploadFiles(roomId: String, imageData: [Data]) async throws -> [String] {
-        // TODO: multipart/form-data 업로드 구현
-        // NetworkManager에서 별도 처리 필요
+        // 1. ChatRouter에 uploadFiles 엔드포인트 사용
+        let endpoint = ChatRouter.uploadFiles(roomId: roomId, imageData: imageData)
 
-        // 임시 구현: 빈 배열 반환
-        // 실제로는 ChatRouter에 uploadFiles case 추가하고
-        // NetworkManager에 multipart upload 메서드 추가 필요
-
-        throw RepositoryError.invalidResponse
+        // 2. NetworkManager의 config 기반 업로드 메서드 호출
+        // FileUploadConfig.chat: jpg, png, jpeg, gif, pdf (5MB, 5개)
+        return try await networkManager.uploadFiles(
+            imageData,
+            config: .chat,
+            endpoint: endpoint
+        )
     }
 
     /// Socket.IO 연결
@@ -412,11 +414,9 @@ final class ChatRepository: ChatRepositoryProtocol {
     }
 
     /// ChatMessage를 CoreData에 저장
+    ///
+    /// - Note: files는 이제 Transformable 타입으로 자동 변환되므로 직접 전달
     private func saveMessageToCoreData(_ message: ChatMessage) throws {
-        // files 배열 -> JSON String 변환
-        let filesJSON = try? JSONEncoder().encode(message.files)
-        let filesString = filesJSON.flatMap { String(data: $0, encoding: .utf8) }
-
         _ = try coreDataManager.upsertChatMessage(
             chatId: message.chatId,
             roomId: message.roomId,
@@ -425,7 +425,7 @@ final class ChatRepository: ChatRepositoryProtocol {
             senderNick: message.senderNick,
             senderProfileImage: message.senderProfileImage,
             createdAt: message.createdAt,
-            files: filesString,
+            files: message.files.isEmpty ? nil : message.files,  // ✅ 직접 전달 (빈 배열은 nil로)
             status: message.status.rawValue
         )
 

@@ -4,7 +4,7 @@
         <attribute name="chatId" attributeType="String"/>
         <attribute name="content" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="files" optional="YES" attributeType="String"/>
+        <attribute name="files" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayValueTransformer" customClassName="[String]"/>
         <attribute name="roomId" attributeType="String"/>
         <attribute name="senderId" attributeType="String"/>
         <attribute name="senderNick" attributeType="String"/>

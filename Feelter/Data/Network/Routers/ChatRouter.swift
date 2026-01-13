@@ -9,15 +9,16 @@ import Foundation
 import Alamofire
 
 enum ChatRouter: BaseRouter {
-    
+
     case createChatRoom(opponentId: String)  // 채팅방 생성 또는 조회
     case fetchChatRooms  // 채팅방 목록 조회
     case sendMessage(roomId: String, content: String, files: [String]?)
     case fetchChatHistory(roomId: String, next: String?)
+    case uploadFiles(roomId: String, imageData: [Data])  // 파일 업로드
 
     var method: HTTPMethod {
         switch self {
-        case .createChatRoom, .sendMessage:
+        case .createChatRoom, .sendMessage, .uploadFiles:
             return .post
         case .fetchChatRooms, .fetchChatHistory:
             return .get
@@ -37,6 +38,9 @@ enum ChatRouter: BaseRouter {
 
         case .fetchChatHistory(let roomId, _):
             return "/v1/chats/\(roomId)"
+
+        case .uploadFiles(let roomId, _):
+            return "/v1/chats/\(roomId)/files"
         }
     }
 
@@ -48,7 +52,7 @@ enum ChatRouter: BaseRouter {
         case .sendMessage(_, let content, let files):
             return SendMessageRequestDTO(content: content, files: files)
 
-        case .fetchChatRooms, .fetchChatHistory:
+        case .fetchChatRooms, .fetchChatHistory, .uploadFiles:
             return nil
         }
     }
@@ -62,7 +66,7 @@ enum ChatRouter: BaseRouter {
             }
             return nil
 
-        case .createChatRoom, .fetchChatRooms, .sendMessage:
+        case .createChatRoom, .fetchChatRooms, .sendMessage, .uploadFiles:
             return nil
         }
     }
