@@ -109,37 +109,60 @@ final class ChatRepository: ChatRepositoryProtocol {
 
     /// 채팅방 목록 조회
     ///
-    /// 동작:
-    /// 1. CoreData에서 기존 목록 가져오기 (캐시)
-    /// 2. API 호출하여 최신 목록 가져오기
-    /// 3. CoreData에 저장 (UPSERT)
-    /// 4. Subject 업데이트
+    /// 동작 (로컬 우선 전략):
+    /// 1. CoreData에서 로컬 데이터를 먼저 가져와서 즉시 반환 (오프라인 지원)
+    /// 2. 백그라운드에서 API 호출하여 최신 목록 가져오기
+    /// 3. 성공 시 CoreData에 저장 (UPSERT)
+    /// 4. Subject 업데이트로 UI 자동 갱신
     ///
-    /// - Returns: [ChatRoom] (Domain Entity 배열)
+    /// - Returns: [ChatRoom] (Domain Entity 배열) - 로컬 데이터 즉시 반환
     func fetchChatRooms() async throws -> [ChatRoom] {
         guard let userId = currentUserId else {
             throw RepositoryError.userNotLoggedIn
         }
 
-        // 1. API 호출
-        let router = ChatRouter.fetchChatRooms
-        let responseDTO = try await networkManager.request(router, type: ChatRoomListResponseDTO.self)
+        // 1. CoreData에서 로컬 데이터를 먼저 가져오기
+        let localChatRooms: [ChatRoom]
+        do {
+            let entities = try coreDataManager.fetchChatRooms()
+            localChatRooms = entities.map { $0.toDomain() }
 
-        // 2. DTO -> Domain Entity 변환 (자기 자신과의 채팅방 필터링)
-        let chatRooms = responseDTO.data.compactMap { $0.toDomain(currentUserId: userId) }
+            // 로컬 데이터가 있으면 즉시 Subject 업데이트 (빠른 UI 표시)
+            if !localChatRooms.isEmpty {
+                chatRoomsSubject.send(localChatRooms)
+            }
+        } catch {
+            localChatRooms = []
+        }
 
-        // 3. CoreData에 저장
-        for chatRoom in chatRooms {
-            try saveChatRoomToCoreData(chatRoom)
-            if let lastMessage = chatRoom.lastMessage {
-                try saveMessageToCoreData(lastMessage)
+        // 2. 백그라운드에서 네트워크 요청 (비동기)
+        Task {
+            do {
+                let router = ChatRouter.fetchChatRooms
+                let responseDTO = try await networkManager.request(router, type: ChatRoomListResponseDTO.self)
+
+                // DTO -> Domain Entity 변환
+                let chatRooms = responseDTO.data.compactMap { $0.toDomain(currentUserId: userId) }
+
+                // CoreData에 저장
+                for chatRoom in chatRooms {
+                    try saveChatRoomToCoreData(chatRoom)
+                    if let lastMessage = chatRoom.lastMessage {
+                        try saveMessageToCoreData(lastMessage)
+                    }
+                }
+
+                // Subject 업데이트 (UI 자동 갱신)
+                await refreshChatRoomsFromCoreData()
+
+            } catch {
+                // 네트워크 에러는 조용히 무시 (로컬 데이터가 이미 표시됨)
+                print("⚠️ [Repository] 채팅방 목록 네트워크 요청 실패 (로컬 데이터 사용): \(error)")
             }
         }
 
-        // 4. Subject 업데이트
-        chatRoomsSubject.send(chatRooms)
-
-        return chatRooms
+        // 3. 로컬 데이터 즉시 반환 (오프라인에서도 작동)
+        return localChatRooms
     }
 
     /// 채팅방 목록 실시간 감지
@@ -153,47 +176,62 @@ final class ChatRepository: ChatRepositoryProtocol {
 
     /// 채팅 내역 조회
     ///
-    /// 동작:
-    /// 1. API로 전체 메시지 요청 (next=nil로 시작)
-    /// 2. CoreData에 저장
-    /// 3. Subject 업데이트
+    /// 동작 (로컬 우선 전략):
+    /// 1. CoreData에서 로컬 메시지를 먼저 가져와서 즉시 반환 (오프라인 지원)
+    /// 2. 백그라운드에서 API로 전체 메시지 요청 (next=nil로 시작)
+    /// 3. 성공 시 CoreData에 저장
+    /// 4. Subject 업데이트로 UI 자동 갱신
     ///
     /// - Parameters:
     ///   - roomId: 채팅방 ID
-    /// - Returns: [ChatMessage] (Domain Entity 배열)
+    /// - Returns: [ChatMessage] (Domain Entity 배열) - 로컬 데이터 즉시 반환
     func fetchChatHistory(roomId: String) async throws -> [ChatMessage] {
         print("📥 [Repository] 채팅 내역 조회 시작: roomId=\(roomId)")
 
-        // API 호출 (next=nil: 전체 내역 조회)
-        let router = ChatRouter.fetchChatHistory(roomId: roomId, next: nil)
-
+        // 1. CoreData에서 로컬 메시지를 먼저 가져오기
+        let localMessages: [ChatMessage]
         do {
-            let responseDTO = try await networkManager.request(router, type: ChatHistoryResponseDTO.self)
-            print("✅ [Repository] API 응답 성공: data.count=\(responseDTO.data.count)")
+            let entities = try coreDataManager.fetchMessages(for: roomId)
+            localMessages = entities.map { $0.toDomain() }
+            print("📦 [Repository] 로컬 메시지 로드: count=\(localMessages.count)")
 
-            // DTO -> Domain Entity 변환
-            let messages = responseDTO.data.map { $0.toDomain() }
-            print("📦 [Repository] 메시지 변환 완료: messages.count=\(messages.count)")
-
-            // CoreData에 저장
-            for message in messages {
-                try saveMessageToCoreData(message)
+            // 로컬 메시지가 있으면 즉시 Subject 업데이트 (빠른 UI 표시)
+            if !localMessages.isEmpty {
+                await refreshMessagesFromCoreData(roomId: roomId)
             }
-
-            // Subject 업데이트
-            await refreshMessagesFromCoreData(roomId: roomId)
-
-            // CoreData에서 전체 메시지 반환
-            let allEntities = try coreDataManager.fetchMessages(for: roomId)
-            print("✅ [Repository] 전체 메시지 반환: count=\(allEntities.count)")
-            return allEntities.map { $0.toDomain() }
-
         } catch {
-            print("❌ [Repository] 채팅 내역 조회 실패: \(error)")
-            print("   - Error Type: \(type(of: error))")
-            print("   - Error Description: \(error.localizedDescription)")
-            throw error
+            localMessages = []
+            print("⚠️ [Repository] 로컬 메시지 로드 실패: \(error)")
         }
+
+        // 2. 백그라운드에서 네트워크 요청 (비동기)
+        Task {
+            do {
+                let router = ChatRouter.fetchChatHistory(roomId: roomId, next: nil)
+                let responseDTO = try await networkManager.request(router, type: ChatHistoryResponseDTO.self)
+                print("✅ [Repository] API 응답 성공: data.count=\(responseDTO.data.count)")
+
+                // DTO -> Domain Entity 변환
+                let messages = responseDTO.data.map { $0.toDomain() }
+                print("📦 [Repository] 메시지 변환 완료: messages.count=\(messages.count)")
+
+                // CoreData에 저장
+                for message in messages {
+                    try saveMessageToCoreData(message)
+                }
+
+                // Subject 업데이트 (UI 자동 갱신)
+                await refreshMessagesFromCoreData(roomId: roomId)
+                print("✅ [Repository] 메시지 업데이트 완료")
+
+            } catch {
+                // 네트워크 에러는 조용히 무시 (로컬 데이터가 이미 표시됨)
+                print("⚠️ [Repository] 채팅 내역 네트워크 요청 실패 (로컬 데이터 사용): \(error)")
+            }
+        }
+
+        // 3. 로컬 데이터 즉시 반환 (오프라인에서도 작동)
+        return localMessages
     }
 
     /// 특정 채팅방의 메시지 실시간 감지
