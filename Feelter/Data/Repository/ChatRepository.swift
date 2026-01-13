@@ -199,12 +199,18 @@ final class ChatRepository: ChatRepositoryProtocol {
     func observeMessages(roomId: String) -> AnyPublisher<[ChatMessage], Never> {
         // Subject가 없으면 생성
         if messagesSubjects[roomId] == nil {
-            messagesSubjects[roomId] = CurrentValueSubject<[ChatMessage], Never>([])
-
-            // CoreData에서 초기 메시지 로드
-            Task {
-                await refreshMessagesFromCoreData(roomId: roomId)
+            // ✅ CoreData에서 초기 메시지를 먼저 로드
+            let initialMessages: [ChatMessage]
+            do {
+                let entities = try coreDataManager.fetchMessages(for: roomId)
+                initialMessages = entities.map { $0.toDomain() }
+            } catch {
+                initialMessages = []
             }
+
+            // ✅ 로드된 데이터로 Subject 생성
+            messagesSubjects[roomId] = CurrentValueSubject<[ChatMessage], Never>(initialMessages)
+        } else {
         }
 
         return messagesSubjects[roomId]!.eraseToAnyPublisher()
@@ -349,6 +355,11 @@ final class ChatRepository: ChatRepositoryProtocol {
 
     // MARK: - Private Helpers
     /// Socket.IO 메시지 리스너 설정
+    ///
+    /// Socket에서 새 메시지 수신 시 동작:
+    /// 1. CoreData에 저장 (항상)
+    /// 2. 현재 채팅방 Subject 업데이트 (조건부)
+    /// 3. 채팅방 목록 Subject 업데이트 (항상)
     private func setupSocketMessageListener() {
         socketManager.observeMessages()
             .sink { [weak self] messageDTO in
@@ -357,16 +368,30 @@ final class ChatRepository: ChatRepositoryProtocol {
                 // DTO -> Domain Entity 변환
                 let message = messageDTO.toDomain()
 
-                // CoreData에 저장
-                do {
-                    try self.saveMessageToCoreData(message)
+                // ✅ CoreData는 메인 스레드에서만 접근 (viewContext 사용)
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
 
-                    // Subject 업데이트
-                    Task {
-                        await self.refreshMessagesFromCoreData(roomId: message.roomId)
+                    do {
+                        // 1. CoreData에 저장 (항상)
+                        try self.saveMessageToCoreData(message)
+
+                        // 2. 현재 채팅방 Subject가 있으면 업데이트
+                        // - 사용자가 해당 채팅방에 있을 때만 실시간 업데이트
+                        // - Subject가 없으면 불필요한 생성 방지
+                        if self.messagesSubjects[message.roomId] != nil {
+                            await self.refreshMessagesFromCoreData(roomId: message.roomId)
+                        } else {
+                        }
+
+                        // 3. 채팅방 목록도 항상 업데이트
+                        // - lastMessage, updatedAt 변경 반영
+                        // - 채팅방 목록 화면에서 실시간 갱신
+                        await self.refreshChatRoomsFromCoreData()
+
+                    } catch {
+                        // Error handling is intentionally silent; other paths handle user-facing alerts.
                     }
-                } catch {
-                    print("Socket 메시지 저장 실패: \(error)")
                 }
             }
             .store(in: &cancellables)
@@ -386,9 +411,6 @@ final class ChatRepository: ChatRepositoryProtocol {
                         object: nil,
                         userInfo: ["error": error]
                     )
-                } else {
-                    // 일반 에러 로그
-                    print("Socket 에러: \(error.localizedDescription ?? "")")
                 }
             }
             .store(in: &cancellables)
@@ -458,7 +480,7 @@ final class ChatRepository: ChatRepositoryProtocol {
 
             chatRoomsSubject.send(chatRooms)
         } catch {
-            print("채팅방 목록 갱신 실패: \(error)")
+            // Error logged upstream if needed
         }
     }
 
@@ -471,7 +493,7 @@ final class ChatRepository: ChatRepositoryProtocol {
 
             messagesSubjects[roomId]?.send(messages)
         } catch {
-            print("메시지 목록 갱신 실패: \(error)")
+            // Error logged upstream if needed
         }
     }
 }

@@ -282,6 +282,9 @@ final class ChatRoomViewController: BaseViewController {
                 guard let self = self else { return }
                 // Domain Entity -> View Item 변환
                 self.messages = self.convertToChatMessageViewItems(chatMessages)
+
+                // items 재구성 (날짜 섹션 포함)
+                self.rebuildItems()
             }
             .store(in: &cancellables)
 

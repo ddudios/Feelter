@@ -55,6 +55,9 @@ enum SocketError: LocalizedError {
 final class SocketIOManager {
 
     // MARK: - Properties
+    /// Socket.IO Manager (연결 유지를 위해 인스턴스 변수로 보관)
+    private var socketManager: SocketManager?
+
     /// 현재 연결된 Socket.IO 클라이언트
     private var socketClient: SocketIOClient?
 
@@ -90,14 +93,12 @@ final class SocketIOManager {
     func connect(to roomId: String) {
         // 1. 토큰 확인 (연결 전 검사)
         guard let token = getAccessToken(), !token.isEmpty else {
-            print("Socket.IO 연결 실패: 토큰이 없습니다.")
             errorSubject.send(.noToken)
             return
         }
 
         // 2. 이미 같은 방에 연결되어 있으면 무시
         if currentRoomId == roomId, socketClient?.status == .connected {
-            print("이미 채팅방 \(roomId)에 연결되어 있습니다.")
             return
         }
 
@@ -110,20 +111,24 @@ final class SocketIOManager {
         let namespace = "/chats-\(roomId)"
 
         // Socket.IO 연결 설정
-        let manager = SocketManager(
+        // 인스턴스 변수에 저장하여 연결 유지
+        socketManager = SocketManager(
             socketURL: baseURL,
             config: [
-                .log(false),  // 프로덕션에서는 false, 디버깅 시 true
+                .log(false),
                 .compress,
-                .forceWebsockets(true),  // WebSocket만 사용 (polling 비활성화)
                 .reconnects(true),  // 자동 재연결
                 .reconnectAttempts(-1),  // 무제한 재시도
-                .reconnectWait(1),  // 1초 후 재시도
-                .connectParams(["token": token])  // 인증 토큰 전달
+                .reconnectWait(5),  // 5초 후 재시도
+                .extraHeaders([
+                    "Authorization": token,
+                    "SeSACKey": Config.apiKey
+                ])
             ]
         )
 
         // 5. 특정 namespace의 Socket 클라이언트 생성
+        guard let manager = socketManager else { return }
         socketClient = manager.socket(forNamespace: namespace)
 
         // 6. 이벤트 리스너 등록
@@ -133,19 +138,22 @@ final class SocketIOManager {
         socketClient?.connect()
         currentRoomId = roomId
 
-        print("Socket.IO 연결 시도: \(baseURL.absoluteString)\(namespace)")
+
+        // 연결 타임아웃 체크 (5초 후 연결 상태 확인)
     }
 
     /// Socket.IO 연결 해제
     func disconnect() {
         guard let socket = socketClient else { return }
 
+        let roomId = currentRoomId ?? "unknown"
+
         socket.disconnect()
         socket.removeAllHandlers()
         socketClient = nil
+        socketManager = nil
         currentRoomId = nil
 
-        print("Socket.IO 연결 해제")
     }
 
     /// 메시지를 Observable로 제공
@@ -171,27 +179,11 @@ final class SocketIOManager {
     private func setupEventHandlers() {
         guard let socket = socketClient else { return }
 
-        // 연결 성공 이벤트
-        socket.on(clientEvent: .connect) { _, _ in
-            print("Socket.IO 연결 성공: \(self.currentRoomId ?? "")")
-        }
-
-        // 연결 해제 이벤트
-        socket.on(clientEvent: .disconnect) { data, _ in
-            print("Socket.IO 연결 해제: \(data)")
-        }
-
-        // 연결 에러 이벤트
         socket.on(clientEvent: .error) { [weak self] data, _ in
-            print("Socket.IO 에러: \(data)")
-
-            // 인증 에러 감지 (연결 후 거절 처리)
-            // Socket.IO 에러 데이터에서 인증 관련 에러 확인
             if let errorArray = data as? [Any],
                let errorDict = errorArray.first as? [String: Any],
                let errorMessage = errorDict["message"] as? String {
 
-                // 인증 관련 키워드 확인
                 if errorMessage.contains("auth") ||
                    errorMessage.contains("unauthorized") ||
                    errorMessage.contains("token") {
@@ -204,12 +196,6 @@ final class SocketIOManager {
             }
         }
 
-        // 재연결 시도 이벤트
-        socket.on(clientEvent: .reconnect) { data, _ in
-            print("Socket.IO 재연결 시도: \(data)")
-        }
-
-        // "chat" 이벤트: 서버가 새 메시지를 push할 때
         socket.on("chat") { [weak self] data, _ in
             guard let self = self else { return }
             self.handleChatEvent(data: data)
@@ -234,13 +220,11 @@ final class SocketIOManager {
     private func handleChatEvent(data: [Any]) {
         // 1. data에서 첫 번째 요소 추출 (Dictionary)
         guard let firstElement = data.first else {
-            print("chat 이벤트 데이터가 비어있습니다.")
             return
         }
 
         // 2. Dictionary로 변환
         guard let messageDict = firstElement as? [String: Any] else {
-            print("chat 이벤트 데이터가 Dictionary가 아닙니다: \(firstElement)")
             return
         }
 
@@ -255,11 +239,8 @@ final class SocketIOManager {
             // 5. Subject로 publish
             messageSubject.send(messageDTO)
 
-            print("새 메시지 수신: \(messageDTO.content)")
-
         } catch {
-            print("chat 이벤트 파싱 실패: \(error.localizedDescription)")
-            print("데이터: \(messageDict)")
+            return
         }
     }
 

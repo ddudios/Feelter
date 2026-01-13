@@ -114,12 +114,12 @@ final class ChatMessageCell: UITableViewCell {
 
     private func configureLayout() {
         horizontalStackView.snp.makeConstraints { make in
-            make.top.bottom.equalToSuperview().inset(8)
+            make.top.bottom.equalToSuperview().inset(4).priority(.high)
             make.leading.trailing.equalToSuperview().inset(16)
         }
 
         profileImageView.snp.makeConstraints { make in
-            make.width.height.equalTo(Layout.profileSize)
+            make.width.height.equalTo(Layout.profileSize).priority(.high)
         }
 
         bubbleStackView.snp.makeConstraints { make in
