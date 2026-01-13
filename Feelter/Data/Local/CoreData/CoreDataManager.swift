@@ -8,6 +8,24 @@
 import Foundation
 import CoreData
 
+/// CoreData 에러 타입
+enum CoreDataError: LocalizedError {
+    case chatRoomNotFound(roomId: String)
+    case invalidContext
+    case saveFailed(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .chatRoomNotFound(let roomId):
+            return "채팅방을 찾을 수 없습니다: \(roomId)"
+        case .invalidContext:
+            return "유효하지 않은 Context입니다."
+        case .saveFailed(let error):
+            return "저장 실패: \(error.localizedDescription)"
+        }
+    }
+}
+
 /// CoreData Stack을 관리하는 매니저 클래스
 /// 1. NSPersistentContainer 생성 및 관리
 /// 2. Context 제공 (Main Thread용, Background용)
@@ -268,11 +286,21 @@ extension CoreDataManager {
         message.senderProfileImage = senderProfileImage
         message.files = files  // ✅ [String]? → NSArray? (CoreData는 NS 타입 사용)
         message.status = status
+
+        // 4. ChatRoom relationship 설정
         let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
         chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
+
         if let chatRoom = try contextToUse.fetch(chatRoomFetchRequest).first {
+            // 채팅방을 찾았으면 relationship 설정
             message.chatRoom = chatRoom
+        } else if message.chatRoom == nil {
+            // 새 메시지인데 채팅방을 찾지 못하면 에러
+            // 이 경우는 메시지를 저장하기 전에 반드시 채팅방이 먼저 저장되어야 함
+            print("⚠️ [CoreData] 메시지를 저장하려고 하는데 채팅방을 찾을 수 없습니다: roomId=\(roomId), chatId=\(chatId)")
+            throw CoreDataError.chatRoomNotFound(roomId: roomId)
         }
+        // 기존 메시지이고 채팅방을 찾지 못하면 기존 relationship 유지 (크래시 방지)
 
         return message
     }

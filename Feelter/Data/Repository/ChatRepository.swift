@@ -317,6 +317,30 @@ final class ChatRepository: ChatRepositoryProtocol {
         socketManager.disconnect()
     }
 
+    /// 채팅방이 CoreData에 존재하는지 확인하고, 없으면 저장
+    ///
+    /// - Parameter chatRoom: 저장할 채팅방 정보
+    func ensureChatRoomExists(_ chatRoom: ChatRoom) throws {
+        // 1. 이미 존재하는지 확인
+        let fetchRequest = ChatRoomEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "roomId == %@", chatRoom.roomId)
+
+        let results = try coreDataManager.viewContext.fetch(fetchRequest)
+
+        if results.isEmpty {
+            // 2. 존재하지 않으면 저장
+            print("📝 [Repository] 채팅방을 CoreData에 저장: roomId=\(chatRoom.roomId)")
+            try saveChatRoomToCoreData(chatRoom)
+
+            // 3. lastMessage가 있으면 함께 저장
+            if let lastMessage = chatRoom.lastMessage {
+                try saveMessageToCoreData(lastMessage)
+            }
+        } else {
+            print("✅ [Repository] 채팅방이 이미 CoreData에 존재: roomId=\(chatRoom.roomId)")
+        }
+    }
+
     /// 마지막 읽은 시간 업데이트
     ///
     /// - Parameter roomId: 채팅방 ID

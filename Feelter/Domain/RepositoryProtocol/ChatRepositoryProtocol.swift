@@ -118,6 +118,21 @@ protocol ChatRepositoryProtocol {
     func disconnectSocket()
 
     // MARK: - 로컬 데이터 관리
+    /// 채팅방이 CoreData에 존재하는지 확인하고, 없으면 저장
+    ///
+    /// 사용처:
+    /// - 채팅방 진입 시 (메시지 조회 전)
+    /// - 메시지를 저장하기 전에 반드시 채팅방이 존재해야 함
+    ///
+    /// 동작:
+    /// - CoreData에서 채팅방 확인
+    /// - 없으면 저장 (lastMessage도 함께 저장)
+    /// - 있으면 무시
+    ///
+    /// - Parameter chatRoom: 저장할 채팅방 정보
+    /// - Throws: CoreData 에러
+    func ensureChatRoomExists(_ chatRoom: ChatRoom) throws
+
     /// 채팅방의 마지막 읽은 시간 업데이트 (로컬 전용)
     ///
     /// 사용처:

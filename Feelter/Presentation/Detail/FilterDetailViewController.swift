@@ -608,9 +608,9 @@ final class FilterDetailViewController: BaseViewController {
         let fetchChatHistoryUsecase = DIContainer.shared.resolve(FetchChatHistoryUsecase.self)
         let sendMessageUsecase = DIContainer.shared.resolve(SendMessageUsecase.self)
 
-        // ChatRoomViewModel은 roomId 파라미터가 필요하므로 직접 생성
+        // ChatRoomViewModel은 chatRoom 파라미터가 필요하므로 직접 생성
         let chatRoomViewModel = ChatRoomViewModel(
-            roomId: chatRoom.roomId,
+            chatRoom: chatRoom,
             fetchChatHistoryUsecase: fetchChatHistoryUsecase,
             sendMessageUsecase: sendMessageUsecase,
             repository: repository

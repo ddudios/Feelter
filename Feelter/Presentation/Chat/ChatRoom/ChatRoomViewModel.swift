@@ -48,6 +48,7 @@ final class ChatRoomViewModel {
 
     // MARK: - Dependencies
 
+    private let chatRoom: ChatRoom
     private let roomId: String
     private let fetchChatHistoryUsecase: FetchChatHistoryUsecase
     private let sendMessageUsecase: SendMessageUsecase
@@ -64,15 +65,24 @@ final class ChatRoomViewModel {
     // MARK: - Initialization
 
     init(
-        roomId: String,
+        chatRoom: ChatRoom,
         fetchChatHistoryUsecase: FetchChatHistoryUsecase,
         sendMessageUsecase: SendMessageUsecase,
         repository: ChatRepositoryProtocol
     ) {
-        self.roomId = roomId
+        self.chatRoom = chatRoom
+        self.roomId = chatRoom.roomId
         self.fetchChatHistoryUsecase = fetchChatHistoryUsecase
         self.sendMessageUsecase = sendMessageUsecase
         self.repository = repository
+
+        // 채팅방 정보를 먼저 CoreData에 저장
+        // 이렇게 해야 메시지를 저장할 때 chatRoom relationship을 설정할 수 있음
+        do {
+            try repository.ensureChatRoomExists(chatRoom)
+        } catch {
+            print("⚠️ [ViewModel] 채팅방 저장 실패: \(error)")
+        }
 
         // Repository의 실시간 업데이트 구독
         setupRealtimeUpdates()
