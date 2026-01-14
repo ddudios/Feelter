@@ -17,7 +17,8 @@ final class ChatRoomViewController: BaseViewController {
         static let inputHorizontalInset: CGFloat = 16
         static let inputVerticalInset: CGFloat = 0
         static let inputButtonSize: CGFloat = 28
-        static let textFieldHeight: CGFloat = 40
+        static let textViewMinHeight: CGFloat = 36
+        static let textViewMaxLines: Int = 7
         static let messageSpacing: CGFloat = 8
         static let messageBottomInset: CGFloat = 8
     }
@@ -35,7 +36,8 @@ final class ChatRoomViewController: BaseViewController {
     private let inputContainerView = UIView()
     private let inputStackView = UIStackView()
     private let attachmentButton = UIButton(type: .system)
-    private let messageTextField = UITextField()
+    private let messageTextView = UITextView()
+    private let placeholderLabel = UILabel()
     private let sendButton = UIButton(type: .system)
     private let inputSeparatorView = UIView()
 
@@ -45,6 +47,7 @@ final class ChatRoomViewController: BaseViewController {
 
     private var inputBottomConstraint: Constraint?
     private var selectedImagesHeightConstraint: Constraint?
+    private var textViewHeightConstraint: Constraint?
     private var items: [Item] = []
     private var messages: [ChatMessageViewItem] = [] {
         didSet {
@@ -205,32 +208,21 @@ final class ChatRoomViewController: BaseViewController {
 
         inputStackView.axis = .horizontal
         inputStackView.spacing = Layout.messageSpacing
-        inputStackView.alignment = .center
+        inputStackView.alignment = .bottom  // 버튼들이 하단에 정렬되도록
         inputContainerView.addSubview(inputStackView)
 
         attachmentButton.tintColor = .Feelter.blackTurquoise
         attachmentButton.setImage(UIImage.Icon.add, for: .normal)
         attachmentButton.addTarget(self, action: #selector(attachmentButtonTapped), for: .touchUpInside)
 
-        messageTextField.font = TextStyle.Pretendard.body2
-        messageTextField.textColor = .Feelter.gray0
-        messageTextField.tintColor = .Feelter.gray100
-        messageTextField.backgroundColor = .Feelter.blackTurquoise
-        messageTextField.layer.cornerRadius = Radius.m
-        messageTextField.attributedPlaceholder = NSAttributedString(
-            string: "메시지 입력",
-            attributes: [.foregroundColor: UIColor.Feelter.gray100 ?? .gray]
-        )
-        messageTextField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
-        messageTextField.leftViewMode = .always
-        messageTextField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        messageTextField.delegate = self
+        // UITextView 설정
+        setupMessageTextView()
 
         sendButton.setImage(UIImage.Icon.message, for: .normal)
         sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
 
         inputStackView.addArrangedSubview(attachmentButton)
-        inputStackView.addArrangedSubview(messageTextField)
+        inputStackView.addArrangedSubview(messageTextView)
         inputStackView.addArrangedSubview(sendButton)
 
         // 제약 설정
@@ -264,9 +256,43 @@ final class ChatRoomViewController: BaseViewController {
             make.width.height.equalTo(Layout.inputButtonSize)
         }
 
-        messageTextField.snp.makeConstraints { make in
-            make.height.equalTo(Layout.textFieldHeight)
+        messageTextView.snp.makeConstraints { make in
+            textViewHeightConstraint = make.height.equalTo(Layout.textViewMinHeight).constraint
         }
+
+        // Placeholder를 TextView 위에 배치
+        messageTextView.addSubview(placeholderLabel)
+        placeholderLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-12)
+            make.centerY.equalToSuperview()
+        }
+    }
+
+    /// UITextView 설정 (카카오톡 스타일)
+    private func setupMessageTextView() {
+        messageTextView.font = TextStyle.Pretendard.body2 ?? .systemFont(ofSize: 14)
+        messageTextView.textColor = .Feelter.gray0
+        messageTextView.tintColor = .Feelter.gray100
+        messageTextView.backgroundColor = .Feelter.blackTurquoise
+        messageTextView.layer.cornerRadius = Radius.m
+        messageTextView.clipsToBounds = true
+
+        // 텍스트 컨테이너 여백 설정
+        messageTextView.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
+        messageTextView.textContainer.lineFragmentPadding = 0
+
+        // 초기 상태: 스크롤 비활성화 (동적 높이 조절을 위해)
+        messageTextView.isScrollEnabled = false
+        messageTextView.showsVerticalScrollIndicator = false
+
+        messageTextView.delegate = self
+
+        // Placeholder 설정
+        placeholderLabel.text = "메시지 입력"
+        placeholderLabel.font = TextStyle.Pretendard.body2 ?? .systemFont(ofSize: 14)
+        placeholderLabel.textColor = .Feelter.gray100
+        placeholderLabel.isUserInteractionEnabled = false
     }
 
     private func configureNavigationBar() {
@@ -457,7 +483,7 @@ final class ChatRoomViewController: BaseViewController {
 
     private func updateSendButtonState() {
         // 텍스트가 필수 (이미지만 보내는 것은 불가)
-        let hasText = !(messageTextField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasText = !messageTextView.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         sendButton.isEnabled = hasText
         sendButton.tintColor = sendButton.isEnabled ? .Feelter.brightTurquoise : .Feelter.blackTurquoise
     }
@@ -519,11 +545,6 @@ final class ChatRoomViewController: BaseViewController {
         view.endEditing(true)
     }
 
-    @objc private func textFieldDidChange() {
-        messageTextSubject.send(messageTextField.text ?? "")
-        updateSendButtonState()
-    }
-
     @objc private func attachmentButtonTapped() {
         var configuration = PHPickerConfiguration()
         configuration.selectionLimit = 5
@@ -539,12 +560,20 @@ final class ChatRoomViewController: BaseViewController {
         sendButtonTappedSubject.send()
 
         // UI 초기화
-        messageTextField.text = nil
+        messageTextView.text = ""
         messageTextSubject.send("")
+        placeholderLabel.isHidden = false
         pendingImages.removeAll()
         selectedImagesSubject.send([])
         updateSelectedImagesPreview()
         updateSendButtonState()
+
+        // 높이 초기화
+        textViewHeightConstraint?.update(offset: Layout.textViewMinHeight)
+        messageTextView.isScrollEnabled = false
+        UIView.animate(withDuration: 0.1) {
+            self.view.layoutIfNeeded()
+        }
     }
 
     @objc private func searchButtonTapped() {
@@ -604,14 +633,81 @@ extension ChatRoomViewController: UITableViewDelegate {
     }
 }
 
-// MARK: - UITextFieldDelegate
-extension ChatRoomViewController: UITextFieldDelegate {
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        // 텍스트가 필수 (이미지만 보내는 것은 불가)
-        let hasText = !(messageTextField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        guard hasText else { return false }
-        sendButtonTapped()
-        return true
+// MARK: - UITextViewDelegate
+extension ChatRoomViewController: UITextViewDelegate {
+
+    /// 텍스트 변경 시 호출 - 동적 높이 조절 및 placeholder 처리
+    func textViewDidChange(_ textView: UITextView) {
+        // 1. ViewModel에 텍스트 전달
+        messageTextSubject.send(textView.text)
+
+        // 2. 전송 버튼 상태 업데이트
+        updateSendButtonState()
+
+        // 3. Placeholder 표시/숨김
+        placeholderLabel.isHidden = !textView.text.isEmpty
+
+        // 4. 동적 높이 계산 및 스크롤 제어
+        updateTextViewHeight(textView)
+    }
+
+    /// TextView 높이 계산 및 스크롤 제어
+    ///
+    /// - 최대 7줄까지 높이 증가
+    /// - 7줄 초과 시 스크롤 활성화
+    /// - font.lineHeight와 textContainerInset을 사용하여 정확한 높이 계산
+    private func updateTextViewHeight(_ textView: UITextView) {
+        guard let font = textView.font else { return }
+
+        // 최대 높이 계산: lineHeight * 7줄 + 상하 여백
+        let lineHeight = font.lineHeight
+        let verticalInsets = textView.textContainerInset.top + textView.textContainerInset.bottom
+        let maxHeight = lineHeight * CGFloat(Layout.textViewMaxLines) + verticalInsets
+
+        // 현재 콘텐츠 높이 계산
+        let fixedWidth = textView.frame.width - textView.textContainerInset.left - textView.textContainerInset.right
+        let sizeThatFits = textView.sizeThatFits(CGSize(width: fixedWidth, height: .greatestFiniteMagnitude))
+        let contentHeight = sizeThatFits.height
+
+        // 최소/최대 높이 범위 내에서 결정
+        let newHeight = min(max(contentHeight, Layout.textViewMinHeight), maxHeight)
+
+        // 스크롤 활성화 여부 결정
+        let shouldEnableScroll = contentHeight > maxHeight
+
+        // 높이가 변경되었을 때만 업데이트
+        if abs(newHeight - (textViewHeightConstraint?.layoutConstraints.first?.constant ?? 0)) > 0.5 {
+            textViewHeightConstraint?.update(offset: newHeight)
+            UIView.animate(withDuration: 0.1) {
+                self.view.layoutIfNeeded()
+            }
+        }
+
+        // 스크롤 상태 변경
+        if textView.isScrollEnabled != shouldEnableScroll {
+            textView.isScrollEnabled = shouldEnableScroll
+            textView.showsVerticalScrollIndicator = shouldEnableScroll
+        }
+    }
+
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        // placeholder 위치 조정 (멀티라인일 때 상단 정렬)
+        placeholderLabel.snp.remakeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-12)
+            make.top.equalToSuperview().offset(textView.textContainerInset.top)
+        }
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        // 텍스트가 비어있을 때 placeholder를 중앙으로 복귀
+        if textView.text.isEmpty {
+            placeholderLabel.snp.remakeConstraints { make in
+                make.leading.equalToSuperview().offset(16)
+                make.trailing.equalToSuperview().offset(-12)
+                make.centerY.equalToSuperview()
+            }
+        }
     }
 }
 
