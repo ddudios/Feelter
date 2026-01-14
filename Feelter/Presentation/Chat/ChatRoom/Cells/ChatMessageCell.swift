@@ -81,6 +81,7 @@ final class ChatMessageCell: UITableViewCell {
         statusLabel.text = nil
         statusIconImageView.image = nil
         retryButton.isHidden = true
+        imageGridView.configure(with: [])  // 이미지 그리드 초기화
     }
 
     func configure(with item: ChatMessageViewItem, opponentProfileImagePath: String?) {
@@ -101,6 +102,7 @@ final class ChatMessageCell: UITableViewCell {
     }
 
     private func configureHierarchy() {
+        contentView.addSubview(profileImageView)
         contentView.addSubview(horizontalStackView)
         bubbleContainerView.addSubview(bubbleStackView)
         bubbleStackView.addArrangedSubview(imageGridView)
@@ -113,13 +115,17 @@ final class ChatMessageCell: UITableViewCell {
     }
 
     private func configureLayout() {
-        horizontalStackView.snp.makeConstraints { make in
-            make.top.bottom.equalToSuperview().inset(4).priority(.high)
-            make.leading.trailing.equalToSuperview().inset(16)
+        // 프로필 이미지: 상단 고정, 크기 고정 (셀 높이와 무관하게 36x36 유지)
+        profileImageView.snp.makeConstraints { make in
+            make.top.equalToSuperview().inset(4)
+            make.leading.equalToSuperview().inset(16)
+            make.width.equalTo(Layout.profileSize).priority(.required)
+            make.height.equalTo(Layout.profileSize).priority(.required)
         }
 
-        profileImageView.snp.makeConstraints { make in
-            make.width.height.equalTo(Layout.profileSize).priority(.high)
+        horizontalStackView.snp.makeConstraints { make in
+            make.top.bottom.equalToSuperview().inset(4).priority(.high)
+            make.trailing.equalToSuperview().inset(16)
         }
 
         bubbleStackView.snp.makeConstraints { make in
@@ -140,10 +146,16 @@ final class ChatMessageCell: UITableViewCell {
         backgroundColor = .clear
         contentView.backgroundColor = .clear
 
+        // 프로필 이미지 찌그러짐 방지 설정
         profileImageView.contentMode = .scaleAspectFill
         profileImageView.clipsToBounds = true
         profileImageView.layer.cornerRadius = Layout.profileSize / 2
         profileImageView.backgroundColor = .clear
+        // 크기 고정을 위한 우선순위 설정 (늘어나거나 줄어들지 않도록)
+        profileImageView.setContentHuggingPriority(.required, for: .vertical)
+        profileImageView.setContentHuggingPriority(.required, for: .horizontal)
+        profileImageView.setContentCompressionResistancePriority(.required, for: .vertical)
+        profileImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         bubbleContainerView.layer.cornerRadius = Layout.bubbleCornerRadius
         bubbleContainerView.clipsToBounds = true
@@ -195,7 +207,8 @@ final class ChatMessageCell: UITableViewCell {
     }
 
     private func configureMessageContent(text: String?, images: [ChatImageSource]) {
-        if let text, !text.isEmpty {
+        // 텍스트가 있고, 공백이 아닌 실제 내용이 있을 때만 표시
+        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             messageLabel.text = text
             messageLabel.isHidden = false
         } else {
@@ -244,7 +257,8 @@ final class ChatMessageCell: UITableViewCell {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        updateBubbleMaxWidth()
+        // 이제 고정 너비로 계산하므로 동적 업데이트 불필요
+        // updateBubbleMaxWidth()
     }
 
     private func updateBubbleMaxWidth() {
@@ -278,20 +292,46 @@ final class ChatMessageCell: UITableViewCell {
         bubbleMaxWidthConstraint?.deactivate()
         bubbleMaxWidthConstraint = nil
 
+        // 프로필 이미지는 스택뷰에 추가하지 않고 visibility만 조절
+        profileImageView.isHidden = isOutgoing
+
+        // horizontalStackView의 leading 제약조건 업데이트
+        horizontalStackView.snp.remakeConstraints { make in
+            make.top.bottom.equalToSuperview().inset(4).priority(.high)
+            make.trailing.equalToSuperview().inset(16)
+            if isOutgoing {
+                make.leading.equalToSuperview().inset(16)
+            } else {
+                // 프로필 이미지 오른쪽에 위치
+                make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.stackSpacing)
+            }
+        }
+
         if isOutgoing {
             horizontalStackView.addArrangedSubview(spacerView)
             horizontalStackView.addArrangedSubview(statusStackView)
             horizontalStackView.addArrangedSubview(timeStackView)
             horizontalStackView.addArrangedSubview(bubbleContainerView)
         } else {
-            horizontalStackView.addArrangedSubview(profileImageView)
             horizontalStackView.addArrangedSubview(bubbleContainerView)
             horizontalStackView.addArrangedSubview(timeStackView)
             horizontalStackView.addArrangedSubview(spacerView)
         }
 
+        // 버블 최대 너비 계산: 화면 너비 - 프로필/시간/상태 등 고정 요소 너비
+        let screenWidth = UIScreen.main.bounds.width
+        let horizontalInset: CGFloat = 16 * 2  // 좌우 inset
+        let stackSpacing: CGFloat = Layout.stackSpacing
+
+        // 고정 요소들의 너비 계산
+        let profileWidth: CGFloat = isOutgoing ? 0 : (Layout.profileSize + stackSpacing)
+        let timeWidth: CGFloat = 60 + stackSpacing  // 시간 레이블 예상 너비
+        let statusWidth: CGFloat = isOutgoing ? (30 + stackSpacing) : 0  // 재전송 버튼/상태 아이콘
+
+        let maxBubbleWidth = screenWidth - horizontalInset - profileWidth - timeWidth - statusWidth
+
         bubbleContainerView.snp.makeConstraints { make in
-            bubbleMaxWidthConstraint = make.width.lessThanOrEqualTo(horizontalStackView.snp.width).constraint
+            bubbleMaxWidthConstraint = make.width.lessThanOrEqualTo(maxBubbleWidth).constraint
         }
 
         timeStackView.alignment = isOutgoing ? .trailing : .leading

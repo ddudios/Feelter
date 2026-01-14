@@ -16,7 +16,7 @@ struct ChatMessageResponseDTO: Decodable {
     /// 채팅방 ID
     let roomId: String
 
-    /// 메시지 내용
+    /// 메시지 내용 (이미지만 보낼 경우 빈 문자열)
     let content: String
 
     /// 메시지 생성 시간 (UTC, ISO 8601)
@@ -44,8 +44,9 @@ struct ChatMessageResponseDTO: Decodable {
 
 // MARK: - Convenience
 extension ChatMessageResponseDTO {
-    /// 파일 URL 배열 (nil-safe)
+    /// 파일 URL 배열 (nil-safe, 빈 문자열 필터링)
+    /// 서버에서 빈 문자열이 포함된 배열을 보낼 수 있으므로 필터링 필요
     var filesArray: [String] {
-        return files ?? []
+        return files?.filter { !$0.isEmpty } ?? []
     }
 }

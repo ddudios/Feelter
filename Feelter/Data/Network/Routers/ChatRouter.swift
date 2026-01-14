@@ -12,7 +12,7 @@ enum ChatRouter: BaseRouter {
 
     case createChatRoom(opponentId: String)  // 채팅방 생성 또는 조회
     case fetchChatRooms  // 채팅방 목록 조회
-    case sendMessage(roomId: String, content: String, files: [String]?)
+    case sendMessage(roomId: String, content: String?, files: [String]?)
     case fetchChatHistory(roomId: String, next: String?)
     case uploadFiles(roomId: String, imageData: [Data])  // 파일 업로드
 

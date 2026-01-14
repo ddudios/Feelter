@@ -16,8 +16,8 @@ struct ChatMessage: Equatable, Hashable, Identifiable {
     /// 채팅방 ID
     let roomId: String
 
-    /// 메시지 내용
-    let content: String
+    /// 메시지 내용 (이미지만 보낼 경우 nil 가능)
+    let content: String?
 
     /// 발신자 ID
     let senderId: String
@@ -81,7 +81,7 @@ extension ChatMessage {
     /// - Returns: 전송 중 상태의 메시지
     static func createLocal(
         roomId: String,
-        content: String,
+        content: String?,
         senderId: String,
         senderNick: String,
         senderProfileImage: String? = nil,

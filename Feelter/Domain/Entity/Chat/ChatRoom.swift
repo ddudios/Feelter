@@ -72,7 +72,7 @@ struct ChatRoom: Equatable, Hashable, Identifiable {
             return "사진 \(lastMessage.files.count)장"
         }
 
-        return lastMessage.content
+        return lastMessage.content ?? ""
     }
 }
 

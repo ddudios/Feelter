@@ -56,9 +56,12 @@ final class SendMessageUsecase {
 
         // 2. Repository 호출
         do {
+            // 이미지만 보낼 때는 content를 nil로 전달
+            let contentToSend: String? = trimmedContent.isEmpty && !files.isEmpty ? nil : trimmedContent
+
             let message = try await repository.sendMessage(
                 roomId: roomId,
-                content: trimmedContent,
+                content: contentToSend,
                 files: files
             )
 

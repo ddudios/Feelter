@@ -271,7 +271,7 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///   - content: 메시지 내용
     ///   - files: 첨부 파일 (옵셔널)
     /// - Returns: ChatMessage (전송된 메시지)
-    func sendMessage(roomId: String, content: String, files: [String]) async throws -> ChatMessage {
+    func sendMessage(roomId: String, content: String?, files: [String]) async throws -> ChatMessage {
         guard let userId = currentUserId else {
             throw RepositoryError.userNotLoggedIn
         }

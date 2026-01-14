@@ -73,7 +73,7 @@ protocol ChatRepositoryProtocol {
     /// - Throws: 네트워크 에러, 서버 에러
     func sendMessage(
         roomId: String,
-        content: String,
+        content: String?,
         files: [String]
     ) async throws -> ChatMessage
 

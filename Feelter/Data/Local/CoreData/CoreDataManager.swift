@@ -251,12 +251,12 @@ extension CoreDataManager {
     func upsertChatMessage(
         chatId: String,
         roomId: String,
-        content: String,
+        content: String?,
         senderId: String,
         senderNick: String,
         senderProfileImage: String?,
         createdAt: Date,
-        files: [String]?,  // ✅ String? → [String]? (Transformable)
+        files: [String]?,
         status: String,
         context: NSManagedObjectContext? = nil
     ) throws -> ChatMessageEntity {
@@ -284,7 +284,16 @@ extension CoreDataManager {
         message.senderId = senderId
         message.senderNick = senderNick
         message.senderProfileImage = senderProfileImage
-        message.files = files  // ✅ [String]? → NSArray? (CoreData는 NS 타입 사용)
+
+        // files 배열 안전하게 저장 (nil 값 필터링)
+        // Transformable 속성에 nil이 포함된 배열을 저장하면 크래시 발생
+        if let files = files {
+            let filteredFiles = files.filter { !$0.isEmpty }
+            message.files = filteredFiles.isEmpty ? nil : (filteredFiles as NSObject)
+        } else {
+            message.files = nil
+        }
+
         message.status = status
 
         // 4. ChatRoom relationship 설정
@@ -297,7 +306,7 @@ extension CoreDataManager {
         } else if message.chatRoom == nil {
             // 새 메시지인데 채팅방을 찾지 못하면 에러
             // 이 경우는 메시지를 저장하기 전에 반드시 채팅방이 먼저 저장되어야 함
-            print("⚠️ [CoreData] 메시지를 저장하려고 하는데 채팅방을 찾을 수 없습니다: roomId=\(roomId), chatId=\(chatId)")
+            print("[CoreData] 메시지를 저장하려고 하는데 채팅방을 찾을 수 없습니다: roomId=\(roomId), chatId=\(chatId)")
             throw CoreDataError.chatRoomNotFound(roomId: roomId)
         }
         // 기존 메시지이고 채팅방을 찾지 못하면 기존 relationship 유지 (크래시 방지)

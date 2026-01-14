@@ -20,17 +20,30 @@ extension ChatMessageEntity {
     /// - Returns: ChatMessage (Domain Entity)
     /// - Note: files는 이제 Transformable 타입으로 자동 변환되므로 별도 파싱 불필요
     func toDomain() -> ChatMessage {
-        // 1. files는 이미 [String]? 타입 (Transformable로 자동 변환)
-        let filesArray = (self.files as? [String]) ?? []
+        // 1. files 안전하게 변환
+        var filesArray: [String] = []
+        if let files = self.files {
+            // Transformable로 저장된 데이터를 [String]으로 변환
+            if let stringArray = files as? [String] {
+                filesArray = stringArray.filter { !$0.isEmpty }
+            } else if let anyArray = files as? [Any] {
+                // 혹시 Any 타입으로 저장되었을 경우 대비
+                filesArray = anyArray.compactMap { $0 as? String }.filter { !$0.isEmpty }
+            } else {
+                print("⚠️ [CoreData] files 타입 변환 실패: \(type(of: files))")
+            }
+        }
 
         // 2. status 변환 (String -> Enum)
         let messageStatus = MessageSendStatus(rawValue: self.status ?? "") ?? .sent
 
         // 3. ChatMessage 생성
+        let contentValue = self.content?.isEmpty == false ? self.content : nil
+
         return ChatMessage(
             chatId: self.chatId ?? "",
             roomId: self.roomId ?? "",
-            content: self.content ?? "",
+            content: contentValue,
             senderId: self.senderId ?? "",
             senderNick: self.senderNick ?? "",
             senderProfileImage: self.senderProfileImage,

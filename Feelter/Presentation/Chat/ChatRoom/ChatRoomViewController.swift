@@ -39,7 +39,12 @@ final class ChatRoomViewController: BaseViewController {
     private let sendButton = UIButton(type: .system)
     private let inputSeparatorView = UIView()
 
+    // 선택된 이미지 미리보기
+    private let selectedImagesScrollView = UIScrollView()
+    private let selectedImagesStackView = UIStackView()
+
     private var inputBottomConstraint: Constraint?
+    private var selectedImagesHeightConstraint: Constraint?
     private var items: [Item] = []
     private var messages: [ChatMessageViewItem] = [] {
         didSet {
@@ -66,6 +71,7 @@ final class ChatRoomViewController: BaseViewController {
     private let viewWillDisappearSubject = PassthroughSubject<Void, Never>()
     private let sendButtonTappedSubject = PassthroughSubject<Void, Never>()
     private let messageTextSubject = CurrentValueSubject<String, Never>("")
+    private let selectedImagesSubject = CurrentValueSubject<[UIImage], Never>([])
 
     init(chatRoom: ChatRoom, viewModel: ChatRoomViewModel) {
         self.chatRoom = chatRoom
@@ -150,7 +156,7 @@ final class ChatRoomViewController: BaseViewController {
         inputContainerView.snp.makeConstraints { make in
             make.leading.trailing.equalToSuperview()
             inputBottomConstraint = make.bottom.equalTo(view.safeAreaLayoutGuide).constraint
-            make.height.equalTo(Layout.inputBarHeight)
+            make.height.greaterThanOrEqualTo(Layout.inputBarHeight)
         }
     }
 
@@ -186,6 +192,17 @@ final class ChatRoomViewController: BaseViewController {
         inputSeparatorView.backgroundColor = .Feelter.blackTurquoise
         inputContainerView.addSubview(inputSeparatorView)
 
+        // 선택된 이미지 스크롤뷰 설정
+        selectedImagesScrollView.showsHorizontalScrollIndicator = false
+        selectedImagesScrollView.backgroundColor = .clear
+        selectedImagesScrollView.isHidden = true
+        inputContainerView.addSubview(selectedImagesScrollView)
+
+        selectedImagesStackView.axis = .horizontal
+        selectedImagesStackView.spacing = 8
+        selectedImagesStackView.alignment = .center
+        selectedImagesScrollView.addSubview(selectedImagesStackView)
+
         inputStackView.axis = .horizontal
         inputStackView.spacing = Layout.messageSpacing
         inputStackView.alignment = .center
@@ -206,7 +223,6 @@ final class ChatRoomViewController: BaseViewController {
         )
         messageTextField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         messageTextField.leftViewMode = .always
-        messageTextField.returnKeyType = .send
         messageTextField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
         messageTextField.delegate = self
 
@@ -223,8 +239,19 @@ final class ChatRoomViewController: BaseViewController {
             make.height.equalTo(1)
         }
 
+        selectedImagesScrollView.snp.makeConstraints { make in
+            make.top.equalTo(inputSeparatorView.snp.bottom).offset(8)
+            make.leading.trailing.equalToSuperview().inset(Layout.inputHorizontalInset)
+            selectedImagesHeightConstraint = make.height.equalTo(0).constraint
+        }
+
+        selectedImagesStackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.height.equalToSuperview()
+        }
+
         inputStackView.snp.makeConstraints { make in
-            make.top.equalTo(inputSeparatorView.snp.bottom).offset(Layout.inputVerticalInset)
+            make.top.equalTo(selectedImagesScrollView.snp.bottom).offset(8)
             make.leading.trailing.equalToSuperview().inset(Layout.inputHorizontalInset)
             make.bottom.equalToSuperview().inset(Layout.inputVerticalInset)
         }
@@ -270,7 +297,8 @@ final class ChatRoomViewController: BaseViewController {
             viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
             viewWillDisappear: viewWillDisappearSubject.eraseToAnyPublisher(),
             sendButtonTapped: sendButtonTappedSubject.eraseToAnyPublisher(),
-            messageText: messageTextSubject.eraseToAnyPublisher()
+            messageText: messageTextSubject.eraseToAnyPublisher(),
+            selectedImages: selectedImagesSubject.eraseToAnyPublisher()
         )
         // Output 구독
         let output = viewModel.transform(input: input)
@@ -344,11 +372,27 @@ final class ChatRoomViewController: BaseViewController {
             let isOutgoing = chatMessage.senderId == currentUserId
 
             // files (String 배열) → ChatImageSource 배열 변환
-            let images: [ChatImageSource] = chatMessage.files.map { .remote($0) }
+            // 안전하게 변환: 빈 문자열이나 유효하지 않은 URL 필터링
+            let images: [ChatImageSource] = chatMessage.files
+                .filter { !$0.isEmpty }
+                .compactMap { urlString in
+                    // URL 유효성 검사
+                    guard URL(string: urlString) != nil else { return nil }
+                    return .remote(urlString)
+                }
+
+            // content가 공백이 아닌 실제 내용이 있을 때만 표시
+            let displayText: String?
+            if let content = chatMessage.content,
+               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                displayText = content
+            } else {
+                displayText = nil
+            }
 
             return ChatMessageViewItem(
                 id: chatMessage.chatId,
-                text: chatMessage.content.isEmpty ? nil : chatMessage.content,
+                text: displayText,
                 images: images,
                 date: chatMessage.createdAt,
                 isOutgoing: isOutgoing,
@@ -412,9 +456,9 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     private func updateSendButtonState() {
+        // 텍스트가 필수 (이미지만 보내는 것은 불가)
         let hasText = !(messageTextField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasImages = !pendingImages.isEmpty
-        sendButton.isEnabled = hasText || hasImages
+        sendButton.isEnabled = hasText
         sendButton.tintColor = sendButton.isEnabled ? .Feelter.brightTurquoise : .Feelter.blackTurquoise
     }
 
@@ -471,6 +515,10 @@ final class ChatRoomViewController: BaseViewController {
         }
     }
 
+    @objc override func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
     @objc private func textFieldDidChange() {
         messageTextSubject.send(messageTextField.text ?? "")
         updateSendButtonState()
@@ -494,9 +542,9 @@ final class ChatRoomViewController: BaseViewController {
         messageTextField.text = nil
         messageTextSubject.send("")
         pendingImages.removeAll()
+        selectedImagesSubject.send([])
+        updateSelectedImagesPreview()
         updateSendButtonState()
-
-        // TODO: 이미지 전송 기능 추가 (uploadFiles 구현 필요)
     }
 
     @objc private func searchButtonTapped() {
@@ -559,9 +607,9 @@ extension ChatRoomViewController: UITableViewDelegate {
 // MARK: - UITextFieldDelegate
 extension ChatRoomViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        // 텍스트가 필수 (이미지만 보내는 것은 불가)
         let hasText = !(messageTextField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasImages = !pendingImages.isEmpty
-        guard hasText || hasImages else { return false }
+        guard hasText else { return false }
         sendButtonTapped()
         return true
     }
@@ -574,6 +622,109 @@ extension ChatRoomViewController: UIGestureRecognizerDelegate {
     }
 }
 
+// MARK: - Selected Images Preview
+private extension ChatRoomViewController {
+
+    /// 선택된 이미지 미리보기 UI 업데이트
+    ///
+    /// 역할:
+    /// 1. 기존 썸네일 제거
+    /// 2. 선택된 이미지마다 썸네일 컨테이너 생성
+    /// 3. x-mark 버튼 추가로 개별 제거 가능
+    /// 4. 스크롤뷰 높이 및 표시 여부 조정
+    ///
+    func updateSelectedImagesPreview() {
+        // 1. 기존 썸네일 모두 제거
+        selectedImagesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        let images = selectedImagesSubject.value
+
+        // 2. 이미지가 없으면 숨김
+        if images.isEmpty {
+            selectedImagesScrollView.isHidden = true
+            selectedImagesHeightConstraint?.update(offset: 0)
+            UIView.animate(withDuration: 0.25) {
+                self.view.layoutIfNeeded()
+            }
+            return
+        }
+
+        // 3. 이미지가 있으면 썸네일 생성
+        for (index, image) in images.enumerated() {
+            let thumbnailContainer = createThumbnailView(image: image, index: index)
+            selectedImagesStackView.addArrangedSubview(thumbnailContainer)
+        }
+
+        // 4. 스크롤뷰 표시 및 높이 조정
+        selectedImagesScrollView.isHidden = false
+        selectedImagesHeightConstraint?.update(offset: 88) // 80(썸네일) + 8(여백)
+        UIView.animate(withDuration: 0.25) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    /// 썸네일 컨테이너 뷰 생성
+    ///
+    /// 구조:
+    /// - 컨테이너 (80x80)
+    ///   - UIImageView (꽉 채움, rounded corners)
+    ///   - X 버튼 (우상단, 24x24)
+    ///
+    func createThumbnailView(image: UIImage, index: Int) -> UIView {
+        let containerView = UIView()
+        containerView.backgroundColor = .clear
+
+        // 이미지 뷰
+        let imageView = UIImageView()
+        imageView.image = image
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = Radius.m
+        imageView.backgroundColor = .Feelter.gray100
+        containerView.addSubview(imageView)
+
+        imageView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.width.height.equalTo(80)
+        }
+
+        // X 버튼
+        let removeButton = UIButton(type: .system)
+        removeButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        removeButton.tintColor = .white
+        removeButton.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        removeButton.layer.cornerRadius = 12
+        removeButton.clipsToBounds = true
+        removeButton.tag = index
+        removeButton.addTarget(self, action: #selector(removeImageButtonTapped(_:)), for: .touchUpInside)
+        containerView.addSubview(removeButton)
+
+        removeButton.snp.makeConstraints { make in
+            make.top.trailing.equalToSuperview()
+            make.width.height.equalTo(24)
+        }
+
+        return containerView
+    }
+
+    /// X 버튼 탭 시 해당 이미지 제거
+    @objc func removeImageButtonTapped(_ sender: UIButton) {
+        let index = sender.tag
+        var images = selectedImagesSubject.value
+
+        guard index < images.count else { return }
+
+        images.remove(at: index)
+        selectedImagesSubject.send(images)
+
+        // pendingImages도 동기화
+        pendingImages.remove(at: index)
+
+        updateSelectedImagesPreview()
+        updateSendButtonState()
+    }
+}
+
 // MARK: - PHPickerViewControllerDelegate
 extension ChatRoomViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
@@ -582,7 +733,7 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
         guard !results.isEmpty else { return }
 
         let dispatchGroup = DispatchGroup()
-        var loadedImages: [ChatImageSource?] = Array(repeating: nil, count: results.count)
+        var loadedImages: [UIImage?] = Array(repeating: nil, count: results.count)
 
         for (index, result) in results.enumerated() {
             let provider = result.itemProvider
@@ -591,7 +742,7 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
             dispatchGroup.enter()
             provider.loadObject(ofClass: UIImage.self) { object, _ in
                 if let image = object as? UIImage {
-                    loadedImages[index] = .local(image)
+                    loadedImages[index] = image
                 }
                 dispatchGroup.leave()
             }
@@ -599,7 +750,17 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
 
         dispatchGroup.notify(queue: .main) { [weak self] in
             guard let self else { return }
-            self.pendingImages = loadedImages.compactMap { $0 }
+            let images = loadedImages.compactMap { $0 }
+
+            // pendingImages 업데이트 (UI용)
+            self.pendingImages = images.map { .local($0) }
+
+            // ViewModel에 UIImage 배열 전달
+            self.selectedImagesSubject.send(images)
+
+            // 이미지 미리보기 UI 업데이트
+            self.updateSelectedImagesPreview()
+
             self.updateSendButtonState()
         }
     }

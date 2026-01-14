@@ -2,9 +2,9 @@
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24512" systemVersion="25C56" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="ChatMessageEntity" representedClassName="ChatMessageEntity" syncable="YES" codeGenerationType="class">
         <attribute name="chatId" attributeType="String"/>
-        <attribute name="content" attributeType="String"/>
+        <attribute name="content" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="files" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayValueTransformer" customClassName="[String]"/>
+        <attribute name="files" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayValueTransformer"/>
         <attribute name="roomId" attributeType="String"/>
         <attribute name="senderId" attributeType="String"/>
         <attribute name="senderNick" attributeType="String"/>

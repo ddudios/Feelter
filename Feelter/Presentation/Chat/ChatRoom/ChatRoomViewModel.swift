@@ -5,6 +5,7 @@
 //  Created by Suji Jang on 1/11/26.
 //
 
+import UIKit
 import Foundation
 import Combine
 
@@ -24,6 +25,9 @@ final class ChatRoomViewModel {
 
         /// 입력 중인 메시지 텍스트
         let messageText: AnyPublisher<String, Never>
+
+        /// 선택된 이미지들 (전송 시)
+        let selectedImages: AnyPublisher<[UIImage], Never>
     }
 
     struct Output {
@@ -102,6 +106,12 @@ final class ChatRoomViewModel {
             .assign(to: \.value, on: messageTextSubject)
             .store(in: &cancellables)
 
+        // 선택된 이미지 상태 저장
+        let selectedImagesSubject = CurrentValueSubject<[UIImage], Never>([])
+        input.selectedImages
+            .assign(to: \.value, on: selectedImagesSubject)
+            .store(in: &cancellables)
+
         // 전송 버튼 활성화 상태
         let isSendButtonEnabled = messageTextSubject
             .map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -138,9 +148,11 @@ final class ChatRoomViewModel {
             .sink { [weak self] in
                 guard let self = self else { return }
                 let text = messageTextSubject.value
+                let images = selectedImagesSubject.value
 
                 self.sendMessage(
                     text: text,
+                    images: images,
                     isSendingSubject: isSendingSubject,
                     errorSubject: errorSubject,
                     scrollToBottomSubject: scrollToBottomSubject
@@ -148,6 +160,7 @@ final class ChatRoomViewModel {
 
                 // 입력창 초기화
                 messageTextSubject.send("")
+                selectedImagesSubject.send([])
             }
             .store(in: &cancellables)
 
@@ -198,13 +211,15 @@ final class ChatRoomViewModel {
     ///
     /// 동작:
     /// 1. 전송 중 상태 시작
-    /// 2. UseCase 호출 (Optimistic Update는 Repository에서 처리)
-    /// 3. 성공: 스크롤
-    /// 4. 실패: 에러 표시
-    /// 5. 전송 중 상태 종료
+    /// 2. 텍스트만 있거나, 텍스트+이미지가 있을 때만 전송
+    /// 3. 이미지만 보내는 것은 차단
+    /// 4. 성공: 스크롤
+    /// 5. 실패: 에러 표시
+    /// 6. 전송 중 상태 종료
     ///
     private func sendMessage(
         text: String,
+        images: [UIImage],
         isSendingSubject: CurrentValueSubject<Bool, Never>,
         errorSubject: PassthroughSubject<String?, Never>,
         scrollToBottomSubject: PassthroughSubject<Void, Never>
@@ -213,11 +228,40 @@ final class ChatRoomViewModel {
 
         Task {
             do {
-                _ = try await sendMessageUsecase.execute(
-                    roomId: roomId,
-                    content: text,
-                    files: []
-                )
+                let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let hasImages = !images.isEmpty
+
+                // 텍스트가 없으면 전송 불가 (이미지만 보내기 차단)
+                guard hasText else {
+                    await MainActor.run {
+                        isSendingSubject.send(false)
+                        errorSubject.send("텍스트를 입력해주세요")
+                    }
+                    return
+                }
+
+                // 1. 텍스트 메시지 전송 (이미지 포함 여부와 관계없이)
+                if hasImages {
+                    // UIImage -> Data 변환
+                    let imageDataArray = images.compactMap { $0.jpegData(compressionQuality: 0.8) }
+
+                    // Repository의 uploadFiles 메서드 호출
+                    let fileUrls = try await repository.uploadFiles(roomId: roomId, imageData: imageDataArray)
+
+                    // 텍스트와 이미지를 함께 전송
+                    _ = try await sendMessageUsecase.execute(
+                        roomId: roomId,
+                        content: text,
+                        files: fileUrls
+                    )
+                } else {
+                    // 텍스트만 전송
+                    _ = try await sendMessageUsecase.execute(
+                        roomId: roomId,
+                        content: text,
+                        files: []
+                    )
+                }
 
                 await MainActor.run {
                     isSendingSubject.send(false)
