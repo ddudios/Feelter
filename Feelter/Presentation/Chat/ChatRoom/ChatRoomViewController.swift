@@ -9,13 +9,14 @@ import UIKit
 import SnapKit
 import PhotosUI
 import Combine
+import UniformTypeIdentifiers
 
 final class ChatRoomViewController: BaseViewController {
 
     private enum Layout {
         static let inputBarHeight: CGFloat = 56
         static let inputHorizontalInset: CGFloat = 16
-        static let inputVerticalInset: CGFloat = 0
+        static let inputVerticalInset: CGFloat = 8
         static let inputButtonSize: CGFloat = 28
         static let textViewMinHeight: CGFloat = 36
         static let textViewMaxLines: Int = 7
@@ -232,7 +233,7 @@ final class ChatRoomViewController: BaseViewController {
         }
 
         selectedImagesScrollView.snp.makeConstraints { make in
-            make.top.equalTo(inputSeparatorView.snp.bottom).offset(8)
+            make.top.equalTo(inputSeparatorView.snp.bottom).offset(4)
             make.leading.trailing.equalToSuperview().inset(Layout.inputHorizontalInset)
             selectedImagesHeightConstraint = make.height.equalTo(0).constraint
         }
@@ -243,7 +244,7 @@ final class ChatRoomViewController: BaseViewController {
         }
 
         inputStackView.snp.makeConstraints { make in
-            make.top.equalTo(selectedImagesScrollView.snp.bottom).offset(8)
+            make.top.equalTo(selectedImagesScrollView.snp.bottom).offset(4)
             make.leading.trailing.equalToSuperview().inset(Layout.inputHorizontalInset)
             make.bottom.equalToSuperview().inset(Layout.inputVerticalInset)
         }
@@ -546,13 +547,58 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     @objc private func attachmentButtonTapped() {
+        let actionSheet = UIAlertController(
+            title: nil,
+            message: nil,
+            preferredStyle: .actionSheet
+        )
+
+        // 옵션 1: 앨범에서 선택
+        let albumAction = UIAlertAction(title: "앨범에서 선택", style: .default) { [weak self] _ in
+            self?.openImagePicker()
+        }
+
+        // 옵션 2: 파일 선택
+        let fileAction = UIAlertAction(title: "파일 선택", style: .default) { [weak self] _ in
+            self?.openFilePicker()
+        }
+
+        // 취소 버튼
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        actionSheet.addAction(albumAction)
+        actionSheet.addAction(fileAction)
+        actionSheet.addAction(cancelAction)
+
+        // iPad 대응 (popover)
+        if let popover = actionSheet.popoverPresentationController {
+            popover.sourceView = attachmentButton
+            popover.sourceRect = attachmentButton.bounds
+        }
+
+        present(actionSheet, animated: true)
+    }
+
+    /// 앨범에서 이미지/비디오 선택 (PHPicker)
+    private func openImagePicker() {
         var configuration = PHPickerConfiguration()
         configuration.selectionLimit = 5
-        configuration.filter = .images
+        configuration.filter = .any(of: [.images, .videos])
 
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = self
         present(picker, animated: true)
+    }
+
+    /// 파일 선택 (UIDocumentPicker)
+    /// 지원 확장자: pdf, jpg, png, jpeg, gif
+    private func openFilePicker() {
+        let supportedTypes: [UTType] = [.pdf, .image, .jpeg, .png, .gif]
+
+        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes)
+        documentPicker.delegate = self
+        documentPicker.allowsMultipleSelection = true
+        present(documentPicker, animated: true)
     }
 
     @objc private func sendButtonTapped() {
@@ -868,5 +914,42 @@ private extension ChatRoomViewController {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].status = .sending
         // TODO: 재전송 로직 연결
+    }
+}
+
+// MARK: - UIDocumentPickerDelegate
+extension ChatRoomViewController: UIDocumentPickerDelegate {
+
+    /// 파일 선택 완료 시 호출
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        for url in urls {
+            // 보안 스코프 접근 시작
+            guard url.startAccessingSecurityScopedResource() else {
+                print("❌ 파일 접근 권한 획득 실패: \(url)")
+                continue
+            }
+
+            defer {
+                // 보안 스코프 접근 종료
+                url.stopAccessingSecurityScopedResource()
+            }
+
+            // 파일 정보 로그 출력
+            let fileName = url.lastPathComponent
+            let fileExtension = url.pathExtension.lowercased()
+
+            print("📎 선택된 파일:")
+            print("   - 파일명: \(fileName)")
+            print("   - 확장자: \(fileExtension)")
+            print("   - URL: \(url.absoluteString)")
+
+            // TODO: 추후 전송 로직 연결
+            // 파일을 임시 디렉토리로 복사하거나 업로드 처리
+        }
+    }
+
+    /// 파일 선택 취소 시 호출
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        print("📎 파일 선택 취소됨")
     }
 }
