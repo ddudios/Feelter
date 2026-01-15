@@ -297,4 +297,110 @@ final class ChatRoomViewModel {
             }
             .store(in: &cancellables)
     }
+
+    // MARK: - File Upload
+
+    /// 파일 전송 (즉시 전송)
+    ///
+    /// 동작:
+    /// 1. Keychain에서 최신 토큰/사용자 정보 재확인
+    /// 2. Repository를 통해 파일 업로드 (multipart/form-data)
+    /// 3. 업로드된 URL로 메시지 전송
+    /// 4. 성공 시 UI 즉시 반영
+    ///
+    /// - Parameters:
+    ///   - data: 파일 바이너리 데이터
+    ///   - fileName: 파일명 (확장자 포함)
+    ///   - mimeType: MIME 타입 (예: "application/pdf")
+    ///   - completion: 완료 콜백 (성공 여부, 에러 메시지)
+    func sendFile(
+        data: Data,
+        fileName: String,
+        mimeType: String,
+        completion: @escaping (Bool, String?) -> Void
+    ) {
+        Task {
+            do {
+                // 1. Keychain에서 최신 토큰 및 사용자 정보 재확인 (방어 코드)
+                // - 인증 토큰이 없으면 API 호출 자체가 실패하므로 먼저 확인
+                guard let accessToken = KeychainManager.shared.read(account: "accessToken"),
+                      !accessToken.isEmpty else {
+                    await MainActor.run {
+                        completion(false, "로그인이 필요합니다. 다시 로그인해주세요.")
+                    }
+                    return
+                }
+
+                // userId도 재확인 (Repository에서 필요)
+                guard let userId = KeychainManager.shared.read(account: "userId"),
+                      !userId.isEmpty else {
+                    await MainActor.run {
+                        completion(false, "사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.")
+                    }
+                    return
+                }
+
+                print("📤 파일 업로드 시작:")
+                print("   - 파일명: \(fileName)")
+                print("   - MIME: \(mimeType)")
+                print("   - 크기: \(data.count) bytes")
+                print("   - roomId: \(roomId)")
+                print("   - userId: \(userId)")
+
+                // 2. Repository를 통해 파일 업로드 (인증 헤더 자동 포함)
+                // NetworkManager의 AuthenticationInterceptor가 accessToken을 헤더에 추가
+                let fileUrls = try await repository.uploadFiles(roomId: roomId, imageData: [data])
+
+                guard !fileUrls.isEmpty else {
+                    await MainActor.run {
+                        completion(false, "파일 업로드에 실패했습니다.")
+                    }
+                    return
+                }
+
+                print("✅ 파일 업로드 성공: \(fileUrls)")
+
+                // 3. 업로드된 파일 URL로 메시지 전송 (sendMessageUsecase 사용)
+                // content는 필수값이므로 파일명을 포함한 기본 텍스트 전송
+                let fileContent = "\(fileName)"
+
+                _ = try await sendMessageUsecase.execute(
+                    roomId: roomId,
+                    content: fileContent,
+                    files: fileUrls
+                )
+
+                print("파일 메시지 전송 완료: \(fileContent)")
+
+                // 4. 성공 콜백
+                await MainActor.run {
+                    completion(true, nil)
+                }
+
+            } catch {
+                print("파일 전송 실패: \(error)")
+
+                await MainActor.run {
+                    // 에러 메시지 구체화
+                    let errorMessage: String
+                    if let urlError = error as? URLError {
+                        switch urlError.code {
+                        case .notConnectedToInternet:
+                            errorMessage = "인터넷 연결을 확인해주세요."
+                        case .timedOut:
+                            errorMessage = "서버 응답 시간이 초과되었습니다."
+                        default:
+                            errorMessage = "네트워크 오류가 발생했습니다."
+                        }
+                    } else if let repoError = error as? RepositoryError {
+                        errorMessage = repoError.errorDescription ?? "알 수 없는 오류가 발생했습니다."
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
+
+                    completion(false, errorMessage)
+                }
+            }
+        }
+    }
 }

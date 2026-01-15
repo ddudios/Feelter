@@ -38,9 +38,12 @@ final class ChatDateSeparatorCell: UITableViewCell {
     }
 
     private func configureLayout() {
+        // leading/trailing에 priority 설정으로 초기 width=0 충돌 방지
         containerStackView.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview().inset(16)
-            make.centerY.equalToSuperview()
+            make.leading.equalToSuperview().inset(16).priority(.high)
+            make.trailing.equalToSuperview().inset(16).priority(.high)
+            make.top.bottom.equalToSuperview().inset(12)
+            make.centerX.equalToSuperview()
         }
 
         leftLineView.snp.makeConstraints { make in
@@ -49,8 +52,14 @@ final class ChatDateSeparatorCell: UITableViewCell {
 
         rightLineView.snp.makeConstraints { make in
             make.height.equalTo(1)
-            make.width.equalTo(leftLineView)
+            make.width.equalTo(leftLineView).priority(.medium)
         }
+
+        // 라인뷰 content priority 설정
+        leftLineView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        rightLineView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        dateLabel.setContentHuggingPriority(.required, for: .horizontal)
+        dateLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
     }
 
     private func configureView() {

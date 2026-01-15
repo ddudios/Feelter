@@ -10,6 +10,7 @@ import SnapKit
 import PhotosUI
 import Combine
 import UniformTypeIdentifiers
+import QuickLook
 
 final class ChatRoomViewController: BaseViewController {
 
@@ -32,6 +33,9 @@ final class ChatRoomViewController: BaseViewController {
     private let chatRoom: ChatRoom
     private let viewModel: ChatRoomViewModel
     private var cancellables = Set<AnyCancellable>()
+
+    /// Chat 화면 전환을 담당하는 Coordinator
+    private var chatCoordinator: ChatCoordinator?
 
     private let messageTableView = UITableView(frame: .zero, style: .plain)
     private let inputContainerView = UIView()
@@ -69,6 +73,9 @@ final class ChatRoomViewController: BaseViewController {
 
     // TODO: 사용자 ID 연동 후 내 메시지 판별에 사용
     private var currentUserId: String?
+
+    /// Quick Look에서 표시할 파일의 로컬 URL
+    private var currentPreviewItem: URL?
 
     // Subjects for Input
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
@@ -108,6 +115,14 @@ final class ChatRoomViewController: BaseViewController {
 
         // Keychain에서 현재 사용자 ID 가져오기
         currentUserId = KeychainManager.shared.read(account: "userId")
+
+        // ChatCoordinator 초기화
+        if let navigationController = navigationController {
+            chatCoordinator = ChatCoordinator(
+                navigationController: navigationController,
+                chatRoomViewController: self
+            )
+        }
 
         // ViewModel 바인딩
         bind()
@@ -188,6 +203,7 @@ final class ChatRoomViewController: BaseViewController {
         messageTableView.delegate = self
         messageTableView.register(ChatMessageCell.self, forCellReuseIdentifier: ChatMessageCell.identifier)
         messageTableView.register(ChatDateSeparatorCell.self, forCellReuseIdentifier: ChatDateSeparatorCell.identifier)
+        messageTableView.register(ChatFileMessageCell.self, forCellReuseIdentifier: ChatFileMessageCell.identifier)
     }
 
     private func setupInputBar() {
@@ -392,25 +408,64 @@ final class ChatRoomViewController: BaseViewController {
     /// 역할:
     /// 1. Domain Entity를 View용 모델로 변환
     /// 2. isOutgoing 판별 (senderId == currentUserId)
-    /// 3. files URL을 ChatImageSource.remote로 변환
+    /// 3. files URL을 이미지 또는 파일 첨부로 분류
+    ///
+    /// 중요:
+    /// - 서버가 PDF를 .jpg 확장자로 저장하는 경우가 있어서
+    ///   content(원본 파일명)의 확장자도 함께 확인합니다.
     ///
     private func convertToChatMessageViewItems(_ chatMessages: [ChatMessage]) -> [ChatMessageViewItem] {
         return chatMessages.map { chatMessage in
             let isOutgoing = chatMessage.senderId == currentUserId
 
-            // files (String 배열) → ChatImageSource 배열 변환
-            // 안전하게 변환: 빈 문자열이나 유효하지 않은 URL 필터링
-            let images: [ChatImageSource] = chatMessage.files
-                .filter { !$0.isEmpty }
-                .compactMap { urlString in
-                    // URL 유효성 검사
-                    guard URL(string: urlString) != nil else { return nil }
-                    return .remote(urlString)
-                }
+            // files를 이미지와 일반 파일로 분류
+            var images: [ChatImageSource] = []
+            var files: [ChatFileAttachment] = []
 
-            // content가 공백이 아닌 실제 내용이 있을 때만 표시
+            // content에서 원본 파일명 확장자 추출 (파일 전송 시 content = 원본 파일명)
+            // 예: content가 "document.pdf"면 원본 확장자는 "pdf"
+            let contentExt = (chatMessage.content as NSString?)?.pathExtension.lowercased() ?? ""
+            let isPDFByContent = contentExt == "pdf"
+
+            for fileUrl in chatMessage.files where !fileUrl.isEmpty {
+                let urlFileName = (fileUrl as NSString).lastPathComponent
+                let urlExt = (urlFileName as NSString).pathExtension.lowercased()
+
+                // 이미지 확장자 판별
+                let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic"]
+
+                // PDF 판별: URL 확장자가 pdf이거나, content가 .pdf로 끝나는 경우
+                let isPDF = urlExt == "pdf" || isPDFByContent
+
+                if isPDF {
+                    // 원본 파일명 사용 (content에서 가져옴, 없으면 URL에서 추출)
+                    let displayFileName = chatMessage.content ?? urlFileName
+                    files.append(ChatFileAttachment(
+                        fileName: displayFileName,
+                        fileURL: fileUrl,
+                        mimeType: "application/pdf"
+                    ))
+                } else if imageExtensions.contains(urlExt) {
+                    images.append(.remote(fileUrl))
+                } else {
+                    // 기타 파일
+                    let displayFileName = chatMessage.content ?? urlFileName
+                    let mimeType = ChatFileAttachment.mimeType(for: displayFileName)
+                    files.append(ChatFileAttachment(
+                        fileName: displayFileName,
+                        fileURL: fileUrl,
+                        mimeType: mimeType
+                    ))
+                }
+            }
+
+            // 파일 첨부 메시지인 경우 content는 표시하지 않음 (파일명만 표시)
+            // 일반 텍스트 메시지인 경우에만 content 표시
             let displayText: String?
-            if let content = chatMessage.content,
+            if !files.isEmpty {
+                // 파일 메시지: content는 파일명이므로 별도 텍스트로 표시하지 않음
+                displayText = nil
+            } else if let content = chatMessage.content,
                !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 displayText = content
             } else {
@@ -421,6 +476,7 @@ final class ChatRoomViewController: BaseViewController {
                 id: chatMessage.chatId,
                 text: displayText,
                 images: images,
+                files: files,
                 date: chatMessage.createdAt,
                 isOutgoing: isOutgoing,
                 status: chatMessage.status,
@@ -656,6 +712,32 @@ extension ChatRoomViewController: UITableViewDataSource {
             return cell
 
         case .message(let message):
+            // 파일 첨부가 있고 이미지가 없으면 파일 전용 셀 사용
+            if message.hasFiles && message.images.isEmpty {
+                guard let cell = tableView.dequeueReusableCell(
+                    withIdentifier: ChatFileMessageCell.identifier,
+                    for: indexPath
+                ) as? ChatFileMessageCell,
+                      let file = message.files.first else {
+                    return UITableViewCell()
+                }
+                cell.configure(
+                    with: file,
+                    date: message.date,
+                    isOutgoing: message.isOutgoing,
+                    showsTime: message.showsTime,
+                    opponentProfileImagePath: chatRoom.opponent.profileImage
+                )
+
+                // 파일 탭 시 뷰어로 열기 (PDF는 전용 뷰어, 그 외는 Quick Look)
+                cell.onFileTapped = { [weak self] in
+                    self?.openFile(file: file)
+                }
+
+                return cell
+            }
+
+            // 일반 메시지 셀 (텍스트, 이미지, 또는 혼합)
             guard let cell = tableView.dequeueReusableCell(
                 withIdentifier: ChatMessageCell.identifier,
                 for: indexPath
@@ -759,8 +841,27 @@ extension ChatRoomViewController: UITextViewDelegate {
 
 // MARK: - UIGestureRecognizerDelegate
 extension ChatRoomViewController: UIGestureRecognizerDelegate {
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        return !(touch.view?.isDescendant(of: inputContainerView) ?? false)
+        // inputContainerView 하위 뷰 터치는 키보드 dismiss 안함
+        if touch.view?.isDescendant(of: inputContainerView) == true {
+            return false
+        }
+
+        // 테이블뷰 영역 내 터치는 키보드 dismiss 안함 (셀의 탭 제스처 우선)
+        if touch.view?.isDescendant(of: messageTableView) == true {
+            return false
+        }
+
+        return true
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        // 테이블뷰 셀 내부 제스처는 동시 인식 허용
+        return true
     }
 }
 
@@ -920,36 +1021,292 @@ private extension ChatRoomViewController {
 // MARK: - UIDocumentPickerDelegate
 extension ChatRoomViewController: UIDocumentPickerDelegate {
 
-    /// 파일 선택 완료 시 호출
+    /// 파일 선택 완료 시 호출 → 즉시 전송 (Auto-send)
+    ///
+    /// Security Scoped Resource를 사용하여 안전하게 파일 데이터를 읽고
+    /// ViewModel을 통해 서버에 즉시 업로드합니다.
+    ///
+    /// 주요 처리:
+    /// 1. 인증 상태 사전 확인 (Keychain에서 토큰 재확인)
+    /// 2. 보안 스코프 접근으로 파일 데이터 읽기
+    /// 3. 즉시 ViewModel로 전송 (추가 UI 조작 없이)
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        for url in urls {
-            // 보안 스코프 접근 시작
-            guard url.startAccessingSecurityScopedResource() else {
-                print("❌ 파일 접근 권한 획득 실패: \(url)")
-                continue
-            }
 
-            defer {
-                // 보안 스코프 접근 종료
+        // 1. 인증 상태 사전 확인 (방어 코드)
+        // - 파일 처리 전에 먼저 로그인 상태를 확인하여 불필요한 작업 방지
+        guard let accessToken = KeychainManager.shared.read(account: "accessToken"),
+              !accessToken.isEmpty else {
+            showErrorAlert(message: "로그인이 필요합니다. 다시 로그인해주세요.")
+            return
+        }
+
+        // userId도 재확인
+        if currentUserId == nil {
+            currentUserId = KeychainManager.shared.read(account: "userId")
+        }
+
+        guard currentUserId != nil else {
+            showErrorAlert(message: "사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.")
+            return
+        }
+
+        // 2. 선택된 파일들 처리
+        for url in urls {
+            processAndSendFile(url: url)
+        }
+    }
+
+    /// 파일 URL을 처리하여 즉시 전송
+    ///
+    /// - Parameter url: 선택된 파일의 URL
+    private func processAndSendFile(url: URL) {
+        // 보안 스코프 접근 시작 (중요!)
+        // 외부 앱에서 선택한 파일은 보안 스코프 내에 있으므로
+        // 접근 권한을 명시적으로 획득해야 합니다.
+        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+
+        // defer를 사용하여 함수 종료 시 반드시 보안 스코프 접근 해제
+        defer {
+            if isSecurityScoped {
                 url.stopAccessingSecurityScopedResource()
             }
+        }
 
-            // 파일 정보 로그 출력
-            let fileName = url.lastPathComponent
-            let fileExtension = url.pathExtension.lowercased()
+        // 파일 정보 추출
+        let fileName = url.lastPathComponent
+        let mimeType = ChatFileAttachment.mimeType(for: fileName)
 
-            print("📎 선택된 파일:")
-            print("   - 파일명: \(fileName)")
-            print("   - 확장자: \(fileExtension)")
-            print("   - URL: \(url.absoluteString)")
+        print("📎 선택된 파일 (즉시 전송):")
+        print("   - 파일명: \(fileName)")
+        print("   - MIME 타입: \(mimeType)")
+        print("   - URL: \(url.absoluteString)")
 
-            // TODO: 추후 전송 로직 연결
-            // 파일을 임시 디렉토리로 복사하거나 업로드 처리
+        // 파일을 Data로 변환
+        do {
+            let fileData = try Data(contentsOf: url)
+
+            // 파일 크기 검증 (5MB 제한)
+            let maxSize = 5 * 1024 * 1024  // 5MB
+            guard fileData.count <= maxSize else {
+                let sizeInMB = Double(fileData.count) / (1024 * 1024)
+                print("❌ 파일 크기 초과: \(String(format: "%.2f", sizeInMB))MB (최대 5MB)")
+                showErrorAlert(message: "파일 크기는 5MB를 초과할 수 없습니다.\n현재 크기: \(String(format: "%.2f", sizeInMB))MB")
+                return
+            }
+
+            print("   - 크기: \(fileData.count) bytes")
+            print("📤 즉시 전송 시작...")
+
+            // ViewModel을 통해 파일 즉시 전송 (인증 헤더는 ViewModel/Repository에서 처리)
+            viewModel.sendFile(
+                data: fileData,
+                fileName: fileName,
+                mimeType: mimeType
+            ) { [weak self] success, errorMessage in
+                DispatchQueue.main.async {
+                    if success {
+                        print("✅ 파일 전송 성공: \(fileName)")
+                        self?.scrollToBottom(animated: true)
+                    } else if let error = errorMessage {
+                        print("❌ 파일 전송 실패: \(error)")
+                        self?.showErrorAlert(message: error)
+                    }
+                }
+            }
+
+        } catch {
+            print("❌ 파일 읽기 실패: \(error.localizedDescription)")
+            showErrorAlert(message: "파일을 읽는데 실패했습니다.")
         }
     }
 
     /// 파일 선택 취소 시 호출
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
         print("📎 파일 선택 취소됨")
+    }
+}
+
+// MARK: - File Viewer
+extension ChatRoomViewController {
+
+    /// 파일 열기 (파일 타입에 따라 분기)
+    ///
+    /// - PDF: PDFViewerViewController (Coordinator 사용)
+    /// - 그 외: Quick Look
+    ///
+    /// - Parameter file: 파일 첨부 정보
+    func openFile(file: ChatFileAttachment) {
+        print("📂 openFile 호출됨: \(file.fileName)")
+
+        let ext = (file.fileName as NSString).pathExtension.lowercased()
+
+        if ext == "pdf" {
+            // Coordinator 지연 초기화 (nil인 경우)
+            if chatCoordinator == nil, let nav = navigationController {
+                chatCoordinator = ChatCoordinator(
+                    navigationController: nav,
+                    chatRoomViewController: self
+                )
+            }
+
+            // PDF는 전용 뷰어로 표시 (Coordinator 사용)
+            if let coordinator = chatCoordinator {
+                print("📄 PDF 뷰어 열기: \(file.fileName)")
+                coordinator.showPDFViewer(file: file)
+            } else {
+                print("⚠️ Coordinator가 nil - Quick Look으로 대체")
+                openFileWithQuickLook(file: file)
+            }
+        } else {
+            // 다른 파일 형식은 Quick Look 사용
+            openFileWithQuickLook(file: file)
+        }
+    }
+}
+
+// MARK: - Quick Look
+extension ChatRoomViewController: QLPreviewControllerDataSource {
+
+    /// Quick Look으로 파일 열기
+    ///
+    /// 원격 파일인 경우:
+    /// 1. 데이터 다운로드
+    /// 2. 임시 폴더에 저장
+    /// 3. 로컬 URL로 Quick Look 표시
+    ///
+    /// - Parameter file: 파일 첨부 정보
+    func openFileWithQuickLook(file: ChatFileAttachment) {
+        print("📂 파일 열기 시도: \(file.fileName)")
+        print("   - URL: \(file.fileURL)")
+
+        // 원격 URL 생성 (서버 base URL + file path)
+        let baseURL = Config.baseURL
+        let fullURLString = "\(Config.baseURL)/v1\(file.fileURL)"
+
+        guard let remoteURL = URL(string: fullURLString) else {
+            showErrorAlert(message: "유효하지 않은 파일 URL입니다.")
+            return
+        }
+
+        // 로딩 인디케이터 표시
+        let loadingAlert = UIAlertController(
+            title: nil,
+            message: "파일을 불러오는 중...",
+            preferredStyle: .alert
+        )
+        let loadingIndicator = UIActivityIndicatorView(style: .medium)
+        loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        loadingIndicator.centerXAnchor.constraint(equalTo: loadingAlert.view.centerXAnchor).isActive = true
+        loadingIndicator.bottomAnchor.constraint(equalTo: loadingAlert.view.bottomAnchor, constant: -20).isActive = true
+        present(loadingAlert, animated: true)
+
+        // 파일 다운로드 및 임시 폴더에 저장
+        downloadAndSaveFile(from: remoteURL, fileName: file.fileName) { [weak self] result in
+            DispatchQueue.main.async {
+                loadingAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success(let localURL):
+                        self?.presentQuickLook(with: localURL)
+                    case .failure(let error):
+                        self?.showErrorAlert(message: "파일을 불러올 수 없습니다: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// 원격 파일 다운로드 및 임시 폴더 저장
+    ///
+    /// - Parameters:
+    ///   - url: 원격 파일 URL
+    ///   - fileName: 저장할 파일명
+    ///   - completion: 완료 핸들러 (로컬 URL 또는 에러)
+    private func downloadAndSaveFile(
+        from url: URL,
+        fileName: String,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        // 인증 헤더 추가
+        var request = URLRequest(url: url)
+        if let accessToken = KeychainManager.shared.read(account: "accessToken") {
+            request.setValue(accessToken, forHTTPHeaderField: "Authorization")
+        }
+        request.setValue(Config.apiKey, forHTTPHeaderField: "SeSACKey")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            // 에러 체크
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            // HTTP 응답 체크
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+                completion(.failure(NSError(
+                    domain: "FileDownload",
+                    code: statusCode,
+                    userInfo: [NSLocalizedDescriptionKey: "서버 응답 오류 (코드: \(statusCode))"]
+                )))
+                return
+            }
+
+            // 데이터 체크
+            guard let data = data, !data.isEmpty else {
+                completion(.failure(NSError(
+                    domain: "FileDownload",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "파일 데이터가 비어있습니다."]
+                )))
+                return
+            }
+
+            // 임시 폴더에 저장
+            let tempDirectory = FileManager.default.temporaryDirectory
+            let localURL = tempDirectory.appendingPathComponent(fileName)
+
+            do {
+                // 기존 파일 삭제 (있는 경우)
+                if FileManager.default.fileExists(atPath: localURL.path) {
+                    try FileManager.default.removeItem(at: localURL)
+                }
+
+                // 새 파일 저장
+                try data.write(to: localURL)
+                print("✅ 파일 저장 완료: \(localURL.path)")
+                completion(.success(localURL))
+
+            } catch {
+                completion(.failure(error))
+            }
+        }
+
+        task.resume()
+    }
+
+    /// Quick Look 뷰어 표시
+    ///
+    /// - Parameter localURL: 로컬 파일 URL
+    private func presentQuickLook(with localURL: URL) {
+        currentPreviewItem = localURL
+
+        let quickLookController = QLPreviewController()
+        quickLookController.dataSource = self
+        quickLookController.currentPreviewItemIndex = 0
+
+        present(quickLookController, animated: true)
+    }
+
+    // MARK: - QLPreviewControllerDataSource
+
+    func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+        return currentPreviewItem != nil ? 1 : 0
+    }
+
+    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        return (currentPreviewItem ?? URL(fileURLWithPath: "")) as QLPreviewItem
     }
 }

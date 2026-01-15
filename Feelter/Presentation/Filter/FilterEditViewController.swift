@@ -20,6 +20,7 @@ final class FilterEditViewController: BaseViewController {
 
     override func configureView() {
         super.configureView()
+        title = "EDIT"
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             image: UIImage.Icon.save,
             style: .plain,

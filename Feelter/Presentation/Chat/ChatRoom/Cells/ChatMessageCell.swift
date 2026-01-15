@@ -8,14 +8,57 @@
 import UIKit
 import SnapKit
 
+/// 파일 첨부 정보
+struct ChatFileAttachment {
+    let fileName: String
+    let fileURL: String
+    let mimeType: String
+
+    /// 파일 확장자 기반 아이콘 이름 반환
+    var iconName: String {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        switch ext {
+        case "pdf":
+            return "doc.fill"
+        case "jpg", "jpeg", "png", "gif":
+            return "photo.fill"
+        default:
+            return "doc.fill"
+        }
+    }
+
+    /// MIME 타입 판별
+    static func mimeType(for fileName: String) -> String {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        switch ext {
+        case "pdf":
+            return "application/pdf"
+        case "jpg", "jpeg":
+            return "image/jpeg"
+        case "png":
+            return "image/png"
+        case "gif":
+            return "image/gif"
+        default:
+            return "application/octet-stream"
+        }
+    }
+}
+
 struct ChatMessageViewItem {
     let id: String
     let text: String?
     let images: [ChatImageSource]
+    let files: [ChatFileAttachment]
     let date: Date
     let isOutgoing: Bool
     var status: MessageSendStatus
     var showsTime: Bool
+
+    /// 파일 첨부가 있는지 여부 (이미지 제외 파일)
+    var hasFiles: Bool {
+        return !files.isEmpty
+    }
 }
 
 enum ChatImageSource {
