@@ -80,15 +80,41 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        
+
         Messaging.messaging().apnsToken = deviceToken
         print("APNs token: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
     }
-    
+
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
         print("APNs 등록 실패: \(error)")
     }
-    
+
+    /// 포그라운드에서 푸시 알림 수신 시 호출
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let userInfo = notification.request.content.userInfo
+        print("📩 포그라운드 푸시 수신: \(userInfo)")
+
+        // 포그라운드에서도 배너, 사운드, 뱃지 표시
+        completionHandler([.banner, .sound, .badge])
+    }
+
+    /// 푸시 알림 탭 시 호출
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        print("📩 푸시 알림 탭: \(userInfo)")
+
+        // TODO: 알림 탭 시 해당 화면으로 이동 처리
+
+        completionHandler()
+    }
 }
 
 extension AppDelegate: MessagingDelegate {
@@ -113,10 +139,25 @@ extension AppDelegate: MessagingDelegate {
     }
 
     private func updateDeviceTokenToServer(_ token: String) async {
-        // TODO: 로그인 상태 확인 필요
+        // 로그인 상태 확인 (accessToken이 없으면 API 호출 불가)
+        guard let accessToken = KeychainManager.shared.read(account: "accessToken"),
+              !accessToken.isEmpty else {
+            print("⚠️ FCM 토큰 업데이트 스킵: 로그인 필요")
+            return
+        }
 
-        // TODO: 서버에 디바이스 토큰 업데이트 API 호출
-        print("FCM 토큰 서버 업데이트 필요: \(token)")
+        // 서버에 디바이스 토큰 업데이트 API 호출
+        do {
+            let requestDTO = DeviceTokenUpdateRequestDTO(deviceToken: token)
+            let networkManager = NetworkManager()
+            _ = try await networkManager.request(
+                UserRouter.updateDeviceToken(body: requestDTO),
+                type: EmptyResponse.self
+            )
+            print("✅ FCM 토큰 서버 업데이트 성공")
+        } catch {
+            print("❌ FCM 토큰 서버 업데이트 실패: \(error)")
+        }
     }
 }
 

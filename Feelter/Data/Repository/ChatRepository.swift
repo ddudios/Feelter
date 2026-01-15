@@ -36,7 +36,6 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// 현재 사용자 ID (채팅방에서 상대방 찾기 위해 필요)
     private var currentUserId: String? {
         // KeychainManager에서 userId 조회
-        // TODO: 실제 키 이름 확인 필요
         return KeychainManager.shared.read(account: "userId")
     }
 

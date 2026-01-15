@@ -61,4 +61,3 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
     }
 }
 
-struct EmptyResponse: Decodable {}
