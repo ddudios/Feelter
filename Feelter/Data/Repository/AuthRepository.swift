@@ -42,6 +42,22 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
         return response.toToken()
     }
 
+    func loginWithApple(idToken: String) async throws -> (User, AuthToken) {
+        let deviceToken = Messaging.messaging().fcmToken ?? ""
+
+        let request = AppleLoginRequestDTO(
+            idToken: idToken,
+            deviceToken: deviceToken
+        )
+
+        let response = try await networkManager.request(
+            UserRouter.appleLogin(body: request),
+            type: AuthResponseDTO.self
+        )
+
+        return (response.toDomain(), response.toToken())
+    }
+
     func logout() async throws {
         // 1. 서버에 로그아웃 요청 (실패해도 로컬 데이터는 삭제)
         do {
@@ -57,6 +73,14 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
         KeychainManager.shared.delete(account: "accessToken")
         KeychainManager.shared.delete(account: "refreshToken")
         KeychainManager.shared.delete(account: "userId")
+
+        // 3. CoreData 초기화 (채팅 데이터 삭제)
+        do {
+            try CoreDataManager.shared.deleteAll(entityName: "ChatRoomEntity")
+            try CoreDataManager.shared.deleteAll(entityName: "ChatMessageEntity")
+        } catch {
+            print("CoreData 삭제 실패: \(error.localizedDescription)")
+        }
     }
 }
 

@@ -12,7 +12,7 @@ extension CreatorDTO {
         return Creator(
             id: userId,
             nickname: nick,
-            name: name,
+            name: name ?? nick,  // Apple 로그인 시 name이 없으면 nickname 사용
             introduction: introduction ?? "",
             profileImageURL: profileImage,
             hashTags: hashTags ?? []

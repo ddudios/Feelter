@@ -8,15 +8,21 @@
 import UIKit
 import SnapKit
 import Combine
+import AuthenticationServices
 
 final class LoginViewController: BaseViewController {
 
     weak var coordinator: AuthCoordinator?
     private let viewModel: LoginViewModel
+    private let authRepository: AuthRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
 
-    init(viewModel: LoginViewModel = DIContainer.shared.resolve(LoginViewModel.self)) {
+    init(
+        viewModel: LoginViewModel = DIContainer.shared.resolve(LoginViewModel.self),
+        authRepository: AuthRepositoryProtocol = DIContainer.shared.resolve(AuthRepositoryProtocol.self)
+    ) {
         self.viewModel = viewModel
+        self.authRepository = authRepository
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -139,6 +145,28 @@ final class LoginViewController: BaseViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupSocialLoginButtons()
+    }
+
+    private func setupSocialLoginButtons() {
+        appleLoginButton.addTarget(self, action: #selector(handleAppleLoginTap), for: .touchUpInside)
+        kakaoLoginButton.addTarget(self, action: #selector(handleKakaoLoginTap), for: .touchUpInside)
+    }
+
+    @objc private func handleAppleLoginTap() {
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        let request = appleIDProvider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+
+        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
+        authorizationController.performRequests()
+    }
+
+    @objc private func handleKakaoLoginTap() {
+        // TODO: 카카오 로그인 구현
+        showAlert(message: "카카오 로그인은 준비 중입니다.")
     }
 
     override func configureHierarchy() {
@@ -242,5 +270,62 @@ final class LoginViewController: BaseViewController {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+}
+
+// MARK: - ASAuthorizationControllerDelegate
+extension LoginViewController: ASAuthorizationControllerDelegate {
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            let userIdentifier = appleIDCredential.user
+            let identityToken = appleIDCredential.identityToken
+
+            guard let identityToken = identityToken,
+                  let tokenString = String(data: identityToken, encoding: .utf8) else {
+                showAlert(message: "Apple 로그인에 실패했습니다.")
+                return
+            }
+
+            // 백엔드 API에 identityToken을 전달하여 로그인 처리
+            Task {
+                do {
+                    let result = try await authRepository.loginWithApple(idToken: tokenString)
+
+                    // 토큰 저장
+                    KeychainManager.shared.save(token: result.1.accessToken, account: "accessToken")
+                    KeychainManager.shared.save(token: result.1.refreshToken, account: "refreshToken")
+                    KeychainManager.shared.save(token: result.0.id, account: "userId")
+
+                    await MainActor.run {
+                        coordinator?.loginDidFinish()
+                    }
+                } catch let error as NetworkError {
+                    await MainActor.run {
+                        showAlert(message: error.errorDescription ?? "Apple 로그인에 실패했습니다.")
+                    }
+                } catch {
+                    await MainActor.run {
+                        showAlert(message: "Apple 로그인에 실패했습니다: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        let nsError = error as NSError
+        // 사용자가 취소한 경우 (에러 코드 1001)
+        if nsError.code == 1001 {
+            return
+        }
+
+        showAlert(message: "Apple 로그인에 실패했습니다.")
+    }
+}
+
+// MARK: - ASAuthorizationControllerPresentationContextProviding
+extension LoginViewController: ASAuthorizationControllerPresentationContextProviding {
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        return view.window!
     }
 }

@@ -79,10 +79,10 @@ final class FeedViewModel: ViewModelProtocol {
             feedFilters = []
             isLoadingMore = false
             isLoadingSubject.send(true)
-            
+
             let category = currentCategory
             let sortType = currentSortType
-            
+
             Task {
                 do {
                     let result = try await filterUsecase.fetchFilterList(
