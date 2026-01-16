@@ -43,43 +43,159 @@ final class LoginViewController: BaseViewController {
         return button
     }()
 
+    // MARK: - Social Login UI
+    private let socialLoginDividerView: UIView = {
+        let containerView = UIView()
+
+        let leftLine = UIView()
+        leftLine.backgroundColor = .Feelter.gray75
+        containerView.addSubview(leftLine)
+
+        let label = UILabel()
+        label.text = "간편 로그인"
+        label.font = TextStyle.Pretendard.caption1
+        label.textColor = .Feelter.gray75
+        label.textAlignment = .center
+        containerView.addSubview(label)
+
+        let rightLine = UIView()
+        rightLine.backgroundColor = .Feelter.gray75
+        containerView.addSubview(rightLine)
+
+        leftLine.snp.makeConstraints { make in
+            make.leading.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.height.equalTo(1)
+        }
+
+        label.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.equalTo(leftLine.snp.trailing).offset(12)
+        }
+
+        rightLine.snp.makeConstraints { make in
+            make.leading.equalTo(label.snp.trailing).offset(12)
+            make.trailing.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.height.equalTo(1)
+        }
+
+        return containerView
+    }()
+
+    private let kakaoLoginButton: UIButton = {
+        let button = UIButton()
+        button.backgroundColor = UIColor(red: 254/255, green: 229/255, blue: 0/255, alpha: 1.0) // 카카오 옐로우
+        button.layer.cornerRadius = 25
+        button.clipsToBounds = true
+
+        let logoImageView = UIImageView(image: UIImage(systemName: "message.fill"))
+        logoImageView.contentMode = .scaleAspectFit
+        logoImageView.tintColor = .Feelter.gray100
+        button.addSubview(logoImageView)
+
+        logoImageView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(24)
+        }
+
+        return button
+    }()
+
+    private let appleLoginButton: UIButton = {
+        let button = UIButton()
+        button.backgroundColor = .Feelter.gray0
+        button.layer.cornerRadius = 25
+        button.clipsToBounds = true
+
+        let logoImageView = UIImageView(image: UIImage(systemName: "apple.logo"))
+        logoImageView.contentMode = .scaleAspectFit
+        logoImageView.tintColor = .Feelter.gray100
+        button.addSubview(logoImageView)
+
+        logoImageView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(24)
+        }
+
+        return button
+    }()
+
+    private lazy var socialLoginButtonStack: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [appleLoginButton, kakaoLoginButton])
+        stackView.axis = .horizontal
+        stackView.spacing = 20
+        stackView.distribution = .fillEqually
+        return stackView
+    }()
+
+    private lazy var contentStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.alignment = .center
+        stackView.spacing = 0
+        return stackView
+    }()
+
     override func viewDidLoad() {
         super.viewDidLoad()
     }
 
     override func configureHierarchy() {
         super.configureHierarchy()
-        view.addSubview(titleLabel)
-        view.addSubview(emailTextField)
-        view.addSubview(passwordTextField)
-        view.addSubview(loginButton)
-        view.addSubview(signUpButton)
+        view.addSubview(contentStackView)
+
+        contentStackView.addArrangedSubview(titleLabel)
+        contentStackView.addArrangedSubview(emailTextField)
+        contentStackView.addArrangedSubview(passwordTextField)
+        contentStackView.addArrangedSubview(loginButton)
+        contentStackView.addArrangedSubview(signUpButton)
+        contentStackView.addArrangedSubview(socialLoginDividerView)
+        contentStackView.addArrangedSubview(socialLoginButtonStack)
+
+        // 각 요소 사이의 커스텀 간격 설정
+        contentStackView.setCustomSpacing(50, after: titleLabel)
+        contentStackView.setCustomSpacing(20, after: emailTextField)
+        contentStackView.setCustomSpacing(20, after: passwordTextField)
+        contentStackView.setCustomSpacing(10, after: loginButton)
+        contentStackView.setCustomSpacing(40, after: signUpButton)
+        contentStackView.setCustomSpacing(20, after: socialLoginDividerView)
     }
 
     override func configureLayout() {
         super.configureLayout()
-        titleLabel.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(80)
-        }
-        emailTextField.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(40)
+
+        // 메인 스택뷰 중앙 배치
+        contentStackView.snp.makeConstraints { make in
+            make.centerY.equalToSuperview()
             make.horizontalEdges.equalToSuperview().inset(40)
+        }
+
+        // 개별 요소 높이 및 너비 설정
+        emailTextField.snp.makeConstraints { make in
+            make.width.equalTo(contentStackView)
             make.height.equalTo(44)
         }
         passwordTextField.snp.makeConstraints { make in
-            make.top.equalTo(emailTextField.snp.bottom).offset(20)
-            make.horizontalEdges.equalToSuperview().inset(40)
+            make.width.equalTo(contentStackView)
             make.height.equalTo(44)
         }
         loginButton.snp.makeConstraints { make in
-            make.top.equalTo(passwordTextField.snp.bottom).offset(20)
-            make.horizontalEdges.equalToSuperview().inset(40)
+            make.width.equalTo(contentStackView)
             make.height.equalTo(44)
         }
-        signUpButton.snp.makeConstraints { make in
-            make.top.equalTo(loginButton.snp.bottom).offset(10)
-            make.centerX.equalToSuperview()
+        socialLoginDividerView.snp.makeConstraints { make in
+            make.width.equalTo(contentStackView)
+            make.height.equalTo(20)
+        }
+        socialLoginButtonStack.snp.makeConstraints { make in
+            make.height.equalTo(50)
+        }
+        appleLoginButton.snp.makeConstraints { make in
+            make.width.height.equalTo(50)
+        }
+        kakaoLoginButton.snp.makeConstraints { make in
+            make.width.height.equalTo(50)
         }
     }
 
