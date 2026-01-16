@@ -45,9 +45,8 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
     func logout() async throws {
         // 1. 서버에 로그아웃 요청 (실패해도 로컬 데이터는 삭제)
         do {
-            _ = try await networkManager.request(
-                UserRouter.logout,
-                type: EmptyResponse.self
+            try await networkManager.requestWithEmptyResponse(
+                UserRouter.logout
             )
         } catch {
             // 서버 로그아웃 실패해도 무시 (토큰 만료 등으로 인한 401은 정상)

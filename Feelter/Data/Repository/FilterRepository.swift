@@ -74,6 +74,21 @@ final class FilterRepository: FilterRepositoryProtocol {
         return response.toDetailDomain()
     }
 
+    func updateFilter(id: String, requestDTO: UpdateFilterRequestDTO) async throws -> FilterDetail {
+        let response = try await networkManager.request(
+            FilterRouter.updateFilter(id: id, body: requestDTO),
+            type: FilterDTO.self
+        )
+
+        return response.toDetailDomain()
+    }
+
+    func deleteFilter(id: String) async throws {
+        try await networkManager.requestWithEmptyResponse(
+            FilterRouter.deleteFilter(id: id)
+        )
+    }
+
     func uploadFiles(_ imageData: [Data]) async throws -> [String] {
         return try await networkManager.uploadFiles(
             imageData,

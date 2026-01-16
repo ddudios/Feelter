@@ -85,6 +85,8 @@ final class FeedViewController: BaseViewController {
     private let loadMoreSubject = PassthroughSubject<Void, Never>()
     private let likeButtonTappedSubject = PassthroughSubject<(filterId: String, isLiked: Bool), Never>()
     private let filterDetailUpdatedSubject = PassthroughSubject<FilterDetailLikeUpdate, Never>()
+    private let filterDeletedSubject = PassthroughSubject<String, Never>()
+    private let filterUpdatedSubject = PassthroughSubject<FilterDetail, Never>()
     private var cancellables = Set<AnyCancellable>()
     
     // State
@@ -142,7 +144,12 @@ final class FeedViewController: BaseViewController {
         title = "FEED"
         setupDataSource()
         bind()
+        setupNotificationObservers()
         viewDidLoadSubject.send(())
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func viewDidLayoutSubviews() {
@@ -162,6 +169,55 @@ final class FeedViewController: BaseViewController {
         }
     }
     
+    // MARK: - Notification Observers
+
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFilterDidCreate(_:)),
+            name: .filterDidCreate,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFilterDidUpdate(_:)),
+            name: .filterDidUpdate,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFilterDidDelete(_:)),
+            name: .filterDidDelete,
+            object: nil
+        )
+    }
+
+    /// 새 필터 생성 시 Feed 새로고침
+    @objc private func handleFilterDidCreate(_ notification: Notification) {
+        // 새 필터가 생성되면 목록을 새로고침하여 최신 데이터 반영
+        viewDidLoadSubject.send(())
+    }
+
+    @objc private func handleFilterDidUpdate(_ notification: Notification) {
+        guard let updatedFilter = notification.userInfo?["filter"] as? FilterDetail else {
+            return
+        }
+
+        // ViewModel에 업데이트 전달 (ViewModel이 데이터 관리)
+        filterUpdatedSubject.send(updatedFilter)
+    }
+
+    @objc private func handleFilterDidDelete(_ notification: Notification) {
+        guard let deletedFilterId = notification.userInfo?["filterId"] as? String else {
+            return
+        }
+
+        // ViewModel에 삭제 알림 (ViewModel이 데이터 관리)
+        filterDeletedSubject.send(deletedFilterId)
+    }
+
     // MARK: - Private Methods
     private func sortButtonTapped(_ sortType: FilterSortType) {
         currentSortType = sortType
@@ -206,29 +262,29 @@ final class FeedViewController: BaseViewController {
                     // 1. 컨테이너(화면) 너비
                     let containerWidth = environment.container.contentSize.width
                     guard containerWidth > 0 else { return }
-                    
+
                     // 2. 현재 가로 스크롤 상의 화면 중심 좌표 계산 (offset.x는 가로 스크롤 오프셋)
                     let visibleCenterX = offset.x + (containerWidth / 2.0)
-                    
+
                     // 3. 애니메이션이 적용될 유효 거리 (대략 아이템 너비만큼)
                     let activeDist = containerWidth * TopRankingLayout.itemWidthFraction
-                    
+
                     items.forEach { item in
                         // Cell에만 적용
                         guard item.representedElementCategory == .cell else { return }
-                        
+
                         // 4. 화면 중심과 아이템 중심 간의 거리
                         let distanceFromCenter = abs(item.frame.midX - visibleCenterX)
-                        
+
                         // 5. 거리 비율 계산 (0.0: 완전 중심, 1.0: 멀어짐)
                         // min(..., 1.0)을 통해 activeDist보다 멀면 1.0으로 고정
                         let ratio = min(distanceFromCenter / activeDist, 1.0)
-                        
+
                         // 6. Y축 이동 계산 (중심에 가까울수록 위로, 멀수록 원래 위치로)
                         // ratio 0 (중심) -> (1 - 0) * -90 = -90 (위로 이동)
                         // ratio 1 (외곽) -> (1 - 1) * -90 = 0   (원래 위치)
                         let yOffset = -TopRankingLayout.verticalOffset * (1 - ratio)
-                        
+
                         item.transform = CGAffineTransform(translationX: 0, y: yOffset)
                     }
 
@@ -432,7 +488,9 @@ final class FeedViewController: BaseViewController {
             categorySelected: categorySubject.eraseToAnyPublisher(),
             loadMore: loadMoreSubject.eraseToAnyPublisher(),
             likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher(),
-            filterDetailUpdated: filterDetailUpdatedSubject.eraseToAnyPublisher()
+            filterDetailUpdated: filterDetailUpdatedSubject.eraseToAnyPublisher(),
+            filterDeleted: filterDeletedSubject.eraseToAnyPublisher(),
+            filterUpdated: filterUpdatedSubject.eraseToAnyPublisher()
         )
         
         let output = viewModel.transform(input: input)
@@ -490,17 +548,17 @@ final class FeedViewController: BaseViewController {
     private func applySnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
         snapshot.appendSections([.topRanking, .filterFeed])
-        
+
         if !topRankingFilters.isEmpty {
             let items = topRankingLoopItems.map { Item.topRanking($0) }
             snapshot.appendItems(items, toSection: .topRanking)
         }
-        
+
         if !feedFilters.isEmpty {
             let items = feedFilters.map { Item.filterFeed($0) }
             snapshot.appendItems(items, toSection: .filterFeed)
         }
-        
+
         dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
             self?.findAndSetupTopRankingScrollView()
             self?.mainCollectionView.collectionViewLayout.invalidateLayout()

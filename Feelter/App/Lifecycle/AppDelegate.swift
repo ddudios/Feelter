@@ -150,9 +150,8 @@ extension AppDelegate: MessagingDelegate {
         do {
             let requestDTO = DeviceTokenUpdateRequestDTO(deviceToken: token)
             let networkManager = NetworkManager()
-            _ = try await networkManager.request(
-                UserRouter.updateDeviceToken(body: requestDTO),
-                type: EmptyResponse.self
+            try await networkManager.requestWithEmptyResponse(
+                UserRouter.updateDeviceToken(body: requestDTO)
             )
             print("✅ FCM 토큰 서버 업데이트 성공")
         } catch {

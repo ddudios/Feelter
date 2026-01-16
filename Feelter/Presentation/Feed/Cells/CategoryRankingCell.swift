@@ -151,13 +151,13 @@ final class CategoryRankingCell: BaseCollectionViewCell {
     // MARK: - Layout Lifecycle (✨ 해결의 핵심)
     override func layoutSubviews() {
         super.layoutSubviews()
-        
+
         // 1. 제약조건을 강제로 프레임으로 변환 (타이밍 문제 해결 1차)
         contentView.layoutIfNeeded()
-        
+
         // 2. Corner Radius 적용
         applyCornerRadius()
-        
+
         // 3. (안전장치) 아주 가끔 layoutIfNeeded로도 프레임이 안 잡히는 첫 로딩 순간을 위해
         //    다음 런루프에서 한 번 더 적용 (타이밍 문제 해결 2차)
         DispatchQueue.main.async { [weak self] in

@@ -11,8 +11,24 @@ import PhotosUI
 import Photos
 import ImageIO
 import UniformTypeIdentifiers
+import Combine
+import Kingfisher
 
 final class FilterMakeViewController: BaseViewController {
+
+    // MARK: - Properties
+
+    private let mode: FilterEditorMode
+    private let viewModel: FilterMakeViewModel
+    private var cancellables = Set<AnyCancellable>()
+
+    /// 수정 완료 후 업데이트된 데이터를 전달하는 클로저
+    var onUpdateComplete: ((FilterDetail) -> Void)?
+
+    private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
+    private let saveButtonTappedSubject = PassthroughSubject<FilterMakeViewModel.ValidatedFilterInput, Never>()
+
+    // MARK: - Layout Constants
 
     private enum Layout {
         static let horizontalInset: CGFloat = 20
@@ -100,7 +116,7 @@ final class FilterMakeViewController: BaseViewController {
 
     private let priceTitleLabel = SectionTitleLabel(title: "판매 가격")
     private let priceTextField = FeelterTextField(
-        placeholder: "1,000",
+        placeholder: "100",
         textContentType: nil,
         keyboardType: .numberPad
     )
@@ -117,11 +133,29 @@ final class FilterMakeViewController: BaseViewController {
         action: #selector(backgroundTapped)
     )
 
+    // MARK: - Initializer
+
+    init(
+        mode: FilterEditorMode = .create,
+        viewModel: FilterMakeViewModel? = nil
+    ) {
+        self.mode = mode
+        self.viewModel = viewModel ?? FilterMakeViewModel(mode: mode)
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "MAKE"
+        title = mode.navigationTitle
         setupKeyboardObservers()
+        bindViewModel()
+        viewDidLoadSubject.send(())
     }
 
     deinit {
@@ -240,6 +274,23 @@ final class FilterMakeViewController: BaseViewController {
         metadataCell.configure(metadata: .empty)
         photoTitleSpacerView.setContentHuggingPriority(.defaultLow, for: .horizontal)
         photoTitleSpacerView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        // 수정 모드 UI 제한 적용
+        configureEditModeRestrictions()
+    }
+
+    /// 수정 모드일 때 이미지/필터값 변경 불가 처리
+    private func configureEditModeRestrictions() {
+        guard mode.isEditMode else { return }
+
+        // 1. 이미지 업로드 버튼 인터랙션 차단
+        photoUploadButton.isUserInteractionEnabled = false
+
+        // 2. 필터 편집(수정하기) 버튼 숨김
+        photoEditButton.isHidden = true
+
+        // 3. 이미지 영역 시각적 표시 (고정 상태임을 알림)
+        photoUploadButton.alpha = 0.8
     }
 
     private func setupCategoryButtons() {
@@ -298,6 +349,115 @@ final class FilterMakeViewController: BaseViewController {
         )
     }
 
+    // MARK: - ViewModel Binding
+
+    private func bindViewModel() {
+        let input = FilterMakeViewModel.Input(
+            viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
+            saveButtonTapped: saveButtonTappedSubject.eraseToAnyPublisher()
+        )
+
+        let output = viewModel.transform(input: input)
+
+        // 수정 모드일 때 기존 데이터로 폼 채우기
+        output.prefilledData
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] data in
+                self?.prefillForm(with: data)
+            }
+            .store(in: &cancellables)
+
+        // 저장 결과 처리
+        output.saveResult
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] result in
+                switch result {
+                case .success(let filterDetail):
+                    self?.handleSaveSuccess(filterDetail: filterDetail)
+                case .failure(let error):
+                    self?.showAlert(message: "저장에 실패했습니다.\n\(error.localizedDescription)")
+                }
+            }
+            .store(in: &cancellables)
+
+        // 로딩 상태 처리
+        output.isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                self?.navigationItem.rightBarButtonItem?.isEnabled = !isLoading
+            }
+            .store(in: &cancellables)
+    }
+
+    private func prefillForm(with data: FilterMakeViewModel.PrefilledFormData) {
+        filterNameTextField.text = data.title
+        descriptionTextField.text = data.description
+        priceTextField.text = formatPriceText(from: String(data.price))
+
+        // 카테고리 선택
+        categoryButtons.forEach { button in
+            button.isSelected = (button.titleLabel?.text == data.category)
+        }
+
+        // 기존 이미지 로드
+        if let imageURLString = data.previewImageURL,
+           let imageURL = URL(string: imageURLString) {
+            loadExistingImage(from: imageURL)
+        }
+
+        // 메타데이터 설정
+        if let metadata = data.metadata {
+            currentPhotoMetadata = metadata
+            metadataCell.configure(metadata: metadata)
+            metadataCell.isHidden = false
+        }
+    }
+
+    private func loadExistingImage(from url: URL) {
+        // 상대 경로를 완전한 URL로 변환 (UIImageView+Extension과 동일한 방식)
+        let path = url.scheme == nil ? url.path : url.absoluteString
+        let fullPath = "\(Config.baseURL)/v1\(path)"
+
+        guard let fullURL = URL(string: fullPath) else { return }
+
+        KingfisherManager.shared.retrieveImage(with: fullURL) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let imageResult):
+                Task { @MainActor in
+                    self.updatePhotoUploadButton(with: imageResult.image)
+                }
+            case .failure:
+                break
+            }
+        }
+    }
+
+    private func handleSaveSuccess(filterDetail: FilterDetail) {
+        print("🟡 [FilterMake] handleSaveSuccess 호출")
+        print("🟡 [FilterMake] isEditMode: \(mode.isEditMode)")
+        print("🟡 [FilterMake] filterDetail.id: \(filterDetail.id)")
+        print("🟡 [FilterMake] filterDetail.title: \(filterDetail.title)")
+
+        if mode.isEditMode {
+            // 수정 모드: 업데이트된 데이터 전달 후 이전 화면으로 돌아가기
+            print("🟡 [FilterMake] 수정 모드 - onUpdateComplete 클로저 호출")
+            onUpdateComplete?(filterDetail)
+            print("🟡 [FilterMake] popViewController 호출")
+            navigationController?.popViewController(animated: true)
+        } else {
+            // 생성 모드: Feed에 새 필터 알림 후 상세 화면으로 이동
+            print("🟡 [FilterMake] 생성 모드 - filterDidCreate 알림 전송")
+            NotificationCenter.default.post(
+                name: .filterDidCreate,
+                object: nil,
+                userInfo: ["filter": filterDetail]
+            )
+            navigateToFilterDetail(filterDetail: filterDetail)
+        }
+    }
+
     private func scrollToVisible(_ view: UIView, animated: Bool = true) {
         let rect = view.convert(view.bounds, to: scrollView)
         let targetRect = rect.insetBy(dx: 0, dy: -Layout.labelSpacing)
@@ -314,70 +474,41 @@ final class FilterMakeViewController: BaseViewController {
 
         switch validationResult {
         case .success(let validatedInput):
-            createFilter(with: validatedInput)
+            // ViewModel로 입력값 전달
+            let viewModelInput = FilterMakeViewModel.ValidatedFilterInput(
+                title: validatedInput.title,
+                category: validatedInput.category,
+                description: validatedInput.description,
+                price: validatedInput.price,
+                photo: validatedInput.photo,
+                metadata: validatedInput.metadata
+            )
+            saveButtonTappedSubject.send(viewModelInput)
 
         case .failure(let error):
             showAlert(message: error.message)
         }
     }
 
-    private func createFilter(with input: ValidatedFilterInput) {
-        // Show loading state
-        navigationItem.rightBarButtonItem?.isEnabled = false
+    private func navigateToFilterDetail(filterDetail: FilterDetail) {
+        let filterDetailVC = FilterDetailViewController(filterId: filterDetail.id)
 
-        Task {
-            do {
-                // 1. Convert UIImage to Data (JPEG)
-                guard let imageData = input.photo.jpegData(compressionQuality: 0.8) else {
-                    throw NSError(domain: "FilterMakeViewController", code: -1, userInfo: [
-                        NSLocalizedDescriptionKey: "이미지 변환에 실패했습니다."
-                    ])
-                }
-
-                // 2. Upload files (original and filtered - same image for now)
-                let repository = DIContainer.shared.resolve(FilterRepositoryProtocol.self)
-                let fileURLs = try await repository.uploadFiles([imageData, imageData])
-
-                // 3. Map PhotoMetadata to DTO
-                let photoMetadataDTO = input.metadata.toDTO()
-
-                // 4. Use default filter values (FilterEditViewController not implemented yet)
-                let filterValues = FilterValues.default
-                let filterValuesDTO = filterValues.toDTO()
-
-                // 5. Create request DTO
-                let requestDTO = CreateFilterRequestDTO(
-                    category: input.category,
-                    title: input.title,
-                    price: input.price,
-                    description: input.description,
-                    files: fileURLs,
-                    photoMetadata: photoMetadataDTO,
-                    filterValues: filterValuesDTO
-                )
-
-                // 6. Call API
-                let createdFilter = try await repository.createFilter(requestDTO: requestDTO)
-
-                // 7. Handle success - Navigate to FilterDetailViewController
-                await MainActor.run {
-                    navigationItem.rightBarButtonItem?.isEnabled = true
-                    navigateToFilterDetail(filterId: createdFilter.id)
-                }
-
-            } catch {
-                // 8. Handle error
-                await MainActor.run {
-                    navigationItem.rightBarButtonItem?.isEnabled = true
-                    showAlert(message: "필터 생성에 실패했습니다.\n\(error.localizedDescription)")
-                }
-            }
+        // 네비게이션 스택 정리: 현재 MakeVC를 새로운 빈 MakeVC로 교체
+        // [RootVC, ..., MakeVC(filled)] -> [RootVC, ..., MakeVC(empty), DetailVC]
+        // DetailVC에서 뒤로가기 시 빈 MakeVC로 돌아가서 새 게시글 작성 가능
+        guard var viewControllers = navigationController?.viewControllers else {
+            navigationController?.pushViewController(filterDetailVC, animated: true)
+            return
         }
-    }
 
-    private func navigateToFilterDetail(filterId: String) {
-        let filterDetailVC = FilterDetailViewController(filterId: filterId)
-        navigationController?.pushViewController(filterDetailVC, animated: true)
+        // 현재 MakeVC (마지막 VC)를 새로운 빈 MakeVC로 교체
+        viewControllers.removeLast()
+        let newMakeVC = FilterMakeViewController(mode: .create)
+        viewControllers.append(newMakeVC)
+        // DetailVC 추가
+        viewControllers.append(filterDetailVC)
+        // 스택 교체 (애니메이션으로 DetailVC 표시)
+        navigationController?.setViewControllers(viewControllers, animated: true)
     }
 
     @objc private func photoUploadButtonTapped() {
@@ -460,6 +591,9 @@ final class FilterMakeViewController: BaseViewController {
 
     @MainActor
     private func updatePhotoUploadButton(with image: UIImage) {
+        print("🟡 [FilterMake-Edit] updatePhotoUploadButton 시작")
+        print("🟡 [FilterMake-Edit] 이미지 크기: \(image.size)")
+
         selectedPhotoImage = image
         photoUploadButton.setBackgroundImage(nil, for: .normal)
         photoUploadButton.setImage(image, for: .normal)
@@ -467,16 +601,31 @@ final class FilterMakeViewController: BaseViewController {
         photoUploadButton.contentHorizontalAlignment = .fill
         photoUploadButton.contentVerticalAlignment = .fill
         photoUploadButton.clipsToBounds = true
+
+        print("🟡 [FilterMake-Edit] 이미지 설정 완료, applyPhotoSelectionLayout 호출")
         applyPhotoSelectionLayout()
     }
 
     @MainActor
     private func applyPhotoSelectionLayout() {
-        photoEditButton.isHidden = false
+        print("🟡 [FilterMake-Edit] applyPhotoSelectionLayout 시작")
+        print("🟡 [FilterMake-Edit] isEditMode: \(mode.isEditMode)")
+
+        // 수정 모드가 아닐 때만 수정하기 버튼 표시
+        if !mode.isEditMode {
+            photoEditButton.isHidden = false
+            print("🟡 [FilterMake-Edit] photoEditButton 표시")
+        } else {
+            print("🟡 [FilterMake-Edit] 수정 모드이므로 photoEditButton 숨김")
+        }
+
         metadataCell.isHidden = false
         photoUploadButtonHeightConstraint?.deactivate()
         photoUploadButtonSquareConstraint?.isActive = true
+
+        print("🟡 [FilterMake-Edit] 레이아웃 제약 변경 완료, layoutIfNeeded 호출")
         view.layoutIfNeeded()
+        print("🟡 [FilterMake-Edit] applyPhotoSelectionLayout 완료")
     }
 
     @MainActor
@@ -502,7 +651,7 @@ final class FilterMakeViewController: BaseViewController {
             case .emptyDescription:
                 return "필터 소개를 입력해주세요."
             case .invalidPrice:
-                return "가격은 1,000원 이상이어야 합니다."
+                return "가격은 100원 이상이어야 합니다."
             case .noPhotoSelected:
                 return "대표 사진을 선택해주세요."
             }
@@ -536,17 +685,25 @@ final class FilterMakeViewController: BaseViewController {
             return .failure(.emptyDescription)
         }
 
-        // 4. Price validation
+        // 4. Price validation (100원 이상)
         guard let priceText = priceTextField.text?.filter({ $0.isNumber }),
               !priceText.isEmpty,
               let price = Int(priceText),
-              price >= 1000 else {
+              price >= 100 else {
             return .failure(.invalidPrice)
         }
 
-        // 5. Photo validation
-        guard let photo = selectedPhotoImage else {
-            return .failure(.noPhotoSelected)
+        // 5. Photo validation (수정 모드에서는 기존 이미지 사용, 새 사진 불필요)
+        let photo: UIImage
+        if mode.isEditMode {
+            // 수정 모드: 기존 이미지가 있으면 사용, 없으면 더미 이미지 (실제 업로드하지 않음)
+            photo = selectedPhotoImage ?? UIImage()
+        } else {
+            // 생성 모드: 사진 필수
+            guard let selectedPhoto = selectedPhotoImage else {
+                return .failure(.noPhotoSelected)
+            }
+            photo = selectedPhoto
         }
 
         // 6. Metadata (use .empty if not extracted)

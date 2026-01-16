@@ -117,6 +117,15 @@ final class FilterDetailViewController: BaseViewController {
             action: #selector(likeButtonTapped)
         )
     }()
+
+    private lazy var moreBarButtonItem: UIBarButtonItem = {
+        UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis"),
+            style: .plain,
+            target: self,
+            action: #selector(moreButtonTapped)
+        )
+    }()
     
     // MARK: - Initializer
     
@@ -229,6 +238,7 @@ final class FilterDetailViewController: BaseViewController {
                 self?.reconfigureCreatorSection()
 
                 self?.bindPaymentViewModelIfNeeded()
+                self?.updateNavigationBarButton(for: filter)
             }
             .store(in: &cancellables)
 
@@ -311,7 +321,142 @@ final class FilterDetailViewController: BaseViewController {
     @objc private func likeButtonTapped() {
         likeButtonTappedSubject.send(())
     }
-    
+
+    @objc private func moreButtonTapped() {
+        showMoreActionSheet()
+    }
+
+    private func updateNavigationBarButton(for filter: FilterDetail) {
+        let currentUserId = KeychainManager.shared.read(account: "userId")
+        let isOwnFilter = currentUserId == filter.creator.id
+
+        if isOwnFilter {
+            navigationItem.rightBarButtonItem = moreBarButtonItem
+        } else {
+            navigationItem.rightBarButtonItem = likeBarButtonItem
+            updateLikeButton(isLiked: filter.isLiked)
+        }
+    }
+
+    private func showMoreActionSheet() {
+        let actionSheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        let editAction = UIAlertAction(title: "수정", style: .default) { [weak self] _ in
+            self?.handleEditFilter()
+        }
+
+        let deleteAction = UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            self?.showDeleteConfirmation()
+        }
+
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        actionSheet.addAction(editAction)
+        actionSheet.addAction(deleteAction)
+        actionSheet.addAction(cancelAction)
+
+        // iPad 대응
+        if let popover = actionSheet.popoverPresentationController {
+            popover.barButtonItem = moreBarButtonItem
+        }
+
+        present(actionSheet, animated: true)
+    }
+
+    private func handleEditFilter() {
+        guard let filterDetail = currentFilterDetail else { return }
+
+        print("🟠 [FilterDetail-Edit] handleEditFilter 호출")
+        print("🟠 [FilterDetail-Edit] filterId: \(filterDetail.id)")
+        print("🟠 [FilterDetail-Edit] title: \(filterDetail.title)")
+
+        let filterMakeVC = FilterMakeViewController(mode: .edit(filterDetail))
+
+        // 수정 완료 시 로컬 UI 업데이트 (네트워크 재호출 없이)
+        filterMakeVC.onUpdateComplete = { [weak self] updatedFilter in
+            print("🟠 [FilterDetail-Edit] onUpdateComplete 호출됨")
+            print("🟠 [FilterDetail-Edit] 업데이트된 title: \(updatedFilter.title)")
+
+            self?.updateLocalFilterDetail(updatedFilter)
+
+            // Feed 화면에도 업데이트 알림
+            print("🟠 [FilterDetail-Edit] NotificationCenter에 filterDidUpdate 전송")
+            NotificationCenter.default.post(
+                name: .filterDidUpdate,
+                object: nil,
+                userInfo: ["filter": updatedFilter]
+            )
+            print("🟠 [FilterDetail-Edit] 알림 전송 완료")
+        }
+
+        navigationController?.pushViewController(filterMakeVC, animated: true)
+    }
+
+    /// 로컬에서 필터 데이터 업데이트 (네트워크 재호출 없이 UI 갱신)
+    private func updateLocalFilterDetail(_ filter: FilterDetail) {
+        currentFilterDetail = filter
+        title = filter.title
+
+        reconfigurePreviewSection()
+        reconfigureMetadataSection()
+        reconfigurePresetsSection()
+        reconfigurePurchaseSection()
+        reconfigureCreatorSection()
+    }
+
+    private func showDeleteConfirmation() {
+        let alert = UIAlertController(
+            title: "필터 삭제",
+            message: "이 필터를 삭제하시겠습니까?\n삭제된 필터는 복구할 수 없습니다.",
+            preferredStyle: .alert
+        )
+
+        let deleteAction = UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            self?.deleteFilter()
+        }
+
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        alert.addAction(cancelAction)
+        alert.addAction(deleteAction)
+
+        present(alert, animated: true)
+    }
+
+    private func deleteFilter() {
+        guard let filterDetail = currentFilterDetail else { return }
+
+        showLoadingIndicator(message: "삭제 중...")
+
+        Task {
+            do {
+                let repository = DIContainer.shared.resolve(FilterRepositoryProtocol.self)
+                try await repository.deleteFilter(id: filterDetail.id)
+
+                await MainActor.run {
+                    hideLoadingIndicator()
+
+                    // Feed 화면에 삭제 알림
+                    NotificationCenter.default.post(
+                        name: .filterDidDelete,
+                        object: nil,
+                        userInfo: ["filterId": filterDetail.id]
+                    )
+
+                    // 알림 처리가 완료된 후 화면 닫기
+                    DispatchQueue.main.async { [weak self] in
+                        self?.navigationController?.popViewController(animated: true)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    hideLoadingIndicator()
+                    showAlert(message: "필터 삭제에 실패했습니다.\n\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
     private func showAlert(message: String) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
@@ -326,6 +471,7 @@ final class FilterDetailViewController: BaseViewController {
             let estimatedHeight: CGFloat
             let topInset: CGFloat
             let bottomInset: CGFloat
+            var horizontalInset: CGFloat = 0
 
             switch sectionType {
             case .preview:
@@ -336,6 +482,7 @@ final class FilterDetailViewController: BaseViewController {
                 estimatedHeight = 140
                 topInset = 0
                 bottomInset = 16
+                horizontalInset = 20
             case .presets:
                 estimatedHeight = 200
                 topInset = 0
@@ -355,7 +502,12 @@ final class FilterDetailViewController: BaseViewController {
             let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .estimated(estimatedHeight))
             let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
             let section = NSCollectionLayoutSection(group: group)
-            section.contentInsets = NSDirectionalEdgeInsets(top: topInset, leading: 0, bottom: bottomInset, trailing: 0)
+            section.contentInsets = NSDirectionalEdgeInsets(
+                            top: topInset,
+                            leading: horizontalInset,
+                            bottom: bottomInset,
+                            trailing: horizontalInset
+                        )
             return section
         }
     }

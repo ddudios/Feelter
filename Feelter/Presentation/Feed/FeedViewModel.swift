@@ -23,6 +23,8 @@ final class FeedViewModel: ViewModelProtocol {
         let loadMore: AnyPublisher<Void, Never>
         let likeButtonTapped: AnyPublisher<(filterId: String, isLiked: Bool), Never>
         let filterDetailUpdated: AnyPublisher<FilterDetailLikeUpdate, Never>
+        let filterDeleted: AnyPublisher<String, Never>
+        let filterUpdated: AnyPublisher<FilterDetail, Never>
     }
     
     struct Output {
@@ -272,6 +274,90 @@ final class FeedViewModel: ViewModelProtocol {
                 var didUpdateTopRanking = false
                 if let index = self.topRankingFilters.firstIndex(where: { $0.id == update.filterId }) {
                     self.topRankingFilters[index] = updatedFilter(self.topRankingFilters[index])
+                    didUpdateTopRanking = true
+                }
+
+                if didUpdateFeed {
+                    feedFiltersSubject.send(self.feedFilters)
+                }
+
+                if didUpdateTopRanking {
+                    topRankingSubject.send(self.topRankingFilters)
+                }
+            }
+            .store(in: &cancellables)
+
+        input.filterDeleted
+            .sink { [weak self] deletedFilterId in
+                guard let self = self else { return }
+
+                var didUpdateFeed = false
+                if self.feedFilters.contains(where: { $0.id == deletedFilterId }) {
+                    self.feedFilters.removeAll { $0.id == deletedFilterId }
+                    didUpdateFeed = true
+                }
+
+                var didUpdateTopRanking = false
+                if self.topRankingFilters.contains(where: { $0.id == deletedFilterId }) {
+                    self.topRankingFilters.removeAll { $0.id == deletedFilterId }
+                    didUpdateTopRanking = true
+                }
+
+                if didUpdateFeed {
+                    feedFiltersSubject.send(self.feedFilters)
+                }
+
+                if didUpdateTopRanking {
+                    topRankingSubject.send(self.topRankingFilters)
+                }
+            }
+            .store(in: &cancellables)
+
+        input.filterUpdated
+            .sink { [weak self] updatedFilter in
+                guard let self = self else { return }
+
+                var didUpdateFeed = false
+                if let index = self.feedFilters.firstIndex(where: { $0.id == updatedFilter.id }) {
+                    let existingFilter = self.feedFilters[index]
+
+                    // 카테고리가 변경되었고 현재 카테고리와 다르면 제거
+                    if updatedFilter.category != self.currentCategory {
+                        self.feedFilters.remove(at: index)
+                        didUpdateFeed = true
+                    } else {
+                        // 같은 카테고리면 업데이트
+                        self.feedFilters[index] = FilterSummary(
+                            id: updatedFilter.id,
+                            category: updatedFilter.category,
+                            title: updatedFilter.title,
+                            description: updatedFilter.description,
+                            mainImageURL: updatedFilter.previewImages.first ?? existingFilter.mainImageURL,
+                            creator: updatedFilter.creator,
+                            photographerName: existingFilter.photographerName,
+                            likeCount: updatedFilter.likeCount,
+                            isLiked: updatedFilter.isLiked,
+                            createdAt: existingFilter.createdAt
+                        )
+                        didUpdateFeed = true
+                    }
+                }
+
+                var didUpdateTopRanking = false
+                if let index = self.topRankingFilters.firstIndex(where: { $0.id == updatedFilter.id }) {
+                    let existingFilter = self.topRankingFilters[index]
+                    self.topRankingFilters[index] = FilterSummary(
+                        id: updatedFilter.id,
+                        category: updatedFilter.category,
+                        title: updatedFilter.title,
+                        description: updatedFilter.description,
+                        mainImageURL: updatedFilter.previewImages.first ?? existingFilter.mainImageURL,
+                        creator: updatedFilter.creator,
+                        photographerName: existingFilter.photographerName,
+                        likeCount: updatedFilter.likeCount,
+                        isLiked: updatedFilter.isLiked,
+                        createdAt: existingFilter.createdAt
+                    )
                     didUpdateTopRanking = true
                 }
 

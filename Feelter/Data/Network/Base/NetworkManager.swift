@@ -11,6 +11,9 @@ import Alamofire
 protocol NetworkManagerProtocol {
     func request<T: Decodable, R: URLRequestConvertible>(_ endpoint: R, type: T.Type) async throws -> T
 
+    /// 응답 Body가 없는 API 요청용 (DELETE 등)
+    func requestWithEmptyResponse<R: URLRequestConvertible>(_ endpoint: R) async throws
+
     // 설정 기반 파일 업로드
     func uploadFiles(_ dataList: [Data], config: FileUploadConfig, endpoint: URLRequestConvertible) async throws -> [String]
 
@@ -30,17 +33,36 @@ final class NetworkManager: NetworkManagerProtocol {
     
     // 3. R: Router(URLRequestConvertible 채택), T: 응답받을 DTO 타입
     func request<T: Decodable, R: URLRequestConvertible>(_ endpoint: R, type: T.Type) async throws -> T {
-        
+
         // Alamofire의 async/await 기능 활용
         let dataTask = session.request(endpoint)
             .validate() // 200~299 상태코드 확인
             .serializingDecodable(T.self)  // Data -> Struct/Class(Decodable) -> success/failure CompletionHandler아닌 async/await를 통해 T객체 리턴
-            
+
         let response = await dataTask.response
-        
+
         switch response.result {
         case .success(let value):
             return value
+
+        case .failure(let error):
+            throw parseError(error, response: response.response, data: response.data)
+        }
+    }
+
+    // 3-1. 응답 Body가 없는 API 요청용 (DELETE 등)
+    /// 상태코드가 200번대이면 성공, Body 디코딩을 시도하지 않음
+    func requestWithEmptyResponse<R: URLRequestConvertible>(_ endpoint: R) async throws {
+        let dataTask = session.request(endpoint)
+            .validate() // 200~299 상태코드 확인
+            .serializingData(emptyResponseCodes: [200, 201, 204]) // 빈 응답 허용
+
+        let response = await dataTask.response
+
+        switch response.result {
+        case .success:
+            // 성공 - 아무것도 반환하지 않음
+            return
 
         case .failure(let error):
             throw parseError(error, response: response.response, data: response.data)
