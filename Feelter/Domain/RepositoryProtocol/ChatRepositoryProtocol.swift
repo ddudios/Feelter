@@ -155,6 +155,25 @@ protocol ChatRepositoryProtocol {
     /// - Throws: CoreData 에러
     func deleteMessage(chatId: String) async throws
 
+    /// 특정 채팅방의 실패한 메시지 조회
+    ///
+    /// 조건:
+    /// - status가 .failed인 메시지만
+    /// - 24시간 이내
+    /// - 최근 20개까지
+    /// - createdAt 오름차순 (FIFO)
+    ///
+    /// - Parameter roomId: 채팅방 ID
+    /// - Returns: 실패한 메시지 배열
+    /// - Throws: CoreData 에러
+    func fetchFailedMessages(roomId: String) async throws -> [ChatMessage]
+
+    /// 특정 채팅방에 실패한 메시지가 있는지 확인
+    ///
+    /// - Parameter roomId: 채팅방 ID
+    /// - Returns: 실패한 메시지가 있으면 true
+    func hasFailedMessages(roomId: String) -> Bool
+
     /// 전송 실패한 메시지 재전송
     /// 1. CoreData에서 해당 메시지 조회 (status: .failed)
     /// 2. status를 .sending으로 변경

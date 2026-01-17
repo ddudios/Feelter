@@ -257,9 +257,15 @@ extension ChatRoomListViewController: UITableViewDataSource {
         }
 
         let chatRoom = chatRooms[indexPath.row]
+        let hasFailedMessages = viewModel.hasFailedMessages(roomId: chatRoom.roomId)
         // TODO: 읽지 않은 메시지 개수 계산 (Repository에서 가져와야 함)
         // 일단은 0을 전달하여 "N"으로 표시
-        cell.configure(with: chatRoom, currentUserId: currentUserId, unreadCount: 0)
+        cell.configure(
+            with: chatRoom,
+            currentUserId: currentUserId,
+            unreadCount: 0,
+            hasFailedMessages: hasFailedMessages
+        )
         return cell
     }
 }

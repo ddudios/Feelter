@@ -153,4 +153,14 @@ final class ChatRoomListViewModel {
             }
             .store(in: &cancellables)
     }
+
+    // MARK: - Public Methods
+
+    /// 특정 채팅방에 실패한 메시지가 있는지 확인
+    ///
+    /// - Parameter roomId: 채팅방 ID
+    /// - Returns: 실패한 메시지가 있으면 true
+    func hasFailedMessages(roomId: String) -> Bool {
+        return repository.hasFailedMessages(roomId: roomId)
+    }
 }

@@ -408,6 +408,63 @@ final class ChatRepository: ChatRepositoryProtocol {
         // 대신 삭제만 하고, observeMessages가 자동으로 갱신함
     }
 
+    /// 특정 채팅방의 실패한 메시지 조회
+    ///
+    /// 조건:
+    /// - status가 .failed인 메시지만
+    /// - 24시간 이내
+    /// - 최근 20개까지
+    /// - createdAt 오름차순 (FIFO - 오래된 것부터)
+    ///
+    /// - Parameter roomId: 채팅방 ID
+    /// - Returns: 실패한 메시지 배열
+    /// - Throws: CoreData 에러
+    func fetchFailedMessages(roomId: String) async throws -> [ChatMessage] {
+        let fetchRequest = ChatMessageEntity.fetchRequest()
+
+        // 24시간 이내
+        let twentyFourHoursAgo = Date().addingTimeInterval(-24 * 60 * 60)
+
+        // 조건: roomId 일치, status가 failed, 24시간 이내
+        fetchRequest.predicate = NSPredicate(
+            format: "roomId == %@ AND status == %@ AND createdAt >= %@",
+            roomId,
+            MessageSendStatus.failed.rawValue,
+            twentyFourHoursAgo as NSDate
+        )
+
+        // 정렬: createdAt 오름차순 (FIFO - 오래된 것부터)
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+
+        // 최대 20개
+        fetchRequest.fetchLimit = 20
+
+        let results = try coreDataManager.viewContext.fetch(fetchRequest)
+
+        return results.map { $0.toDomain() }
+    }
+
+    /// 특정 채팅방에 실패한 메시지가 있는지 확인
+    ///
+    /// - Parameter roomId: 채팅방 ID
+    /// - Returns: 실패한 메시지가 있으면 true
+    func hasFailedMessages(roomId: String) -> Bool {
+        let fetchRequest = ChatMessageEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(
+            format: "roomId == %@ AND status == %@",
+            roomId,
+            MessageSendStatus.failed.rawValue
+        )
+        fetchRequest.fetchLimit = 1
+
+        do {
+            let count = try coreDataManager.viewContext.count(for: fetchRequest)
+            return count > 0
+        } catch {
+            return false
+        }
+    }
+
     /// 실패한 메시지 재전송
     ///
     /// - Parameter chatId: 재전송할 메시지 ID

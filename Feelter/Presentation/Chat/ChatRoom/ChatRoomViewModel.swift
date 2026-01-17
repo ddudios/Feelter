@@ -69,6 +69,12 @@ final class ChatRoomViewModel {
     /// 스크롤 트리거 (재전송 시에도 사용)
     private let scrollToBottomSubject = PassthroughSubject<Void, Never>()
 
+    /// 메시지 전송 대기열 관리자
+    private let queueManager = MessageQueueManager()
+
+    /// 네트워크 모니터
+    private let networkMonitor = NetworkMonitor.shared
+
     // MARK: - Initialization
 
     init(
@@ -92,6 +98,9 @@ final class ChatRoomViewModel {
 
         // Repository의 실시간 업데이트 구독
         setupRealtimeUpdates()
+
+        // 네트워크 재연결 감지 구독
+        setupNetworkMonitoring()
     }
 
     // MARK: - Transform
@@ -118,7 +127,7 @@ final class ChatRoomViewModel {
             .map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .eraseToAnyPublisher()
 
-        // viewDidLoad: 채팅 내역 로드 + Socket 연결
+        // viewDidLoad: 채팅 내역 로드 + Socket 연결 + 자동 재전송
         input.viewDidLoad
             .sink { [weak self] in
                 guard let self = self else { return }
@@ -135,6 +144,13 @@ final class ChatRoomViewModel {
                 // 3. 마지막 읽은 시간 업데이트
                 Task {
                     try? await self.repository.updateLastReadDate(roomId: self.roomId)
+                }
+
+                // 4. 실패한 메시지 자동 재전송 (네트워크 연결되어 있을 때만)
+                if self.networkMonitor.isConnected {
+                    Task {
+                        await self.retryFailedMessages()
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -216,9 +232,10 @@ final class ChatRoomViewModel {
     /// 1. 전송 중 상태 시작
     /// 2. 텍스트만 있거나, 텍스트+이미지가 있을 때만 전송
     /// 3. 이미지만 보내는 것은 차단
-    /// 4. 성공: 스크롤
-    /// 5. 실패: 에러 표시
-    /// 6. 전송 중 상태 종료
+    /// 4. 대기열이 비어있으면 바로 전송, 아니면 대기열에 추가
+    /// 5. 성공: 스크롤
+    /// 6. 실패: 에러 표시
+    /// 7. 전송 중 상태 종료
     ///
     private func sendMessage(
         text: String,
@@ -243,27 +260,41 @@ final class ChatRoomViewModel {
                     return
                 }
 
-                // 1. 텍스트 메시지 전송 (이미지 포함 여부와 관계없이)
+                var fileUrls: [String] = []
+
+                // 1. 이미지가 있으면 업로드
                 if hasImages {
                     // UIImage -> Data 변환
                     let imageDataArray = images.compactMap { $0.jpegData(compressionQuality: 0.8) }
 
                     // Repository의 uploadFiles 메서드 호출
-                    let fileUrls = try await repository.uploadFiles(roomId: roomId, imageData: imageDataArray)
+                    fileUrls = try await repository.uploadFiles(roomId: roomId, imageData: imageDataArray)
+                }
 
-                    // 텍스트와 이미지를 함께 전송
+                // 2. 대기열 확인
+                let isQueueEmpty = await queueManager.isEmpty()
+                let isCurrentlySending = await queueManager.isCurrentlySending()
+
+                if isQueueEmpty && !isCurrentlySending {
+                    // 대기열이 비어있고 전송 중이 아니면 바로 전송
                     _ = try await sendMessageUsecase.execute(
                         roomId: roomId,
                         content: text,
                         files: fileUrls
                     )
                 } else {
-                    // 텍스트만 전송
-                    _ = try await sendMessageUsecase.execute(
-                        roomId: roomId,
+                    // 대기열에 추가
+                    let item = MessageQueueManager.QueueItem(
+                        messageId: UUID().uuidString,  // 임시 ID
                         content: text,
-                        files: []
+                        files: fileUrls,
+                        isRetry: false
                     )
+
+                    await queueManager.enqueue(item)
+
+                    // 대기열 처리 시작
+                    await processQueue()
                 }
 
                 await MainActor.run {
@@ -299,6 +330,81 @@ final class ChatRoomViewModel {
                 self?.messagesSubject.send(messages)
             }
             .store(in: &cancellables)
+    }
+
+    /// 네트워크 재연결 감지 및 자동 재전송
+    ///
+    /// 동작:
+    /// 1. 네트워크 재연결 이벤트 구독
+    /// 2. 재연결 시 실패한 메시지 조회 (24시간 이내, 최근 20개)
+    /// 3. 대기열에 추가 후 순차 전송
+    ///
+    private func setupNetworkMonitoring() {
+        networkMonitor.networkReconnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.handleNetworkReconnected()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 네트워크 재연결 시 자동 재전송 처리
+    private func handleNetworkReconnected() {
+        Task {
+            await retryFailedMessages()
+        }
+    }
+
+    /// 실패한 메시지 자동 재전송
+    ///
+    /// 동작:
+    /// 1. CoreData에서 실패한 메시지 조회 (24시간 이내, 최근 20개, FIFO)
+    /// 2. 대기열에 추가
+    /// 3. 순차 전송
+    ///
+    func retryFailedMessages() async {
+        do {
+            // 1. 실패한 메시지 조회
+            let failedMessages = try await repository.fetchFailedMessages(roomId: roomId)
+
+            guard !failedMessages.isEmpty else { return }
+
+            // 2. 대기열에 추가
+            for message in failedMessages {
+                guard let content = message.content else { continue }
+
+                let item = MessageQueueManager.QueueItem(
+                    messageId: message.chatId,
+                    content: content,
+                    files: message.files,
+                    isRetry: true
+                )
+
+                await queueManager.enqueue(item)
+            }
+
+            // 3. 대기열 처리
+            await processQueue()
+
+        } catch {
+            // 조용히 실패 처리
+        }
+    }
+
+    /// 대기열 처리
+    private func processQueue() async {
+        let successCount = await queueManager.processQueue(
+            repository: repository,
+            roomId: roomId,
+            networkMonitor: networkMonitor
+        )
+
+        // 성공한 메시지가 있으면 스크롤
+        if successCount > 0 {
+            await MainActor.run {
+                scrollToBottomSubject.send()
+            }
+        }
     }
 
     // MARK: - File Upload

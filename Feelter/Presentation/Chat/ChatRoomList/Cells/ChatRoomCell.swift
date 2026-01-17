@@ -32,6 +32,7 @@ final class ChatRoomCell: UITableViewCell {
             right: Layout.badgeHorizontalPadding
         )
     )
+    private let failedMessageIconView = UIImageView()
 
     private let headerStackView = UIStackView()
     private let footerStackView = UIStackView()
@@ -76,9 +77,10 @@ final class ChatRoomCell: UITableViewCell {
         timeLabel.text = nil
         messageLabel.text = nil
         unreadBadgeLabel.isHidden = true
+        failedMessageIconView.isHidden = true
     }
 
-    func configure(with chatRoom: ChatRoom, currentUserId: String?, unreadCount: Int = 0) {
+    func configure(with chatRoom: ChatRoom, currentUserId: String?, unreadCount: Int = 0, hasFailedMessages: Bool = false) {
         nameLabel.text = chatRoom.opponent.nick
         messageLabel.text = chatRoom.lastMessagePreview
         timeLabel.text = formattedTimestamp(from: chatRoom.updatedAt)
@@ -99,6 +101,9 @@ final class ChatRoomCell: UITableViewCell {
             }
         } else {
         }
+
+        // 실패한 메시지 아이콘 표시
+        failedMessageIconView.isHidden = !hasFailedMessages
 
         profileImageView.image = UIImage(named: "appIcon")
         if chatRoom.opponent.hasProfileImage {
@@ -153,10 +158,16 @@ final class ChatRoomCell: UITableViewCell {
         unreadBadgeLabel.backgroundColor = .systemRed
         unreadBadgeLabel.isHidden = true
 
+        failedMessageIconView.image = UIImage(systemName: "exclamationmark.circle.fill")
+        failedMessageIconView.tintColor = .systemRed
+        failedMessageIconView.contentMode = .scaleAspectFit
+        failedMessageIconView.isHidden = true
+
         headerStackView.axis = .horizontal
         headerStackView.alignment = .center
         headerStackView.spacing = Layout.stackSpacing
         headerStackView.addArrangedSubview(nameLabel)
+        headerStackView.addArrangedSubview(failedMessageIconView)
         headerStackView.addArrangedSubview(timeLabel)
 
         footerStackView.axis = .horizontal
@@ -176,6 +187,12 @@ final class ChatRoomCell: UITableViewCell {
         unreadBadgeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         messageLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         unreadBadgeLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+        failedMessageIconView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        failedMessageIconView.setContentHuggingPriority(.required, for: .horizontal)
+        failedMessageIconView.snp.makeConstraints { make in
+            make.width.height.equalTo(16)
+        }
     }
 
     private func formattedTimestamp(from date: Date, referenceDate: Date = Date()) -> String {
