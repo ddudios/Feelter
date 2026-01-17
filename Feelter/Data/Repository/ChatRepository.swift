@@ -393,6 +393,21 @@ final class ChatRepository: ChatRepositoryProtocol {
         await refreshChatRoomsFromCoreData()
     }
 
+    /// 메시지 삭제 (CoreData에서만 삭제, 서버에는 영향 없음)
+    ///
+    /// 사용처:
+    /// - 전송 실패한 메시지 재전송 전 기존 메시지 삭제
+    ///
+    /// - Parameter chatId: 삭제할 메시지 ID
+    /// - Throws: CoreData 에러
+    func deleteMessage(chatId: String) async throws {
+        try deleteMessageFromCoreData(chatId: chatId)
+
+        // 메시지 목록 갱신 (UI 업데이트)
+        // roomId를 모르므로 전체 메시지 갱신은 불가능
+        // 대신 삭제만 하고, observeMessages가 자동으로 갱신함
+    }
+
     /// 실패한 메시지 재전송
     ///
     /// - Parameter chatId: 재전송할 메시지 ID

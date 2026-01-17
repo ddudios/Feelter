@@ -66,6 +66,9 @@ final class ChatRoomViewModel {
     /// Cancellables
     private var cancellables = Set<AnyCancellable>()
 
+    /// 스크롤 트리거 (재전송 시에도 사용)
+    private let scrollToBottomSubject = PassthroughSubject<Void, Never>()
+
     // MARK: - Initialization
 
     init(
@@ -97,7 +100,6 @@ final class ChatRoomViewModel {
         let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
         let isSendingSubject = CurrentValueSubject<Bool, Never>(false)
         let errorSubject = PassthroughSubject<String?, Never>()
-        let scrollToBottomSubject = PassthroughSubject<Void, Never>()
 
         // 입력 텍스트 상태 저장
         let messageTextSubject = CurrentValueSubject<String, Never>("")
@@ -403,6 +405,61 @@ final class ChatRoomViewModel {
                     }
 
                     completion(false, errorMessage)
+                }
+            }
+        }
+    }
+
+    // MARK: - Retry Message
+
+    /// 실패한 메시지 재전송
+    ///
+    /// 동작:
+    /// 1. 기존 실패 메시지를 즉시 삭제 (Repository에서 처리)
+    /// 2. 새 메시지로 재전송 (text + files)
+    /// 3. 성공 시 새 메시지는 자동으로 가장 아래(최근)로 이동
+    /// 4. 실패 시 새로운 failed 메시지 생성
+    ///
+    /// - Parameters:
+    ///   - messageId: 실패한 메시지의 ID (삭제용)
+    ///   - text: 메시지 텍스트
+    ///   - files: 첨부 파일 URL 배열 (이미 업로드된 경우)
+    func retryMessage(messageId: String, text: String?, files: [String]) {
+        Task {
+            // text가 nil이거나 빈 문자열이면 에러
+            guard let content = text, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                await MainActor.run {
+                    // 에러 메시지 표시 (선택적)
+                }
+                return
+            }
+
+            // 1. 기존 실패 메시지 즉시 삭제
+            do {
+                try await repository.deleteMessage(chatId: messageId)
+            } catch {
+                // 삭제 실패해도 재전송 시도
+            }
+
+            // 2. 새 메시지 전송 (sendMessageUsecase가 sending 상태로 저장 후 전송)
+            do {
+                _ = try await sendMessageUsecase.execute(
+                    roomId: roomId,
+                    content: content,
+                    files: files
+                )
+
+                // 3. 성공: 자동으로 messagesSubject가 업데이트됨 (Repository의 observeMessages)
+                // 스크롤을 가장 아래로 이동
+                await MainActor.run {
+                    scrollToBottomSubject.send()
+                }
+
+            } catch {
+                // 4. 실패: 새로운 failed 메시지가 자동으로 생성됨 (Repository의 sendMessage에서 처리)
+                // 사용자는 다시 재전송 버튼을 누를 수 있음
+                await MainActor.run {
+                    // 조용히 실패 처리
                 }
             }
         }

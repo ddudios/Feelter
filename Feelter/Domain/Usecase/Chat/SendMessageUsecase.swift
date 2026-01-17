@@ -124,8 +124,21 @@ extension SendMessageUsecase {
                 return sendError
             }
 
-            // URLError 확인
+            // URLError 확인 (비행기 모드, 인터넷 연결 끊김 등)
             if let urlError = error as? URLError {
+                switch urlError.code {
+                case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+                    return .networkError
+                case .timedOut:
+                    return .networkError
+                default:
+                    return .networkError
+                }
+            }
+
+            // NSError 확인 (URLError가 NSError로 래핑된 경우)
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain {
                 return .networkError
             }
 

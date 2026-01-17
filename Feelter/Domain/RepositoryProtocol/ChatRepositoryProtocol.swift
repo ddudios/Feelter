@@ -146,6 +146,15 @@ protocol ChatRepositoryProtocol {
     /// - Parameter roomId: 채팅방 ID
     func updateLastReadDate(roomId: String) async throws
 
+    /// 메시지 삭제 (CoreData에서만 삭제, 서버에는 영향 없음)
+    ///
+    /// 사용처:
+    /// - 전송 실패한 메시지 재전송 전 기존 메시지 삭제
+    ///
+    /// - Parameter chatId: 삭제할 메시지 ID
+    /// - Throws: CoreData 에러
+    func deleteMessage(chatId: String) async throws
+
     /// 전송 실패한 메시지 재전송
     /// 1. CoreData에서 해당 메시지 조회 (status: .failed)
     /// 2. status를 .sending으로 변경

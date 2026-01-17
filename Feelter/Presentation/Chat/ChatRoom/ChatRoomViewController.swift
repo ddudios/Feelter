@@ -150,6 +150,8 @@ final class ChatRoomViewController: BaseViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+
+        // 채팅방 최초 진입 시 스크롤을 가장 아래로 (animation 없이)
         scrollToBottomIfNeeded()
 
         // 채팅방 입장 시 읽음 처리
@@ -506,7 +508,12 @@ final class ChatRoomViewController: BaseViewController {
 
         // ✅ TableView 업데이트 (reloadData만 사용 - 행 개수 변경 시)
         // beginUpdates/endUpdates는 이미지 로딩 완료 시에만 사용 (셀 높이 재계산용)
-        messageTableView.reloadData()
+        // performWithoutAnimation으로 레이아웃 깜빡임 방지
+        UIView.performWithoutAnimation {
+            messageTableView.reloadData()
+            // 레이아웃 강제 완료 (찌그러짐 방지)
+            messageTableView.layoutIfNeeded()
+        }
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -537,6 +544,11 @@ final class ChatRoomViewController: BaseViewController {
             }
 
             var updatedMessage = message
+
+            // 이전 메시지가 failed였는지 체크
+            let previousMessage = index > 0 ? sortedMessages[index - 1] : nil
+            let isPreviousFailed = previousMessage?.status == .failed
+
             if index < sortedMessages.count - 1 {
                 let nextMessage = sortedMessages[index + 1]
                 let isSameMinute = calendar.isDate(
@@ -544,7 +556,13 @@ final class ChatRoomViewController: BaseViewController {
                     equalTo: nextMessage.date,
                     toGranularity: .minute
                 )
-                updatedMessage.showsTime = !isSameMinute
+
+                // 다음 메시지가 failed이거나 이전 메시지가 failed이면 시간 표시
+                if nextMessage.status == .failed || isPreviousFailed {
+                    updatedMessage.showsTime = true
+                } else {
+                    updatedMessage.showsTime = !isSameMinute
+                }
             } else {
                 updatedMessage.showsTime = true
             }
@@ -809,27 +827,29 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     @objc private func sendButtonTapped() {
+        // 높이 초기화를 먼저 수행 (애니메이션 없이)
+        textViewHeightConstraint?.update(offset: Layout.textViewMinHeight)
+        messageTextView.isScrollEnabled = false
+
         // ViewModel에게 전송 이벤트 전달
         sendButtonTappedSubject.send()
 
-        // UI 초기화
-        messageTextView.text = ""
-        messageTextSubject.send("")
-        placeholderLabel.isHidden = false
-        pendingImages.removeAll()
-        selectedImagesSubject.send([])
-        updateSelectedImagesPreview()
-        updateSendButtonState()
+        // UI 초기화 (애니메이션 없이 즉시 처리)
+        UIView.performWithoutAnimation {
+            messageTextView.text = ""
+            messageTextSubject.send("")
+            placeholderLabel.isHidden = false
+            pendingImages.removeAll()
+            selectedImagesSubject.send([])
+            updateSelectedImagesPreview()
+            updateSendButtonState()
 
-        // 높이 초기화
-        textViewHeightConstraint?.update(offset: Layout.textViewMinHeight)
-        messageTextView.isScrollEnabled = false
-        shouldScrollToBottomAfterNextReload = true
-        UIView.animate(withDuration: 0.1, animations: {
+            // 레이아웃 즉시 완료
             self.view.layoutIfNeeded()
-        }, completion: { [weak self] _ in
-            self?.scrollToBottom(animated: false)
-        })
+        }
+
+        // 스크롤은 메시지가 추가된 후 자동으로 처리됨
+        shouldScrollToBottomAfterNextReload = true
     }
 
     @objc private func searchButtonTapped() {
@@ -1164,10 +1184,28 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
 
 // MARK: - Message Actions
 private extension ChatRoomViewController {
+    /// 실패한 메시지 재전송
+    ///
+    /// 동작:
+    /// 1. 실패한 메시지 찾기
+    /// 2. text와 files 정보 추출
+    /// 3. ViewModel을 통해 재전송
+    /// 4. 재전송 성공 시 새 메시지는 자동으로 가장 아래(최근)에 위치
+    ///
+    /// - Parameter id: 재전송할 메시지 ID
     func retryMessage(id: String) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].status = .sending
-        // TODO: 재전송 로직 연결
+        // 1. 실패한 메시지 찾기
+        guard let message = messages.first(where: { $0.id == id }) else { return }
+
+        // 2. text와 files 정보 추출
+        let text = message.text
+        let files = message.files.map { $0.fileURL }
+
+        // 3. ViewModel을 통해 재전송
+        viewModel.retryMessage(messageId: id, text: text, files: files)
+
+        // 4. UI는 ViewModel의 output.messages를 통해 자동 업데이트됨
+        // 재전송 성공 시 새 메시지는 가장 최근(아래)에 자동 배치됨
     }
 }
 

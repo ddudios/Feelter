@@ -149,7 +149,7 @@ final class ChatMessageCell: UITableViewCell {
         currentIsOutgoing = item.isOutgoing
         configureMessageContent(text: item.text, images: item.images)
         configureTextWithTimeLayout(isOutgoing: item.isOutgoing)
-        configureTimeLabel(date: item.date, showsTime: item.showsTime)
+        configureTimeLabel(date: item.date, showsTime: item.showsTime, status: item.status)
         configureStatus(for: item.status, showsTime: item.showsTime, isOutgoing: item.isOutgoing)
         configureLayoutDirection(isOutgoing: item.isOutgoing)
         configureColors(isOutgoing: item.isOutgoing)
@@ -422,14 +422,27 @@ final class ChatMessageCell: UITableViewCell {
         }
     }
 
-    private func configureTimeLabel(date: Date, showsTime: Bool) {
-        timeLabel.text = Self.timeFormatter.string(from: date)
-        timeLabel.isHidden = !showsTime
-        timeStackView.isHidden = !showsTime
+    private func configureTimeLabel(date: Date, showsTime: Bool, status: MessageSendStatus) {
+        // failed 상태일 때는 시간을 완전히 숨김
+        if status == .failed {
+            timeLabel.isHidden = true
+            timeStackView.isHidden = true
+        } else {
+            timeLabel.text = Self.timeFormatter.string(from: date)
+            timeLabel.isHidden = !showsTime
+            timeStackView.isHidden = !showsTime
+        }
     }
 
     private func configureStatus(for status: MessageSendStatus, showsTime: Bool, isOutgoing: Bool) {
-        let shouldShowStatus = showsTime && status != .sent
+        // failed 상태일 때는 showsTime과 관계없이 항상 재전송 버튼 표시
+        let shouldShowStatus: Bool
+        if status == .failed {
+            shouldShowStatus = true  // 항상 표시
+        } else {
+            shouldShowStatus = showsTime && status != .sent
+        }
+
         statusStackView.isHidden = !shouldShowStatus
 
         statusLabel.text = nil
