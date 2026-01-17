@@ -78,12 +78,27 @@ final class ChatRoomCell: UITableViewCell {
         unreadBadgeLabel.isHidden = true
     }
 
-    func configure(with chatRoom: ChatRoom) {
+    func configure(with chatRoom: ChatRoom, currentUserId: String?, unreadCount: Int = 0) {
         nameLabel.text = chatRoom.opponent.nick
         messageLabel.text = chatRoom.lastMessagePreview
         timeLabel.text = formattedTimestamp(from: chatRoom.updatedAt)
-        unreadBadgeLabel.text = "N"
-        unreadBadgeLabel.isHidden = !chatRoom.hasUnreadMessage
+
+
+        // 개선된 hasUnreadMessage 메서드 사용 (내가 보낸 메시지는 배지 안 붙음)
+        let hasUnread = chatRoom.hasUnreadMessage(currentUserId: currentUserId)
+        unreadBadgeLabel.isHidden = !hasUnread
+
+        // 읽지 않은 메시지 개수 표시
+        if hasUnread {
+            if unreadCount > 0 {
+                // 개수가 있으면 숫자로 표시
+                unreadBadgeLabel.text = unreadCount > 99 ? "99+" : "\(unreadCount)"
+            } else {
+                // 개수 정보가 없으면 "N"으로 표시
+                unreadBadgeLabel.text = "N"
+            }
+        } else {
+        }
 
         profileImageView.image = UIImage(named: "appIcon")
         if chatRoom.opponent.hasProfileImage {

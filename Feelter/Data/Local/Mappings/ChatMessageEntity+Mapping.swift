@@ -30,7 +30,6 @@ extension ChatMessageEntity {
                 // 혹시 Any 타입으로 저장되었을 경우 대비
                 filesArray = anyArray.compactMap { $0 as? String }.filter { !$0.isEmpty }
             } else {
-                print("⚠️ [CoreData] files 타입 변환 실패: \(type(of: files))")
             }
         }
 

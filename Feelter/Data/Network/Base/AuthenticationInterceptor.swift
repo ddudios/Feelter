@@ -53,14 +53,12 @@ final class AuthenticationInterceptor: RequestInterceptor {
         // 로그아웃 URL이 포함되어 있다면, 토큰 갱신하지 않고 바로 실패 처리(doNotRetry)
         if let urlString = request.request?.url?.absoluteString,
            urlString.contains("logout") {
-            print("로그아웃 401 에러: 토큰 갱신 없이 즉시 종료합니다.")
             completion(.doNotRetry)
             return
         }
 
         // Refresh 요청 자체가 실패한 경우 로그아웃 처리
         if request.request?.url?.absoluteString.contains("auth/refresh") == true {
-            print("❌ Refresh 요청 실패 (401) - 토큰 삭제")
             // 만료된 토큰 삭제
             KeychainManager.shared.delete(account: "accessToken")
             KeychainManager.shared.delete(account: "refreshToken")
@@ -81,7 +79,6 @@ final class AuthenticationInterceptor: RequestInterceptor {
         // 키체인에서 토큰 가져오기
         guard let accessToken = KeychainManager.shared.read(account: "accessToken"),
               let refreshToken = KeychainManager.shared.read(account: "refreshToken") else {
-            print("❌ Keychain에 토큰 없음 - 로그아웃")
             NotificationCenter.default.post(name: .unauthorizedError, object: nil)
             isRefreshing = false
             requestsToRetry.forEach { $0(.doNotRetry) }
@@ -112,7 +109,6 @@ final class AuthenticationInterceptor: RequestInterceptor {
             } catch {
                 // Refresh 실패 시 토큰 삭제 및 로그아웃
                 await MainActor.run {
-                    print("❌ Refresh API 호출 실패 - 토큰 삭제: \(error)")
                     // 만료된 토큰 삭제
                     KeychainManager.shared.delete(account: "accessToken")
                     KeychainManager.shared.delete(account: "refreshToken")

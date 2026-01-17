@@ -69,6 +69,7 @@ enum ChatImageSource {
 final class ChatMessageCell: UITableViewCell {
 
     var onRetryTapped: (() -> Void)?
+    var onImageTapped: (([ChatImageSource], Int) -> Void)?  // (전체 이미지 목록, 탭한 이미지 인덱스)
 
     private enum Layout {
         static let profileSize: CGFloat = 36
@@ -81,10 +82,20 @@ final class ChatMessageCell: UITableViewCell {
     private let profileImageView = UIImageView()
     private let bubbleContainerView = UIView()
     private let bubbleStackView = UIStackView()
-    private let messageLabel = PaddingLabel()
-    private let imageGridView = ChatImageGridView()
+    private let messageTextView = UITextView()  // UITextView로 변경
+    private let textBubbleView = UIView()  // 텍스트 전용 버블
+    private let imageGridView = ChatImageGridView()  // 이미지 그리드 (직접 사용)
+
+    /// ✅ 이미지+텍스트일 때 시간을 텍스트 버블 옆에 배치하기 위한 컨테이너
+    private lazy var textWithTimeContainer: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = Layout.stackSpacing
+        stack.alignment = .bottom
+        return stack
+    }()
+
     private let timeLabel = UILabel()
-    private let readCountLabel = UILabel()
     private let timeStackView = UIStackView()
     private let statusLabel = UILabel()
     private let statusIconImageView = UIImageView()
@@ -92,8 +103,10 @@ final class ChatMessageCell: UITableViewCell {
     private let statusStackView = UIStackView()
     private let horizontalStackView = UIStackView()
     private let spacerView = UIView()
+    private let textBubbleSpacerView = UIView()  // textWithTimeContainer용 spacer
     private var bubbleMaxWidthConstraint: Constraint?
     private var currentIsOutgoing = false
+    private var hasImageAndText = false  // 이미지와 텍스트가 함께 있는지
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -116,24 +129,54 @@ final class ChatMessageCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         onRetryTapped = nil
+        onImageTapped = nil
         currentIsOutgoing = false
-        messageLabel.text = nil
+        hasImageAndText = false
+        messageTextView.text = nil
         timeLabel.text = nil
-        readCountLabel.text = nil
-        readCountLabel.isHidden = true
         statusLabel.text = nil
         statusIconImageView.image = nil
         retryButton.isHidden = true
-        imageGridView.configure(with: [])  // 이미지 그리드 초기화
+
+        // ✅ 이미지 그리드 완전 초기화 (이전 콜백 무효화)
+        imageGridView.reset()
+
+        // 텍스트 버블 제약조건 초기화 (재사용 시 이전 제약 제거)
+        textBubbleView.snp.removeConstraints()
     }
 
     func configure(with item: ChatMessageViewItem, opponentProfileImagePath: String?) {
         currentIsOutgoing = item.isOutgoing
         configureMessageContent(text: item.text, images: item.images)
+        configureTextWithTimeLayout(isOutgoing: item.isOutgoing)
         configureTimeLabel(date: item.date, showsTime: item.showsTime)
         configureStatus(for: item.status, showsTime: item.showsTime, isOutgoing: item.isOutgoing)
         configureLayoutDirection(isOutgoing: item.isOutgoing)
         configureColors(isOutgoing: item.isOutgoing)
+
+        // 이미지 탭 제스처 연결
+        imageGridView.onImageTapped = { [weak self] tappedIndex in
+            self?.onImageTapped?(item.images, tappedIndex)
+        }
+
+        // ✅ 이미지 로딩 완료 시 TableView에 높이 재계산 요청
+        imageGridView.onImageLoadingCompleted = { [weak self] in
+            guard let self = self else { return }
+
+            // TableView를 찾아서 beginUpdates/endUpdates 호출 (높이 재계산)
+            var view: UIView? = self.superview
+            while view != nil {
+                if let tableView = view as? UITableView {
+                    guard tableView.window != nil else { break }
+                    UIView.performWithoutAnimation {
+                        tableView.beginUpdates()
+                        tableView.endUpdates()
+                    }
+                    break
+                }
+                view = view?.superview
+            }
+        }
 
         if item.isOutgoing {
             profileImageView.image = nil
@@ -148,9 +191,10 @@ final class ChatMessageCell: UITableViewCell {
         contentView.addSubview(profileImageView)
         contentView.addSubview(horizontalStackView)
         bubbleContainerView.addSubview(bubbleStackView)
-        bubbleStackView.addArrangedSubview(imageGridView)
-        bubbleStackView.addArrangedSubview(messageLabel)
-        timeStackView.addArrangedSubview(readCountLabel)
+
+        // 텍스트 버블 (색상 있음)
+        textBubbleView.addSubview(messageTextView)
+
         timeStackView.addArrangedSubview(timeLabel)
         statusStackView.addArrangedSubview(statusIconImageView)
         statusStackView.addArrangedSubview(statusLabel)
@@ -172,6 +216,11 @@ final class ChatMessageCell: UITableViewCell {
         }
 
         bubbleStackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        // 텍스트 뷰 레이아웃
+        messageTextView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
 
@@ -200,26 +249,41 @@ final class ChatMessageCell: UITableViewCell {
         profileImageView.setContentCompressionResistancePriority(.required, for: .vertical)
         profileImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        bubbleContainerView.layer.cornerRadius = Layout.bubbleCornerRadius
-        bubbleContainerView.clipsToBounds = true
+        bubbleContainerView.layer.cornerRadius = 0  // 컨테이너는 투명
+        bubbleContainerView.clipsToBounds = false
+        bubbleContainerView.backgroundColor = .clear
+        bubbleContainerView.isUserInteractionEnabled = true  // 터치 이벤트 전달 허용
         bubbleContainerView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         bubbleContainerView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         bubbleStackView.axis = .vertical
         bubbleStackView.spacing = Layout.bubbleSpacing
+        bubbleStackView.isUserInteractionEnabled = true  // 터치 이벤트 전달 허용
+        // alignment는 configureLayoutDirection에서 동적으로 설정
 
-        messageLabel.font = TextStyle.Pretendard.body2
-        messageLabel.textColor = .Feelter.gray0
-        messageLabel.numberOfLines = 0
-        messageLabel.lineBreakMode = .byWordWrapping
-        messageLabel.padding = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
-        messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
-        messageLabel.setContentHuggingPriority(.required, for: .vertical)
+        // 이미지 그리드 뷰 (둥근 모서리)
+        imageGridView.layer.cornerRadius = Layout.bubbleCornerRadius
+        imageGridView.clipsToBounds = true
+        imageGridView.backgroundColor = .clear
 
-        readCountLabel.font = TextStyle.Pretendard.caption2
-        readCountLabel.textColor = .Feelter.gray60
-        readCountLabel.textAlignment = .right
-        readCountLabel.isHidden = true
+        // 텍스트 버블 (색상 있음, 둥근 모서리)
+        textBubbleView.layer.cornerRadius = Layout.bubbleCornerRadius
+        textBubbleView.clipsToBounds = true
+        textBubbleView.isUserInteractionEnabled = true  // 터치 이벤트 전달 허용
+        textBubbleView.setContentHuggingPriority(.required, for: .horizontal)  // 텍스트 길이에 맞춤
+
+        // UITextView 설정 (복사 가능)
+        messageTextView.font = TextStyle.Pretendard.body2
+        messageTextView.textColor = .Feelter.gray0
+        messageTextView.backgroundColor = .clear
+        messageTextView.isEditable = false
+        messageTextView.isSelectable = true
+        messageTextView.isUserInteractionEnabled = true  // 터치 및 제스처 활성화
+        messageTextView.isScrollEnabled = false
+        messageTextView.textContainerInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        messageTextView.textContainer.lineFragmentPadding = 4
+        messageTextView.setContentCompressionResistancePriority(.required, for: .vertical)
+        messageTextView.setContentHuggingPriority(.required, for: .vertical)
 
         timeStackView.axis = .vertical
         timeStackView.spacing = 2
@@ -251,19 +315,94 @@ final class ChatMessageCell: UITableViewCell {
 
     private func configureMessageContent(text: String?, images: [ChatImageSource]) {
         // 텍스트가 있고, 공백이 아닌 실제 내용이 있을 때만 표시
-        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            messageLabel.text = text
-            messageLabel.isHidden = false
-        } else {
-            messageLabel.text = nil
-            messageLabel.isHidden = true
+        let hasText = text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        let hasImages = !images.isEmpty
+
+        // 이미지와 텍스트가 함께 있는지 확인
+        hasImageAndText = hasText && hasImages
+
+
+        // 기존 배치 초기화
+        bubbleStackView.arrangedSubviews.forEach {
+            bubbleStackView.removeArrangedSubview($0)
+            $0.removeFromSuperview()
         }
 
-        if images.isEmpty {
-            imageGridView.isHidden = true
+        textWithTimeContainer.isHidden = !hasImageAndText
+
+        if hasText, let text = text {
+            messageTextView.text = text
+            textBubbleView.isHidden = false
         } else {
+            messageTextView.text = nil
+            textBubbleView.isHidden = true
+        }
+
+        if hasImages {
             imageGridView.isHidden = false
             imageGridView.configure(with: images)
+        } else {
+            imageGridView.isHidden = true
+        }
+
+        // 레이아웃 재구성
+        if hasImageAndText {
+            // 이미지 + 텍스트: 세로로 배치 (텍스트+시간은 하단 행)
+            bubbleStackView.addArrangedSubview(imageGridView)
+            bubbleStackView.addArrangedSubview(textWithTimeContainer)
+        } else if hasImages {
+            // 이미지만
+            bubbleStackView.addArrangedSubview(imageGridView)
+        } else if hasText {
+            // 텍스트만
+            bubbleStackView.addArrangedSubview(textBubbleView)
+        }
+    }
+
+    private func configureTextWithTimeLayout(isOutgoing: Bool) {
+        // 이미지+텍스트일 때 텍스트 버블 너비 제한
+        guard hasImageAndText else { return }
+
+        // 화면 너비 기반 계산
+        let screenWidth = UIScreen.main.bounds.width
+        let horizontalInset: CGFloat = 16 * 2  // 좌우 inset
+        let stackSpacing: CGFloat = Layout.stackSpacing
+
+        // 고정 요소 너비 (이미지+텍스트는 시간/상태를 컨테이너 내부에 배치)
+        let profileWidth: CGFloat = isOutgoing ? 0 : (Layout.profileSize + stackSpacing)
+        let bubbleMaxWidth = screenWidth - horizontalInset - profileWidth
+
+        let timeWidth: CGFloat = 60 + stackSpacing  // 시간 레이블 예상 너비
+        let statusWidth: CGFloat = isOutgoing ? (30 + stackSpacing) : 0  // 재전송 버튼/상태 아이콘
+        let maxTextBubbleWidth = max(0, bubbleMaxWidth - timeWidth - statusWidth)
+
+        textBubbleView.snp.remakeConstraints { make in
+            make.width.lessThanOrEqualTo(maxTextBubbleWidth).priority(.required)
+        }
+
+    }
+
+    private func configureTextWithTimeContainer(isOutgoing: Bool) {
+        resetTextWithTimeContainer()
+
+        statusStackView.removeFromSuperview()
+        timeStackView.removeFromSuperview()
+        textBubbleView.removeFromSuperview()
+
+        if isOutgoing {
+            textWithTimeContainer.addArrangedSubview(statusStackView)
+            textWithTimeContainer.addArrangedSubview(timeStackView)
+            textWithTimeContainer.addArrangedSubview(textBubbleView)
+        } else {
+            textWithTimeContainer.addArrangedSubview(textBubbleView)
+            textWithTimeContainer.addArrangedSubview(timeStackView)
+        }
+    }
+
+    private func resetTextWithTimeContainer() {
+        textWithTimeContainer.arrangedSubviews.forEach { view in
+            textWithTimeContainer.removeArrangedSubview(view)
+            view.removeFromSuperview()
         }
     }
 
@@ -292,10 +431,6 @@ final class ChatMessageCell: UITableViewCell {
         case .sent:
             break
         }
-
-        let shouldShowReadCount = isOutgoing && showsTime && status == .sent
-        readCountLabel.text = shouldShowReadCount ? "1" : nil
-        readCountLabel.isHidden = !shouldShowReadCount
     }
 
     override func layoutSubviews() {
@@ -338,6 +473,9 @@ final class ChatMessageCell: UITableViewCell {
         // 프로필 이미지는 스택뷰에 추가하지 않고 visibility만 조절
         profileImageView.isHidden = isOutgoing
 
+        // 텍스트 버블 정렬 (보내는 메시지는 오른쪽, 받는 메시지는 왼쪽)
+        bubbleStackView.alignment = isOutgoing ? .trailing : .leading
+
         // horizontalStackView의 leading 제약조건 업데이트
         horizontalStackView.snp.remakeConstraints { make in
             make.top.bottom.equalToSuperview().inset(4).priority(.high)
@@ -350,12 +488,27 @@ final class ChatMessageCell: UITableViewCell {
             }
         }
 
-        if isOutgoing {
+        if hasImageAndText {
+            configureTextWithTimeContainer(isOutgoing: isOutgoing)
+            if isOutgoing {
+                // 보내는 메시지 (이미지+텍스트): [spacer] [bubble]
+                horizontalStackView.addArrangedSubview(spacerView)
+                horizontalStackView.addArrangedSubview(bubbleContainerView)
+            } else {
+                // 받는 메시지 (이미지+텍스트): [bubble] [spacer]
+                horizontalStackView.addArrangedSubview(bubbleContainerView)
+                horizontalStackView.addArrangedSubview(spacerView)
+            }
+        } else if isOutgoing {
+            resetTextWithTimeContainer()
+            // 보내는 메시지: [spacer] [status] [time] [bubble]
             horizontalStackView.addArrangedSubview(spacerView)
             horizontalStackView.addArrangedSubview(statusStackView)
             horizontalStackView.addArrangedSubview(timeStackView)
             horizontalStackView.addArrangedSubview(bubbleContainerView)
         } else {
+            resetTextWithTimeContainer()
+            // 받는 메시지: [bubble] [time] [spacer]
             horizontalStackView.addArrangedSubview(bubbleContainerView)
             horizontalStackView.addArrangedSubview(timeStackView)
             horizontalStackView.addArrangedSubview(spacerView)
@@ -368,8 +521,8 @@ final class ChatMessageCell: UITableViewCell {
 
         // 고정 요소들의 너비 계산
         let profileWidth: CGFloat = isOutgoing ? 0 : (Layout.profileSize + stackSpacing)
-        let timeWidth: CGFloat = 60 + stackSpacing  // 시간 레이블 예상 너비
-        let statusWidth: CGFloat = isOutgoing ? (30 + stackSpacing) : 0  // 재전송 버튼/상태 아이콘
+        let timeWidth: CGFloat = hasImageAndText ? 0 : (60 + stackSpacing)  // 시간 레이블 예상 너비
+        let statusWidth: CGFloat = (isOutgoing && !hasImageAndText) ? (30 + stackSpacing) : 0  // 재전송 버튼/상태 아이콘
 
         let maxBubbleWidth = screenWidth - horizontalInset - profileWidth - timeWidth - statusWidth
 
@@ -379,7 +532,6 @@ final class ChatMessageCell: UITableViewCell {
 
         timeStackView.alignment = isOutgoing ? .trailing : .leading
         timeLabel.textAlignment = isOutgoing ? .right : .left
-        readCountLabel.textAlignment = isOutgoing ? .right : .left
 
         timeStackView.setContentCompressionResistancePriority(.required, for: .horizontal)
         timeStackView.setContentHuggingPriority(.required, for: .horizontal)
@@ -389,10 +541,55 @@ final class ChatMessageCell: UITableViewCell {
     }
 
     private func configureColors(isOutgoing: Bool) {
-        bubbleContainerView.backgroundColor = isOutgoing ? .Feelter.brightTurquoise : .Feelter.deepTurquoise
+        // 텍스트 버블만 색상 적용 (이미지 버블은 항상 투명)
+        textBubbleView.backgroundColor = isOutgoing ? .Feelter.brightTurquoise : .Feelter.deepTurquoise
     }
 
     @objc private func retryButtonTapped() {
         onRetryTapped?()
+    }
+
+    /// hitTest 오버라이드: 터치가 실제 텍스트 콘텐츠 위에 있을 때만 messageTextView를 반환
+    /// UITextView는 padding이 있어서 bounds보다 더 정확한 터치 감지가 필요
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // messageTextView가 숨겨져 있지 않고, 사용 가능한 경우
+        if !messageTextView.isHidden,
+           messageTextView.isUserInteractionEnabled,
+           !textBubbleView.isHidden,
+           messageTextView.text?.isEmpty == false {
+
+            // contentView 기준 point를 messageTextView 기준으로 변환
+            let textViewPoint = messageTextView.convert(point, from: self)
+
+            // 먼저 bounds 체크
+            guard messageTextView.bounds.contains(textViewPoint) else {
+                return super.hitTest(point, with: event)
+            }
+
+            // textContainer 기준으로 변환 (inset 고려)
+            var containerPoint = textViewPoint
+            containerPoint.x -= messageTextView.textContainerInset.left
+            containerPoint.y -= messageTextView.textContainerInset.top
+
+            // layoutManager를 사용하여 실제 텍스트 영역인지 확인
+            let layoutManager = messageTextView.layoutManager
+            let textContainer = messageTextView.textContainer
+
+            // 텍스트가 있는 실제 영역의 bounding rect 계산
+            let glyphRange = layoutManager.glyphRange(for: textContainer)
+            let boundingRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+            // 약간의 여유 공간 추가 (탭하기 쉽게)
+            let expandedRect = boundingRect.insetBy(dx: -8, dy: -8)
+
+            // 터치가 실제 텍스트 영역 내에 있는지 확인
+            if expandedRect.contains(containerPoint) {
+                return messageTextView
+            } else {
+            }
+        }
+
+        // 그 외의 경우 기본 동작
+        return super.hitTest(point, with: event)
     }
 }

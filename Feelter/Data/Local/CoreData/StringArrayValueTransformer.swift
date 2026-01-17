@@ -26,6 +26,5 @@ final class StringArrayValueTransformer: NSSecureUnarchiveFromDataTransformer {
         let transformer = StringArrayValueTransformer()
         ValueTransformer.setValueTransformer(transformer, forName: name)
 
-        print("StringArrayValueTransformer 등록 완료")
     }
 }

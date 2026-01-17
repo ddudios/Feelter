@@ -85,7 +85,6 @@ final class ChatRoomViewModel {
         do {
             try repository.ensureChatRoomExists(chatRoom)
         } catch {
-            print("⚠️ [ViewModel] 채팅방 저장 실패: \(error)")
         }
 
         // Repository의 실시간 업데이트 구독
@@ -132,7 +131,9 @@ final class ChatRoomViewModel {
                 self.repository.connectSocket(roomId: self.roomId)
 
                 // 3. 마지막 읽은 시간 업데이트
-                try? self.repository.updateLastReadDate(roomId: self.roomId)
+                Task {
+                    try? await self.repository.updateLastReadDate(roomId: self.roomId)
+                }
             }
             .store(in: &cancellables)
 
@@ -300,6 +301,18 @@ final class ChatRoomViewModel {
 
     // MARK: - File Upload
 
+    /// 채팅방을 읽음으로 표시
+    /// - viewDidAppear: 채팅방 진입 시
+    /// - appDidBecomeActive: 백그라운드에서 복귀 시
+    func markChatRoomAsRead() {
+        Task {
+            do {
+                try await repository.updateLastReadDate(roomId: roomId)
+            } catch {
+            }
+        }
+    }
+
     /// 파일 전송 (즉시 전송)
     ///
     /// 동작:
@@ -340,12 +353,6 @@ final class ChatRoomViewModel {
                     return
                 }
 
-                print("📤 파일 업로드 시작:")
-                print("   - 파일명: \(fileName)")
-                print("   - MIME: \(mimeType)")
-                print("   - 크기: \(data.count) bytes")
-                print("   - roomId: \(roomId)")
-                print("   - userId: \(userId)")
 
                 // 2. Repository를 통해 파일 업로드 (인증 헤더 자동 포함)
                 // NetworkManager의 AuthenticationInterceptor가 accessToken을 헤더에 추가
@@ -358,7 +365,6 @@ final class ChatRoomViewModel {
                     return
                 }
 
-                print("✅ 파일 업로드 성공: \(fileUrls)")
 
                 // 3. 업로드된 파일 URL로 메시지 전송 (sendMessageUsecase 사용)
                 // content는 필수값이므로 파일명을 포함한 기본 텍스트 전송
@@ -370,7 +376,6 @@ final class ChatRoomViewModel {
                     files: fileUrls
                 )
 
-                print("파일 메시지 전송 완료: \(fileContent)")
 
                 // 4. 성공 콜백
                 await MainActor.run {
@@ -378,7 +383,6 @@ final class ChatRoomViewModel {
                 }
 
             } catch {
-                print("파일 전송 실패: \(error)")
 
                 await MainActor.run {
                     // 에러 메시지 구체화

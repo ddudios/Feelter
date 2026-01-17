@@ -13,10 +13,8 @@ enum AppFont {
     /// 앱에 등록된 모든 폰트 패밀리 네임 출력 (디버그용)
     static func printAvailableFonts() {
         UIFont.familyNames.sorted().forEach { familyName in
-            print("Font Family: \(familyName)")
             let fontNames = UIFont.fontNames(forFamilyName: familyName)
             fontNames.forEach { fontName in
-                print("\(fontName)")
             }
         }
     }

@@ -86,15 +86,7 @@ final class ChatFileMessageCell: UITableViewCell {
         return label
     }()
 
-    /// 읽음 표시 라벨
-    private let readCountLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 10)
-        label.textColor = .Feelter.gray0
-        return label
-    }()
-
-    /// 시간 + 읽음 스택뷰
+    /// 시간 스택뷰
     private let timeStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .vertical
@@ -133,7 +125,6 @@ final class ChatFileMessageCell: UITableViewCell {
         profileImageView.image = nil
         fileNameLabel.text = nil
         timeLabel.text = nil
-        readCountLabel.text = nil
         currentIsOutgoing = false
         onFileTapped = nil
     }
@@ -149,14 +140,11 @@ final class ChatFileMessageCell: UITableViewCell {
     ) {
         currentIsOutgoing = isOutgoing
 
-        
+
         fileNameLabel.text = file.fileName
-        
+
         timeLabel.text = Self.timeFormatter.string(from: date)
         timeStackView.isHidden = !showsTime
-        
-        readCountLabel.text = isOutgoing ? "1" : nil
-        readCountLabel.isHidden = !isOutgoing
 
         // 레이아웃 방향
         updateLayoutDirection(isOutgoing: isOutgoing)
@@ -190,7 +178,6 @@ final class ChatFileMessageCell: UITableViewCell {
         bubbleContentStackView.addArrangedSubview(fileIconImageView)
 
         // 시간 스택
-        timeStackView.addArrangedSubview(readCountLabel)
         timeStackView.addArrangedSubview(timeLabel)
     }
 

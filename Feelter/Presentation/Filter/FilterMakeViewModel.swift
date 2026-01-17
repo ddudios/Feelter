@@ -73,14 +73,8 @@ final class FilterMakeViewModel: ViewModelProtocol {
         input.viewDidLoad
             .sink { [weak self] in
                 guard let self else { return }
-                print("🟢 [ViewModel] viewDidLoad 수신")
-                print("🟢 [ViewModel] mode: \(self.mode)")
 
                 if case .edit(let filterDetail) = self.mode {
-                    print("🟢 [ViewModel] edit 모드 - PrefilledFormData 생성")
-                    print("🟢 [ViewModel] filterDetail.id: \(filterDetail.id)")
-                    print("🟢 [ViewModel] filterDetail.title: \(filterDetail.title)")
-                    print("🟢 [ViewModel] filterDetail.previewImages.first: \(filterDetail.previewImages.first ?? "nil")")
 
                     let prefilled = PrefilledFormData(
                         title: filterDetail.title,
@@ -91,10 +85,8 @@ final class FilterMakeViewModel: ViewModelProtocol {
                         metadata: filterDetail.metadata
                     )
 
-                    print("🟢 [ViewModel] prefilledDataSubject.send 호출")
                     prefilledDataSubject.send(prefilled)
                 } else {
-                    print("🟢 [ViewModel] create 모드 - prefilled 데이터 없음")
                 }
             }
             .store(in: &cancellables)

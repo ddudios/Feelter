@@ -48,7 +48,6 @@ final class PaymentStateManager {
             let data = try JSONEncoder().encode(payment)
             UserDefaults.standard.set(data, forKey: Keys.pendingPayment)
         } catch {
-            print("❌ Failed to save pending payment: \(error)")
         }
     }
 
@@ -74,7 +73,6 @@ final class PaymentStateManager {
 
             return payment
         } catch {
-            print("❌ Failed to decode pending payment: \(error)")
             // 디코딩 실패 시 손상된 데이터 삭제
             clearPendingPayment()
             return nil

@@ -237,7 +237,6 @@ final class PDFViewerViewController: BaseViewController {
             try data.write(to: fileURL)
             localFileURL = fileURL
         } catch {
-            print("임시 파일 저장 실패: \(error.localizedDescription)")
         }
     }
 

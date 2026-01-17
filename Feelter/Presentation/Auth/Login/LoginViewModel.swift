@@ -90,8 +90,6 @@ final class LoginViewModel: ViewModelProtocol {
                             errorMessageSubject.send(error.errorDescription)
                         }
                     } catch {
-                        print("에러 타입: \(type(of: error))")
-                        print(error.localizedDescription)
 
                         await MainActor.run {
                             isLoadingSubject.send(false)

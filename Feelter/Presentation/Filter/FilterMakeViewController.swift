@@ -435,20 +435,13 @@ final class FilterMakeViewController: BaseViewController {
     }
 
     private func handleSaveSuccess(filterDetail: FilterDetail) {
-        print("🟡 [FilterMake] handleSaveSuccess 호출")
-        print("🟡 [FilterMake] isEditMode: \(mode.isEditMode)")
-        print("🟡 [FilterMake] filterDetail.id: \(filterDetail.id)")
-        print("🟡 [FilterMake] filterDetail.title: \(filterDetail.title)")
 
         if mode.isEditMode {
             // 수정 모드: 업데이트된 데이터 전달 후 이전 화면으로 돌아가기
-            print("🟡 [FilterMake] 수정 모드 - onUpdateComplete 클로저 호출")
             onUpdateComplete?(filterDetail)
-            print("🟡 [FilterMake] popViewController 호출")
             navigationController?.popViewController(animated: true)
         } else {
             // 생성 모드: Feed에 새 필터 알림 후 상세 화면으로 이동
-            print("🟡 [FilterMake] 생성 모드 - filterDidCreate 알림 전송")
             NotificationCenter.default.post(
                 name: .filterDidCreate,
                 object: nil,
@@ -591,8 +584,6 @@ final class FilterMakeViewController: BaseViewController {
 
     @MainActor
     private func updatePhotoUploadButton(with image: UIImage) {
-        print("🟡 [FilterMake-Edit] updatePhotoUploadButton 시작")
-        print("🟡 [FilterMake-Edit] 이미지 크기: \(image.size)")
 
         selectedPhotoImage = image
         photoUploadButton.setBackgroundImage(nil, for: .normal)
@@ -602,30 +593,23 @@ final class FilterMakeViewController: BaseViewController {
         photoUploadButton.contentVerticalAlignment = .fill
         photoUploadButton.clipsToBounds = true
 
-        print("🟡 [FilterMake-Edit] 이미지 설정 완료, applyPhotoSelectionLayout 호출")
         applyPhotoSelectionLayout()
     }
 
     @MainActor
     private func applyPhotoSelectionLayout() {
-        print("🟡 [FilterMake-Edit] applyPhotoSelectionLayout 시작")
-        print("🟡 [FilterMake-Edit] isEditMode: \(mode.isEditMode)")
 
         // 수정 모드가 아닐 때만 수정하기 버튼 표시
         if !mode.isEditMode {
             photoEditButton.isHidden = false
-            print("🟡 [FilterMake-Edit] photoEditButton 표시")
         } else {
-            print("🟡 [FilterMake-Edit] 수정 모드이므로 photoEditButton 숨김")
         }
 
         metadataCell.isHidden = false
         photoUploadButtonHeightConstraint?.deactivate()
         photoUploadButtonSquareConstraint?.isActive = true
 
-        print("🟡 [FilterMake-Edit] 레이아웃 제약 변경 완료, layoutIfNeeded 호출")
         view.layoutIfNeeded()
-        print("🟡 [FilterMake-Edit] applyPhotoSelectionLayout 완료")
     }
 
     @MainActor
@@ -729,8 +713,8 @@ final class FilterMakeViewController: BaseViewController {
 }
 
 // MARK: - UIGestureRecognizerDelegate
-extension FilterMakeViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+extension FilterMakeViewController {
+    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         let location = touch.location(in: scrollView)
         if isTouchInsideTextFields(at: location) {
             return false

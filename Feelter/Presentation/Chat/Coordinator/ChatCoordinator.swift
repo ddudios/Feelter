@@ -93,14 +93,19 @@ final class ChatCoordinator: Coordinator {
         showPDFViewer(fileURL: file.fileURL, fileName: file.fileName)
     }
 
-    /// 이미지 뷰어 표시 (추후 확장용)
+    /// 이미지 뷰어 표시 (갤러리 형태)
     ///
     /// - Parameters:
     ///   - images: 이미지 소스 배열
     ///   - selectedIndex: 선택된 이미지 인덱스
     func showImageViewer(images: [ChatImageSource], selectedIndex: Int = 0) {
-        // TODO: 이미지 뷰어 구현 시 사용
-        print("이미지 뷰어 표시: \(images.count)개 이미지, 선택: \(selectedIndex)")
+
+        let imageViewerVC = ImageViewerViewController(images: images, initialIndex: selectedIndex)
+        imageViewerVC.modalPresentationStyle = .fullScreen
+        imageViewerVC.modalTransitionStyle = .crossDissolve
+
+        navigationController.present(imageViewerVC, animated: true) {
+        }
     }
 
     /// 파일 뷰어 표시 (파일 타입에 따라 분기)

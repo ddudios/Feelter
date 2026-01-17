@@ -27,9 +27,6 @@ final class ChatRoomListViewModel {
         /// 채팅방 목록
         let chatRooms: AnyPublisher<[ChatRoom], Never>
 
-        /// 로딩 상태
-        let isLoading: AnyPublisher<Bool, Never>
-
         /// 에러 메시지
         let error: AnyPublisher<String?, Never>
 
@@ -104,7 +101,6 @@ final class ChatRoomListViewModel {
 
         return Output(
             chatRooms: chatRoomsSubject.eraseToAnyPublisher(),
-            isLoading: isLoadingSubject.eraseToAnyPublisher(),
             error: errorSubject.eraseToAnyPublisher(),
             selectedChatRoom: selectedChatRoomSubject.eraseToAnyPublisher()
         )

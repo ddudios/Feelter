@@ -144,7 +144,7 @@ protocol ChatRepositoryProtocol {
     /// - 서버로 전송하지 않음 (로컬에서만 관리)
     ///
     /// - Parameter roomId: 채팅방 ID
-    func updateLastReadDate(roomId: String) throws
+    func updateLastReadDate(roomId: String) async throws
 
     /// 전송 실패한 메시지 재전송
     /// 1. CoreData에서 해당 메시지 조회 (status: .failed)

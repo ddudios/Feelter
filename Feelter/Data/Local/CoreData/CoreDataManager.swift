@@ -67,7 +67,6 @@ final class CoreDataManager {
 
             // 로드 성공 시 로그 (개발 중에만)
             #if DEBUG
-            print("CoreData Store 로드 성공: \(storeDescription.url?.absoluteString ?? "")")
             #endif
         }
 
@@ -115,7 +114,6 @@ final class CoreDataManager {
             try contextToSave.save()
         } catch {
             #if DEBUG
-            print("CoreData 저장 실패: \(error.localizedDescription)")
             #endif
             throw error
         }
@@ -136,7 +134,6 @@ final class CoreDataManager {
         try saveContext()
 
         #if DEBUG
-        print("\(entityName) 전체 삭제 완료")
         #endif
     }
 }
@@ -160,7 +157,6 @@ extension CoreDataManager {
             let results = try viewContext.fetch(fetchRequest)
             return results.first?.createdAt
         } catch {
-            print("마지막 메시지 시간 조회 실패: \(error)")
             return nil
         }
     }
@@ -306,7 +302,6 @@ extension CoreDataManager {
         } else if message.chatRoom == nil {
             // 새 메시지인데 채팅방을 찾지 못하면 에러
             // 이 경우는 메시지를 저장하기 전에 반드시 채팅방이 먼저 저장되어야 함
-            print("[CoreData] 메시지를 저장하려고 하는데 채팅방을 찾을 수 없습니다: roomId=\(roomId), chatId=\(chatId)")
             throw CoreDataError.chatRoomNotFound(roomId: roomId)
         }
         // 기존 메시지이고 채팅방을 찾지 못하면 기존 relationship 유지 (크래시 방지)

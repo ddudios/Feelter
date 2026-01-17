@@ -45,6 +45,10 @@ final class ChatRoomListViewController: BaseViewController {
         }
     }
 
+    private var currentUserId: String? {
+        return KeychainManager.shared.read(account: "userId")
+    }
+
     // MARK: - Initialization
 
     init(viewModel: ChatRoomListViewModel) {
@@ -134,16 +138,6 @@ final class ChatRoomListViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] chatRooms in
                 self?.updateChatRooms(chatRooms)
-            }
-            .store(in: &cancellables)
-
-        // 로딩 상태
-        output.isLoading
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoading in
-                if !isLoading {
-                    self?.refreshControl.endRefreshing()
-                }
             }
             .store(in: &cancellables)
 
@@ -263,7 +257,9 @@ extension ChatRoomListViewController: UITableViewDataSource {
         }
 
         let chatRoom = chatRooms[indexPath.row]
-        cell.configure(with: chatRoom)
+        // TODO: 읽지 않은 메시지 개수 계산 (Repository에서 가져와야 함)
+        // 일단은 0을 전달하여 "N"으로 표시
+        cell.configure(with: chatRoom, currentUserId: currentUserId, unreadCount: 0)
         return cell
     }
 }

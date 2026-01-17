@@ -61,6 +61,9 @@ final class ChatRoomViewController: BaseViewController {
     }
     private var pendingImages: [ChatImageSource] = []
     private var didScrollToBottomOnAppear = false
+    private var didStartInitialLoad = false
+    private var didFinishInitialLoad = false
+    private var isTextViewBeingEdited = false  // TextView 편집 중 플래그
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -96,18 +99,25 @@ final class ChatRoomViewController: BaseViewController {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // BaseViewController의 키보드 dismiss 제스처를 그대로 사용
+        // (override한 gestureRecognizer(_:shouldReceive:) 메서드로 세밀하게 제어)
+
         setupTableView()
 
         setupInputBar()
 
-        setupKeyboardDismissGesture()
-
         setupKeyboardObservers()
+        setupAppLifecycleObservers()
 
         updateSendButtonState()
 
@@ -138,11 +148,10 @@ final class ChatRoomViewController: BaseViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if !didScrollToBottomOnAppear {
-            didScrollToBottomOnAppear = true
-            messageTableView.layoutIfNeeded()
-            scrollToBottom(animated: false)
-        }
+        scrollToBottomIfNeeded()
+
+        // 채팅방 입장 시 읽음 처리
+        markChatRoomAsRead()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -156,6 +165,7 @@ final class ChatRoomViewController: BaseViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateMessageTableInsets()
+        scrollToBottomIfNeeded()
     }
 
     override func configureHierarchy() {
@@ -183,13 +193,6 @@ final class ChatRoomViewController: BaseViewController {
         super.configureView()
         title = chatRoom.opponent.nick
         configureNavigationBar()
-    }
-
-    private func setupKeyboardDismissGesture() {
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tapGesture.cancelsTouchesInView = false
-        tapGesture.delegate = self
-        view.addGestureRecognizer(tapGesture)
     }
 
     private func setupTableView() {
@@ -313,6 +316,7 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     private func configureNavigationBar() {
+        //TODO: 추후 구현
         let searchButton = UIBarButtonItem(
             image: UIImage.TabBar.searchEmpty,
             style: .plain,
@@ -325,7 +329,7 @@ final class ChatRoomViewController: BaseViewController {
             target: self,
             action: #selector(moreButtonTapped)
         )
-        navigationItem.rightBarButtonItems = [moreButton, searchButton]
+//        navigationItem.rightBarButtonItems = [moreButton, searchButton]
     }
 
     /// ViewModel과 바인딩
@@ -353,17 +357,22 @@ final class ChatRoomViewController: BaseViewController {
                 guard let self = self else { return }
                 // Domain Entity -> View Item 변환
                 self.messages = self.convertToChatMessageViewItems(chatMessages)
-
-                // items 재구성 (날짜 섹션 포함)
-                self.rebuildItems()
             }
             .store(in: &cancellables)
 
         // 로딩 상태
         output.isLoading
             .receive(on: DispatchQueue.main)
-            .sink { _ in
-                // TODO: 로딩 인디케이터 표시
+            .removeDuplicates()
+            .sink { [weak self] isLoading in
+                guard let self = self else { return }
+                if isLoading {
+                    self.didStartInitialLoad = true
+                    self.didFinishInitialLoad = false
+                } else if self.didStartInitialLoad, !self.didFinishInitialLoad {
+                    self.didFinishInitialLoad = true
+                    self.scrollToBottomIfNeeded()
+                }
             }
             .store(in: &cancellables)
 
@@ -388,7 +397,7 @@ final class ChatRoomViewController: BaseViewController {
         output.scrollToBottom
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
-                self?.scrollToBottom(animated: true)
+                self?.scrollToBottom(animated: false)
             }
             .store(in: &cancellables)
 
@@ -497,9 +506,16 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     private func rebuildItems() {
+        let oldItemsCount = items.count
         items = buildItems(from: messages)
+
+        // ✅ TableView 업데이트 (reloadData만 사용 - 행 개수 변경 시)
+        // beginUpdates/endUpdates는 이미지 로딩 완료 시에만 사용 (셀 높이 재계산용)
         messageTableView.reloadData()
-        scrollToBottom(animated: false)
+
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollToBottomIfNeeded()
+        }
     }
 
     private func buildItems(from messages: [ChatMessageViewItem]) -> [Item] {
@@ -551,6 +567,13 @@ final class ChatRoomViewController: BaseViewController {
         messageTableView.scrollToRow(at: indexPath, at: .bottom, animated: animated)
     }
 
+    private func scrollToBottomIfNeeded() {
+        guard didFinishInitialLoad, !didScrollToBottomOnAppear, !messages.isEmpty, view.window != nil else { return }
+        messageTableView.layoutIfNeeded()
+        scrollToBottom(animated: false)
+        didScrollToBottomOnAppear = true
+    }
+
     private func setCustomTabBarHidden(_ hidden: Bool) {
         (tabBarController as? CustomTabBarController)?.setCustomTabBarHidden(hidden, animated: false)
     }
@@ -570,6 +593,27 @@ final class ChatRoomViewController: BaseViewController {
         )
     }
 
+    private func setupAppLifecycleObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    /// 앱이 활성화될 때 호출 (백그라운드에서 복귀)
+    @objc private func appDidBecomeActive() {
+        markChatRoomAsRead()
+    }
+
+    /// 채팅방을 읽음으로 표시
+    /// - viewDidAppear: 채팅방 진입 시
+    /// - appDidBecomeActive: 백그라운드에서 복귀 시
+    private func markChatRoomAsRead() {
+        viewModel.markChatRoomAsRead()
+    }
+
     private func updateMessageTableInsets() {
         let bottomInset = Layout.messageBottomInset
         let newInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
@@ -584,11 +628,33 @@ final class ChatRoomViewController: BaseViewController {
         let keyboardHeight = frame.height - view.safeAreaInsets.bottom
         inputBottomConstraint?.update(offset: -keyboardHeight)
 
-        UIView.animate(withDuration: 0.25) {
-            self.view.layoutIfNeeded()
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        let curveRaw = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
+            ?? UIView.AnimationOptions.curveEaseInOut.rawValue
+        let options = UIView.AnimationOptions(rawValue: curveRaw << 16)
+
+        let shouldScrollToBottom = !isTextViewBeingEdited && !items.isEmpty
+        let targetOffsetY: CGFloat
+        if shouldScrollToBottom {
+            let finalHeight = max(0, messageTableView.bounds.height - keyboardHeight)
+            let topInset = messageTableView.adjustedContentInset.top
+            let bottomInset = messageTableView.adjustedContentInset.bottom
+            let contentHeight = messageTableView.contentSize.height
+            let rawOffset = contentHeight - finalHeight + bottomInset
+            targetOffsetY = max(-topInset, rawOffset)
+        } else {
+            targetOffsetY = messageTableView.contentOffset.y
         }
 
-        scrollToBottom(animated: true)
+        UIView.animate(withDuration: duration, delay: 0, options: options) {
+            self.view.layoutIfNeeded()
+            if shouldScrollToBottom {
+                self.messageTableView.contentOffset = CGPoint(x: 0, y: targetOffsetY)
+            }
+        }
+
+        // TextView를 탭해서 키보드가 나타난 경우에는 스크롤하지 않음
+        // 메시지 전송 후나 새 메시지 수신 시에는 ViewModel의 scrollToBottom publisher를 통해 스크롤됨
     }
 
     @objc private func keyboardWillHide(_ notification: Notification) {
@@ -600,6 +666,89 @@ final class ChatRoomViewController: BaseViewController {
 
     @objc override func dismissKeyboard() {
         view.endEditing(true)
+    }
+
+    // MARK: - UIGestureRecognizerDelegate Override
+    /// BaseViewController의 제스처 delegate 메서드를 override
+    /// 세밀한 터치 감지:
+    /// - inputContainerView: 키보드 유지
+    /// - 메시지 버블 (PDF, 이미지, 텍스트): 키보드 유지 (버블의 탭 제스처 우선)
+    /// - 그 외 배경: 키보드 내림
+    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+
+        // 1. inputContainerView 하위 뷰 터치는 키보드 dismiss 안함
+        if touch.view?.isDescendant(of: inputContainerView) == true {
+            return false
+        }
+
+        // 2. messageTableView 내부에서 세밀한 판단
+        if touch.view?.isDescendant(of: messageTableView) == true {
+
+            // 터치된 뷰가 상호작용 가능한 요소인지 확인
+            if let touchedView = touch.view {
+                // UITextView (메시지 버블) - 복사 및 선택 가능하도록 키보드 유지
+                if touchedView is UITextView {
+                    return false
+                }
+
+                // 버블 컨테이너나 상호작용 가능한 뷰인지 확인
+                // UIImageView, UILabel (버블 내부), UIButton 등은 키보드 유지
+                if touchedView is UIImageView {
+                    return false
+                }
+
+                if touchedView is UILabel && touchedView.superview?.superview is ChatMessageCell {
+                    return false
+                }
+
+                if touchedView is UIView && touchedView.superview is ChatImageGridView {
+                    return false
+                }
+
+                if touchedView is UIButton {
+                    return false
+                }
+
+                // UITableViewCell이나 그 contentView는 빈 공간으로 간주 → 키보드 내림
+                if touchedView is UITableViewCell {
+                    return true
+                }
+
+                // 그 외 테이블뷰의 배경 뷰도 키보드 내림
+                if touchedView == messageTableView {
+                    return true
+                }
+
+                // ChatImageGridView 내부의 이미지 컨테이너 확인
+                // gestureRecognizers가 있고 tag가 설정된 UIView는 이미지 컨테이너
+                if touchedView is UIView,
+                   !(touchedView is UIStackView),
+                   !(touchedView is UITableViewCell),
+                   let gestureRecognizers = touchedView.gestureRecognizers,
+                   !gestureRecognizers.isEmpty {
+                    return false
+                }
+
+                // 명시적으로 판단하지 못한 경우: 클래스 이름으로 확인
+                let className = String(describing: type(of: touchedView))
+
+                // contentView 확인 (클래스 이름으로)
+                if className.contains("ContentView") {
+                    return true
+                }
+
+                // 버블 관련 뷰들은 키보드 유지
+                if className.contains("Bubble") || className.contains("Message") || className.contains("File") {
+                    return false
+                }
+            }
+
+            // 기본값: 테이블뷰 내부의 명확하지 않은 터치는 키보드 내림
+            return true
+        }
+
+        // 3. 그 외 배경 터치는 키보드 내림
+        return true
     }
 
     @objc private func attachmentButtonTapped() {
@@ -748,6 +897,9 @@ extension ChatRoomViewController: UITableViewDataSource {
             cell.onRetryTapped = { [weak self] in
                 self?.retryMessage(id: message.id)
             }
+            cell.onImageTapped = { [weak self] images, tappedIndex in
+                self?.showImageViewer(images: images, selectedIndex: tappedIndex)
+            }
             return cell
         }
     }
@@ -819,15 +971,37 @@ extension ChatRoomViewController: UITextViewDelegate {
     }
 
     func textViewDidBeginEditing(_ textView: UITextView) {
+        // 스크롤뷰가 하단에 있는지 확인
+        let scrollView = messageTableView
+        let contentHeight = scrollView.contentSize.height
+        let scrollViewHeight = scrollView.bounds.height
+        let contentOffsetY = scrollView.contentOffset.y
+        let bottomInset = scrollView.contentInset.bottom
+
+        // 스크롤뷰가 거의 하단에 있는지 확인 (여유 50pt)
+        let isNearBottom = contentOffsetY + scrollViewHeight + bottomInset >= contentHeight - 50
+
+        // 스크롤뷰가 하단에 있을 때만 키보드와 함께 스크롤되도록 플래그 설정
+        isTextViewBeingEdited = !isNearBottom
+
+
         // placeholder 위치 조정 (멀티라인일 때 상단 정렬)
         placeholderLabel.snp.remakeConstraints { make in
             make.leading.equalToSuperview().offset(16)
             make.trailing.equalToSuperview().offset(-12)
             make.top.equalToSuperview().offset(textView.textContainerInset.top)
         }
+
+        // 다음 런루프에서 플래그 해제 (키보드 애니메이션 이후)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.isTextViewBeingEdited = false
+        }
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
+        // 편집 종료 시 플래그 해제
+        isTextViewBeingEdited = false
+
         // 텍스트가 비어있을 때 placeholder를 중앙으로 복귀
         if textView.text.isEmpty {
             placeholderLabel.snp.remakeConstraints { make in
@@ -836,32 +1010,6 @@ extension ChatRoomViewController: UITextViewDelegate {
                 make.centerY.equalToSuperview()
             }
         }
-    }
-}
-
-// MARK: - UIGestureRecognizerDelegate
-extension ChatRoomViewController: UIGestureRecognizerDelegate {
-
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // inputContainerView 하위 뷰 터치는 키보드 dismiss 안함
-        if touch.view?.isDescendant(of: inputContainerView) == true {
-            return false
-        }
-
-        // 테이블뷰 영역 내 터치는 키보드 dismiss 안함 (셀의 탭 제스처 우선)
-        if touch.view?.isDescendant(of: messageTableView) == true {
-            return false
-        }
-
-        return true
-    }
-
-    func gestureRecognizer(
-        _ gestureRecognizer: UIGestureRecognizer,
-        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
-    ) -> Bool {
-        // 테이블뷰 셀 내부 제스처는 동시 인식 허용
-        return true
     }
 }
 
@@ -1076,10 +1224,6 @@ extension ChatRoomViewController: UIDocumentPickerDelegate {
         let fileName = url.lastPathComponent
         let mimeType = ChatFileAttachment.mimeType(for: fileName)
 
-        print("📎 선택된 파일 (즉시 전송):")
-        print("   - 파일명: \(fileName)")
-        print("   - MIME 타입: \(mimeType)")
-        print("   - URL: \(url.absoluteString)")
 
         // 파일을 Data로 변환
         do {
@@ -1089,13 +1233,10 @@ extension ChatRoomViewController: UIDocumentPickerDelegate {
             let maxSize = 5 * 1024 * 1024  // 5MB
             guard fileData.count <= maxSize else {
                 let sizeInMB = Double(fileData.count) / (1024 * 1024)
-                print("❌ 파일 크기 초과: \(String(format: "%.2f", sizeInMB))MB (최대 5MB)")
                 showErrorAlert(message: "파일 크기는 5MB를 초과할 수 없습니다.\n현재 크기: \(String(format: "%.2f", sizeInMB))MB")
                 return
             }
 
-            print("   - 크기: \(fileData.count) bytes")
-            print("📤 즉시 전송 시작...")
 
             // ViewModel을 통해 파일 즉시 전송 (인증 헤더는 ViewModel/Repository에서 처리)
             viewModel.sendFile(
@@ -1105,24 +1246,20 @@ extension ChatRoomViewController: UIDocumentPickerDelegate {
             ) { [weak self] success, errorMessage in
                 DispatchQueue.main.async {
                     if success {
-                        print("✅ 파일 전송 성공: \(fileName)")
                         self?.scrollToBottom(animated: true)
                     } else if let error = errorMessage {
-                        print("❌ 파일 전송 실패: \(error)")
                         self?.showErrorAlert(message: error)
                     }
                 }
             }
 
         } catch {
-            print("❌ 파일 읽기 실패: \(error.localizedDescription)")
             showErrorAlert(message: "파일을 읽는데 실패했습니다.")
         }
     }
 
     /// 파일 선택 취소 시 호출
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        print("📎 파일 선택 취소됨")
     }
 }
 
@@ -1136,7 +1273,6 @@ extension ChatRoomViewController {
     ///
     /// - Parameter file: 파일 첨부 정보
     func openFile(file: ChatFileAttachment) {
-        print("📂 openFile 호출됨: \(file.fileName)")
 
         let ext = (file.fileName as NSString).pathExtension.lowercased()
 
@@ -1151,15 +1287,35 @@ extension ChatRoomViewController {
 
             // PDF는 전용 뷰어로 표시 (Coordinator 사용)
             if let coordinator = chatCoordinator {
-                print("📄 PDF 뷰어 열기: \(file.fileName)")
                 coordinator.showPDFViewer(file: file)
             } else {
-                print("⚠️ Coordinator가 nil - Quick Look으로 대체")
                 openFileWithQuickLook(file: file)
             }
         } else {
             // 다른 파일 형식은 Quick Look 사용
             openFileWithQuickLook(file: file)
+        }
+    }
+
+    /// 이미지 뷰어 열기 (갤러리 형태)
+    ///
+    /// - Parameters:
+    ///   - images: 이미지 소스 배열
+    ///   - selectedIndex: 선택된 이미지 인덱스
+    private func showImageViewer(images: [ChatImageSource], selectedIndex: Int) {
+
+        // Coordinator 지연 초기화 (nil인 경우)
+        if chatCoordinator == nil, let nav = navigationController {
+            chatCoordinator = ChatCoordinator(
+                navigationController: nav,
+                chatRoomViewController: self
+            )
+        }
+
+        // Coordinator를 통해 이미지 뷰어 표시
+        if let coordinator = chatCoordinator {
+            coordinator.showImageViewer(images: images, selectedIndex: selectedIndex)
+        } else {
         }
     }
 }
@@ -1176,8 +1332,6 @@ extension ChatRoomViewController: QLPreviewControllerDataSource {
     ///
     /// - Parameter file: 파일 첨부 정보
     func openFileWithQuickLook(file: ChatFileAttachment) {
-        print("📂 파일 열기 시도: \(file.fileName)")
-        print("   - URL: \(file.fileURL)")
 
         // 원격 URL 생성 (서버 base URL + file path)
         let baseURL = Config.baseURL
@@ -1276,7 +1430,6 @@ extension ChatRoomViewController: QLPreviewControllerDataSource {
 
                 // 새 파일 저장
                 try data.write(to: localURL)
-                print("✅ 파일 저장 완료: \(localURL.path)")
                 completion(.success(localURL))
 
             } catch {

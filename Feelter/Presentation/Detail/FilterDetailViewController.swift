@@ -366,27 +366,20 @@ final class FilterDetailViewController: BaseViewController {
     private func handleEditFilter() {
         guard let filterDetail = currentFilterDetail else { return }
 
-        print("🟠 [FilterDetail-Edit] handleEditFilter 호출")
-        print("🟠 [FilterDetail-Edit] filterId: \(filterDetail.id)")
-        print("🟠 [FilterDetail-Edit] title: \(filterDetail.title)")
 
         let filterMakeVC = FilterMakeViewController(mode: .edit(filterDetail))
 
         // 수정 완료 시 로컬 UI 업데이트 (네트워크 재호출 없이)
         filterMakeVC.onUpdateComplete = { [weak self] updatedFilter in
-            print("🟠 [FilterDetail-Edit] onUpdateComplete 호출됨")
-            print("🟠 [FilterDetail-Edit] 업데이트된 title: \(updatedFilter.title)")
 
             self?.updateLocalFilterDetail(updatedFilter)
 
             // Feed 화면에도 업데이트 알림
-            print("🟠 [FilterDetail-Edit] NotificationCenter에 filterDidUpdate 전송")
             NotificationCenter.default.post(
                 name: .filterDidUpdate,
                 object: nil,
                 userInfo: ["filter": updatedFilter]
             )
-            print("🟠 [FilterDetail-Edit] 알림 전송 완료")
         }
 
         navigationController?.pushViewController(filterMakeVC, animated: true)

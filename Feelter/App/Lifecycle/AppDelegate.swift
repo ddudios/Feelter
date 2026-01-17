@@ -53,17 +53,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             .requestModifier(AuthHeaderModifier())
         ]
         
-        /*
-        for family in UIFont.familyNames.sorted() {
-            let names = UIFont.fontNames(forFamilyName: family).sorted()
-            
-            print("Family: \(family)")
-            for name in names {
-                print("  ➜ \(name)")
-            }
-        }
-         */
-        
         return true
     }
     
@@ -102,7 +91,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         let userInfo = notification.request.content.userInfo
-        print("📩 포그라운드 푸시 수신: \(userInfo)")
 
         // 포그라운드에서도 배너, 사운드, 뱃지 표시
         completionHandler([.banner, .sound, .badge])
@@ -115,7 +103,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        print("📩 푸시 알림 탭: \(userInfo)")
 
         // TODO: 알림 탭 시 해당 화면으로 이동 처리
 
@@ -148,7 +135,6 @@ extension AppDelegate: MessagingDelegate {
         // 로그인 상태 확인 (accessToken이 없으면 API 호출 불가)
         guard let accessToken = KeychainManager.shared.read(account: "accessToken"),
               !accessToken.isEmpty else {
-            print("⚠️ FCM 토큰 업데이트 스킵: 로그인 필요")
             return
         }
 
@@ -159,9 +145,7 @@ extension AppDelegate: MessagingDelegate {
             try await networkManager.requestWithEmptyResponse(
                 UserRouter.updateDeviceToken(body: requestDTO)
             )
-            print("✅ FCM 토큰 서버 업데이트 성공")
         } catch {
-            print("❌ FCM 토큰 서버 업데이트 실패: \(error)")
         }
     }
 }

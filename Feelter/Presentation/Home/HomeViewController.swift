@@ -184,7 +184,6 @@ final class HomeViewController: BaseViewController {
 
     private func printAccessToken() {
         let token = KeychainManager.shared.read(account: "accessToken")
-        print("AccessToken: \(token ?? "nil")")
     }
 
     private func setupDataSource() {
@@ -244,7 +243,6 @@ final class HomeViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { isLoading in
                 // TODO: 로딩 인디케이터 처리
-                print("Loading: \(isLoading)")
             }
             .store(in: &cancellables)
 

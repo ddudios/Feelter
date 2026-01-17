@@ -30,7 +30,6 @@ extension ChatRoomResponseDTO {
         // 내 ID를 제외한 사람이 상대방
         guard let opponentDTO = participants.first(where: { $0.userId != currentUserId }) else {
             // 자기 자신과의 채팅방인 경우 nil 반환 (필터링)
-            print("자기 자신과의 채팅방 감지, 필터링: roomId=\(roomId)")
             return nil
         }
 

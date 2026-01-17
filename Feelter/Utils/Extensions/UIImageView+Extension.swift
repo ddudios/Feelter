@@ -11,10 +11,11 @@ import Kingfisher
 extension UIImageView {
     
     // path만 넘기면 알아서 baseURL 붙여서 요청하는 함수
-    func setFeelterImage(with path: String?) {
+    func setFeelterImage(with path: String?, completion: ((Bool) -> Void)? = nil) {
         guard let path = path, !path.isEmpty else {
             // path가 없으면 이미지 초기화 or 기본 이미지
             self.image = nil
+            completion?(false)
             return
         }
 
@@ -22,28 +23,28 @@ extension UIImageView {
         // (슬래시 처리가 애매하면 여기서 확실하게 처리해도 됨)
         let fullPath = "\(Config.baseURL)/v1\(path)"
 
-        guard let url = URL(string: fullPath) else { return }
+        guard let url = URL(string: fullPath) else {
+            completion?(false)
+            return
+        }
 
         // 2. Kingfisher 호출
         // 전역 헤더 설정은 자동으로 적용됨
-        self.kf.indicatorType = .activity
+        self.kf.indicatorType = .none  // 인디케이터 제거
         self.kf.setImage(
             with: url,
-            placeholder: UIImage(systemName: "doc.fill"),
+            placeholder: nil,  // placeholder 제거
             options: [
                 .transition(.fade(0.2)), // 부드럽게 뜨는 효과
                 .cacheOriginalImage      // 원본 캐싱
             ]
-        ) { [weak self] result in
+        ) { result in
             switch result {
             case .success:
-                break
-            case .failure(let error):
-                // 이미지 로드 실패 시 파일 아이콘 표시 (PDF 등 비이미지 데이터 대응)
-                print("⚠️ 이미지 로드 실패: \(error.localizedDescription)")
-                self?.image = UIImage(systemName: "doc.fill")
-                self?.tintColor = .systemGray
-                self?.contentMode = .center
+                completion?(true)
+            case .failure:
+                // 이미지 로드 실패 시 에러 로그만 남기고 아이콘 표시 안 함
+                completion?(false)
             }
         }
     }
@@ -59,26 +60,23 @@ extension UIImageView {
 
         let processor = ResizingImageProcessor(referenceSize: targetSize, mode: .aspectFill)
 
-        kf.indicatorType = .activity
+        kf.indicatorType = .none  // 인디케이터 제거
         kf.setImage(
             with: url,
-            placeholder: UIImage(systemName: "doc.fill"),
+            placeholder: nil,  // placeholder 제거
             options: [
                 .processor(processor),
                 .scaleFactor(UIScreen.main.scale),
                 .transition(.fade(0.2)),
                 .cacheOriginalImage
             ]
-        ) { [weak self] result in
+        ) { result in
             switch result {
             case .success:
                 break
-            case .failure(let error):
-                // 이미지 로드 실패 시 파일 아이콘 표시 (PDF 등 비이미지 데이터 대응)
-                print("⚠️ 이미지 로드 실패: \(error.localizedDescription)")
-                self?.image = UIImage(systemName: "doc.fill")
-                self?.tintColor = .systemGray
-                self?.contentMode = .center
+            case .failure:
+                // 이미지 로드 실패 시 에러 로그만 남기고 아이콘 표시 안 함
+                break
             }
         }
     }

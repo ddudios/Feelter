@@ -52,7 +52,6 @@ enum ISO8601DateParser {
         }
 
         // 3. 파싱 실패 시 현재 시간 반환
-        print("ISO8601 날짜 파싱 실패: \(string)")
         return Date()
     }
 

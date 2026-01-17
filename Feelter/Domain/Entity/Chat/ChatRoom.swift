@@ -45,16 +45,34 @@ struct ChatRoom: Equatable, Hashable, Identifiable {
     var id: String { roomId }
 
     // MARK: - Computed Properties
-    /// 새 메시지 존재 여부 (빨간 점 표시용)
+    /// 새 메시지 존재 여부 (빨간 점 표시용) - Deprecated
     ///
-    /// 계산 방법:
-    /// - lastReadAt이 nil이면 -> 한 번도 읽지 않았으므로 true
-    /// - updatedAt > lastReadAt -> 내가 읽은 후 새 메시지 도착
+    /// @deprecated: hasUnreadMessage(currentUserId:) 메서드를 사용하세요
+    /// 기존 호환성을 위해 유지되지만, 내가 보낸 메시지도 배지로 표시되는 버그가 있습니다.
     var hasUnreadMessage: Bool {
         guard let lastReadAt = lastReadAt else {
-            return true // 한 번도 안 읽었으면 새 메시지로 간주
+            return true
         }
         return updatedAt > lastReadAt
+    }
+
+    /// 읽지 않은 메시지 개수 계산
+    ///
+    /// - Parameters:
+    ///   - messages: 해당 채팅방의 모든 메시지 목록
+    ///   - currentUserId: 현재 로그인한 사용자 ID
+    /// - Returns: 읽지 않은 메시지 개수
+    func unreadMessageCount(from messages: [ChatMessage], currentUserId: String?) -> Int {
+        guard let currentUserId = currentUserId,
+              let lastReadAt = lastReadAt else {
+            // lastReadAt이 없으면 상대방이 보낸 모든 메시지가 읽지 않은 메시지
+            return messages.filter { $0.senderId != currentUserId }.count
+        }
+
+        // lastReadAt 이후에 상대방이 보낸 메시지 개수
+        return messages.filter { message in
+            message.senderId != currentUserId && message.createdAt > lastReadAt
+        }.count
     }
 
     /// 마지막 메시지 미리보기 텍스트
@@ -96,6 +114,37 @@ extension ChatRoom {
 
 // MARK: - Helper Methods
 extension ChatRoom {
+
+    /// 새 메시지 존재 여부 (개선된 버전)
+    ///
+    /// 계산 방법:
+    /// - lastMessage가 없으면 -> false
+    /// - lastMessage가 내가 보낸 메시지면 -> false (내가 보낸 메시지에는 배지 안 붙음)
+    /// - lastReadAt이 nil이고 lastMessage가 상대방 메시지면 -> true
+    /// - updatedAt > lastReadAt && lastMessage가 상대방 메시지면 -> true
+    ///
+    /// - Parameter currentUserId: 현재 로그인한 사용자 ID
+    /// - Returns: 읽지 않은 메시지가 있는지 여부
+    func hasUnreadMessage(currentUserId: String?) -> Bool {
+        // lastMessage가 없으면 배지 표시 안 함
+        guard let lastMessage = lastMessage else {
+            return false
+        }
+
+        // lastMessage가 내가 보낸 메시지면 배지 표시 안 함
+        guard let currentUserId = currentUserId,
+              lastMessage.senderId != currentUserId else {
+            return false
+        }
+
+        // lastReadAt이 nil이면 한 번도 안 읽었으므로 true
+        guard let lastReadAt = lastReadAt else {
+            return true
+        }
+
+        // updatedAt > lastReadAt인지 확인 (상대방 메시지가 도착했는지)
+        return updatedAt > lastReadAt
+    }
 
     /// 마지막 읽은 시간 업데이트
     /// 채팅방을 열 때 호출

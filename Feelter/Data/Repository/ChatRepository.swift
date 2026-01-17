@@ -156,7 +156,6 @@ final class ChatRepository: ChatRepositoryProtocol {
 
             } catch {
                 // 네트워크 에러는 조용히 무시 (로컬 데이터가 이미 표시됨)
-                print("⚠️ [Repository] 채팅방 목록 네트워크 요청 실패 (로컬 데이터 사용): \(error)")
             }
         }
 
@@ -185,14 +184,12 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///   - roomId: 채팅방 ID
     /// - Returns: [ChatMessage] (Domain Entity 배열) - 로컬 데이터 즉시 반환
     func fetchChatHistory(roomId: String) async throws -> [ChatMessage] {
-        print("📥 [Repository] 채팅 내역 조회 시작: roomId=\(roomId)")
 
         // 1. CoreData에서 로컬 메시지를 먼저 가져오기
         let localMessages: [ChatMessage]
         do {
             let entities = try coreDataManager.fetchMessages(for: roomId)
             localMessages = entities.map { $0.toDomain() }
-            print("📦 [Repository] 로컬 메시지 로드: count=\(localMessages.count)")
 
             // 로컬 메시지가 있으면 즉시 Subject 업데이트 (빠른 UI 표시)
             if !localMessages.isEmpty {
@@ -200,7 +197,6 @@ final class ChatRepository: ChatRepositoryProtocol {
             }
         } catch {
             localMessages = []
-            print("⚠️ [Repository] 로컬 메시지 로드 실패: \(error)")
         }
 
         // 2. 백그라운드에서 네트워크 요청 (비동기)
@@ -208,11 +204,9 @@ final class ChatRepository: ChatRepositoryProtocol {
             do {
                 let router = ChatRouter.fetchChatHistory(roomId: roomId, next: nil)
                 let responseDTO = try await networkManager.request(router, type: ChatHistoryResponseDTO.self)
-                print("✅ [Repository] API 응답 성공: data.count=\(responseDTO.data.count)")
 
                 // DTO -> Domain Entity 변환
                 let messages = responseDTO.data.map { $0.toDomain() }
-                print("📦 [Repository] 메시지 변환 완료: messages.count=\(messages.count)")
 
                 // CoreData에 저장
                 for message in messages {
@@ -221,11 +215,9 @@ final class ChatRepository: ChatRepositoryProtocol {
 
                 // Subject 업데이트 (UI 자동 갱신)
                 await refreshMessagesFromCoreData(roomId: roomId)
-                print("✅ [Repository] 메시지 업데이트 완료")
 
             } catch {
                 // 네트워크 에러는 조용히 무시 (로컬 데이터가 이미 표시됨)
-                print("⚠️ [Repository] 채팅 내역 네트워크 요청 실패 (로컬 데이터 사용): \(error)")
             }
         }
 
@@ -366,7 +358,6 @@ final class ChatRepository: ChatRepositoryProtocol {
 
         if results.isEmpty {
             // 2. 존재하지 않으면 저장
-            print("📝 [Repository] 채팅방을 CoreData에 저장: roomId=\(chatRoom.roomId)")
             try saveChatRoomToCoreData(chatRoom)
 
             // 3. lastMessage가 있으면 함께 저장
@@ -374,24 +365,32 @@ final class ChatRepository: ChatRepositoryProtocol {
                 try saveMessageToCoreData(lastMessage)
             }
         } else {
-            print("✅ [Repository] 채팅방이 이미 CoreData에 존재: roomId=\(chatRoom.roomId)")
         }
     }
 
     /// 마지막 읽은 시간 업데이트
     ///
     /// - Parameter roomId: 채팅방 ID
-    func updateLastReadDate(roomId: String) throws {
+    func updateLastReadDate(roomId: String) async throws {
+
         // CoreData에서 ChatRoomEntity 조회
         let fetchRequest = ChatRoomEntity.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
 
         let results = try coreDataManager.viewContext.fetch(fetchRequest)
-        guard let chatRoomEntity = results.first else { return }
+        guard let chatRoomEntity = results.first else {
+            return
+        }
+
+        let beforeDate = chatRoomEntity.lastReadAt
 
         // lastReadAt 업데이트
         chatRoomEntity.lastReadAt = Date()
+
         try coreDataManager.saveContext()
+
+        // 채팅방 목록 갱신 (배지 업데이트를 위해)
+        await refreshChatRoomsFromCoreData()
     }
 
     /// 실패한 메시지 재전송
@@ -422,9 +421,11 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// Socket.IO 메시지 리스너 설정
     ///
     /// Socket에서 새 메시지 수신 시 동작:
-    /// 1. CoreData에 저장 (항상)
-    /// 2. 현재 채팅방 Subject 업데이트 (조건부)
-    /// 3. 채팅방 목록 Subject 업데이트 (항상)
+    /// 1. CoreData에 이미 존재하는지 확인 (중복 방지)
+    /// 2. .sending 상태의 로컬 임시 메시지 삭제 (Optimistic Update 정리)
+    /// 3. 없을 때만 CoreData에 저장
+    /// 4. 현재 채팅방 Subject 업데이트 (조건부)
+    /// 5. 채팅방 목록 Subject 업데이트 (항상)
     private func setupSocketMessageListener() {
         socketManager.observeMessages()
             .sink { [weak self] messageDTO in
@@ -438,24 +439,55 @@ final class ChatRepository: ChatRepositoryProtocol {
                     guard let self = self else { return }
 
                     do {
-                        // 1. CoreData에 저장 (항상)
+                        // 1. CoreData에 이미 존재하는지 확인 (중복 방지)
+                        let fetchRequest = ChatMessageEntity.fetchRequest()
+                        fetchRequest.predicate = NSPredicate(format: "chatId == %@", message.chatId)
+
+                        let results = try self.coreDataManager.viewContext.fetch(fetchRequest)
+
+                        // 이미 존재하면 저장하지 않음 (API 응답으로 이미 저장된 메시지)
+                        if !results.isEmpty {
+                            return
+                        }
+
+                        // ✅ 2. .sending 상태의 로컬 임시 메시지 삭제 (중복 방지)
+                        // - 같은 roomId + senderId + 비슷한 createdAt 시간을 가진 .sending 메시지 찾기
+                        // - 이는 사용자가 방금 전송한 메시지의 임시 버전
+                        let tempMessageRequest = ChatMessageEntity.fetchRequest()
+                        tempMessageRequest.predicate = NSPredicate(
+                            format: "roomId == %@ AND senderId == %@ AND status == %@",
+                            message.roomId,
+                            message.senderId,
+                            MessageSendStatus.sending.rawValue
+                        )
+
+                        let tempMessages = try self.coreDataManager.viewContext.fetch(tempMessageRequest)
+
+                        // 시간 차이가 5초 이내인 메시지를 찾음 (같은 메시지로 간주)
+                        let fiveSecondsAgo = Date().addingTimeInterval(-5)
+                        for tempMessage in tempMessages {
+                            if let tempCreatedAt = tempMessage.createdAt,
+                               tempCreatedAt >= fiveSecondsAgo {
+                                self.coreDataManager.viewContext.delete(tempMessage)
+                            }
+                        }
+
+                        // 3. CoreData에 저장 (존재하지 않을 때만)
                         try self.saveMessageToCoreData(message)
 
-                        // 2. 현재 채팅방 Subject가 있으면 업데이트
+                        // 4. 현재 채팅방 Subject가 있으면 업데이트
                         // - 사용자가 해당 채팅방에 있을 때만 실시간 업데이트
                         // - Subject가 없으면 불필요한 생성 방지
                         if self.messagesSubjects[message.roomId] != nil {
                             await self.refreshMessagesFromCoreData(roomId: message.roomId)
-                        } else {
                         }
 
-                        // 3. 채팅방 목록도 항상 업데이트
+                        // 5. 채팅방 목록도 항상 업데이트
                         // - lastMessage, updatedAt 변경 반영
                         // - 채팅방 목록 화면에서 실시간 갱신
                         await self.refreshChatRoomsFromCoreData()
 
                     } catch {
-                        // Error handling is intentionally silent; other paths handle user-facing alerts.
                     }
                 }
             }
@@ -490,11 +522,23 @@ final class ChatRepository: ChatRepositoryProtocol {
             updatedAt: chatRoom.updatedAt
         )
 
+
         // 2. 상대방 정보 설정 (반환된 entity에 바로 설정)
         entity.opponentUserId = chatRoom.opponent.userId
         entity.opponentNick = chatRoom.opponent.nick
         entity.opponentProfileImage = chatRoom.opponent.profileImage
-        entity.lastReadAt = chatRoom.lastReadAt
+
+        // lastReadAt은 기존 값이 더 최신이면 유지 (로컬에서 읽은 시간을 서버 데이터로 덮어쓰지 않음)
+        if let existingLastReadAt = entity.lastReadAt,
+           let newLastReadAt = chatRoom.lastReadAt {
+            // 둘 다 있으면 더 최신 값 사용
+            entity.lastReadAt = max(existingLastReadAt, newLastReadAt)
+        } else if chatRoom.lastReadAt != nil {
+            // 새 값만 있으면 새 값 사용
+            entity.lastReadAt = chatRoom.lastReadAt
+        } else {
+            // 기존 값만 있거나 둘 다 없으면 기존 값 유지
+        }
 
         // 3. 저장
         try coreDataManager.saveContext()
