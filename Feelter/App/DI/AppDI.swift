@@ -107,9 +107,9 @@ func registerDependencies() {
         return HomeViewModel(filterUsecase: filterUsecase, bannerUsecase: bannerUsecase, tokenRepository: tokenRepository)
     }
 
-    container.registerFactory(FeedViewModel.self) {
+    container.registerFactory(CategoryRankingViewModel.self) {
         let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
-        return FeedViewModel(filterUsecase: filterUsecase)
+        return CategoryRankingViewModel(filterUsecase: filterUsecase)
     }
 
     container.registerFactory(ChatRoomListViewModel.self) {

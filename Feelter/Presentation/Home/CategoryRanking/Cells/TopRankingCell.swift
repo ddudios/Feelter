@@ -1,5 +1,5 @@
 //
-//  CategoryRankingCell.swift
+//  TopRankingCell.swift
 //  Feelter
 //
 //  Created by Suji Jang on 1/7/26.
@@ -9,8 +9,8 @@ import UIKit
 import SnapKit
 import Kingfisher
 
-final class CategoryRankingCell: BaseCollectionViewCell {
-
+final class TopRankingCell: BaseCollectionViewCell {
+    
     var onTap: (() -> Void)?
 
     // MARK: - Layout Constants
@@ -101,7 +101,7 @@ final class CategoryRankingCell: BaseCollectionViewCell {
         cardView.addSubview(creatorNameLabel)
         cardView.addSubview(titleLabel)
         cardView.addSubview(categoryLabel)
-        
+
         // 뱃지는 카드 위에 떠야 하므로 마지막에 add
         contentView.addSubview(rankBadgeView)
         rankBadgeView.addSubview(rankLabel)
@@ -164,19 +164,19 @@ final class CategoryRankingCell: BaseCollectionViewCell {
             self?.applyCornerRadius()
         }
     }
-    
+
     private func applyCornerRadius() {
         // [고정 크기 뷰] bounds 계산 필요 없음 -> 상수로 박아버려서 무조건 원형 보장
         filterImageView.layer.cornerRadius = Layout.imageSize / 2
         rankBadgeView.layer.cornerRadius = Layout.rankBadgeDiameter / 2
-        
+
         // [가변 크기 뷰] layoutIfNeeded() 덕분에 올바른 width를 가져옴
         // 혹시라도 width가 0이면 0이 들어가겠지만, DispatchQueue가 곧바로 다시 잡아줌
         if cardView.bounds.width > 0 {
             cardView.layer.cornerRadius = cardView.bounds.width / 2
         }
     }
-    
+
     override func prepareForReuse() {
         super.prepareForReuse()
         // 재사용될 때 레이아웃 갱신 예약

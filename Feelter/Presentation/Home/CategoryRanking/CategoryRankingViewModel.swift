@@ -1,5 +1,5 @@
 //
-//  FeedViewModel.swift
+//  CategoryRankingViewModel.swift
 //  Feelter
 //
 //  Created by Suji Jang on 1/7/26.
@@ -14,7 +14,7 @@ struct FilterDetailLikeUpdate {
     let likeCount: Int
 }
 
-final class FeedViewModel: ViewModelProtocol {
+final class CategoryRankingViewModel: ViewModelProtocol {
     
     struct Input {
         let viewDidLoad: AnyPublisher<Void, Never>
@@ -380,7 +380,7 @@ final class FeedViewModel: ViewModelProtocol {
     }
 }
 
-private extension FeedViewModel {
+private extension CategoryRankingViewModel {
     func fetchTopRankingFilters(
         orderBy: FilterSortType,
         categories: [FilterCategory]

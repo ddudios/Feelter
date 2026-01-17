@@ -1,5 +1,5 @@
 //
-//  FilterFeedHeaderView.swift
+//  CategoryFeedHeaderView.swift
 //  Feelter
 //
 //  Created by Suji Jang on 1/8/26.
@@ -8,9 +8,9 @@
 import UIKit
 import SnapKit
 
-final class FilterFeedHeaderView: UICollectionReusableView {
+final class CategoryFeedHeaderView: UICollectionReusableView {
 
-    static let identifier = String(describing: FilterFeedHeaderView.self)
+    static let identifier = String(describing: CategoryFeedHeaderView.self)
 
     private enum Layout {
         static let buttonHeight: CGFloat = 28

@@ -12,6 +12,8 @@ import Kingfisher
 
 final class HomeViewController: BaseViewController {
 
+    weak var coordinator: HomeCoordinator?
+
     // MARK: - Types
     enum Section {
         case todayFilter
@@ -199,6 +201,11 @@ final class HomeViewController: BaseViewController {
                     return UICollectionViewCell()
                 }
                 cell.configure(with: filter)
+
+                cell.onCategoryTapped = { [weak self] category in
+                    self?.coordinator?.showCategoryRanking(initialCategory: category)
+                }
+
                 return cell
 
             case .banner(let banner):

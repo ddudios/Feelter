@@ -1,15 +1,15 @@
 //
-//  FilterFeedCell.swift
+//  CategoryFeedBlockCell.swift
 //  Feelter
 //
-//  Created by Suji Jang on 1/7/26.
+//  Created by Suji Jang on 1/8/26.
 //
 
 import UIKit
 import SnapKit
 import Kingfisher
 
-final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate {
+final class CategoryFeedBlockCell: BaseCollectionViewCell, UIGestureRecognizerDelegate {
 
     var onTap: ((String) -> Void)?
     var onLikeTapped: ((String, Bool) -> Void)?
@@ -24,9 +24,24 @@ final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate 
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 8
+        imageView.layer.cornerRadius = 16
         imageView.backgroundColor = .Feelter.gray90
         return imageView
+    }()
+
+    private let titleLabel = {
+        let label = UILabel()
+        label.font = TextStyle.Mulgyeol.caption1
+        label.textColor = .Feelter.gray30
+        label.numberOfLines = 2
+        return label
+    }()
+
+    private let creatorNameLabel = {
+        let label = UILabel()
+        label.font = TextStyle.Pretendard.caption1
+        label.textColor = .Feelter.gray90
+        return label
     }()
 
     private let likeButton = {
@@ -37,35 +52,19 @@ final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate 
         return button
     }()
 
-    private let titleLabel = {
+    private let likeCountLabel = {
         let label = UILabel()
-        label.font = TextStyle.Mulgyeol.body1
-        label.textColor = .Feelter.gray15
-        label.numberOfLines = 1
+        label.font = TextStyle.Pretendard.body4
+        label.textColor = .Feelter.gray0
         return label
     }()
 
-    private let categoryLabel = {
-        let label = CapsuleLabel()
-        label.font = TextStyle.Pretendard.caption1
-        label.textColor = .Feelter.gray60
-        label.backgroundColor = UIColor.Feelter.blackTurquoise
-        return label
-    }()
-
-    private let creatorNameLabel = {
-        let label = UILabel()
-        label.font = TextStyle.Pretendard.body1
-        label.textColor = .Feelter.gray75
-        return label
-    }()
-
-    private let descriptionLabel = {
-        let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
-        label.textColor = .Feelter.gray60
-        label.numberOfLines = 3
-        return label
+    private lazy var likeStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [likeButton, likeCountLabel])
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.spacing = 4
+        return stackView
     }()
 
     override init(frame: CGRect) {
@@ -79,11 +78,9 @@ final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate 
 
     override func configureHierarchy() {
         contentView.addSubview(thumbnailImageView)
-        contentView.addSubview(likeButton)
-        contentView.addSubview(titleLabel)
-        contentView.addSubview(categoryLabel)
+        thumbnailImageView.addSubview(titleLabel)
+        thumbnailImageView.addSubview(likeStackView)
         contentView.addSubview(creatorNameLabel)
-        contentView.addSubview(descriptionLabel)
     }
 
     override func configureView() {
@@ -93,43 +90,35 @@ final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate 
 
     override func configureLayout() {
         thumbnailImageView.snp.makeConstraints { make in
-            make.leading.equalToSuperview()
-            make.verticalEdges.equalToSuperview()
-            make.width.equalTo(90)
-            make.height.equalTo(110)
-        }
-
-        likeButton.snp.makeConstraints { make in
-            make.bottom.equalTo(thumbnailImageView.snp.bottom).offset(-8)
-            make.trailing.equalTo(thumbnailImageView.snp.trailing).offset(-8)
-            make.width.height.equalTo(24)
+            make.top.leading.trailing.equalToSuperview()
+            make.bottom.equalTo(creatorNameLabel.snp.top).offset(-8)
         }
 
         titleLabel.snp.makeConstraints { make in
-            make.top.equalTo(thumbnailImageView.snp.top).offset(5)
-            make.leading.equalTo(thumbnailImageView.snp.trailing).offset(16)
+            make.top.equalToSuperview().offset(12)
+            make.leading.equalToSuperview().offset(12)
+            make.trailing.lessThanOrEqualToSuperview().offset(-12)
         }
 
-        categoryLabel.snp.makeConstraints { make in
-            make.centerY.equalTo(titleLabel.snp.centerY)
-            make.leading.equalTo(titleLabel.snp.trailing).offset(6)
-            make.trailing.lessThanOrEqualToSuperview()
+        likeStackView.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-12)
+            make.bottom.equalToSuperview().offset(-12)
+        }
+
+        likeButton.snp.makeConstraints { make in
+            make.width.height.equalTo(18)
         }
 
         creatorNameLabel.snp.makeConstraints { make in
-            make.top.equalTo(categoryLabel.snp.bottom).offset(2)
-            make.leading.equalTo(titleLabel)
-        }
-
-        descriptionLabel.snp.makeConstraints { make in
-            make.top.equalTo(creatorNameLabel.snp.bottom).offset(4)
-            make.leading.equalTo(titleLabel)
-            make.trailing.equalToSuperview()
+            make.top.equalTo(thumbnailImageView.snp.bottom).offset(8)
+            make.leading.trailing.equalToSuperview()
+            make.bottom.equalToSuperview()
         }
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        thumbnailImageView.image = nil
         onTap = nil
         onLikeTapped = nil
         currentFilter = nil
@@ -157,10 +146,8 @@ final class FilterFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegate 
 
         thumbnailImageView.setFeelterImage(with: filter.mainImageURL)
         titleLabel.text = filter.title
-        categoryLabel.text = "#\(filter.category.rawValue)"
         creatorNameLabel.text = filter.creator.nickname
-        descriptionLabel.text = filter.description
-
+        likeCountLabel.text = "\(filter.likeCount)"
         likeButton.isSelected = filter.isLiked
     }
 }

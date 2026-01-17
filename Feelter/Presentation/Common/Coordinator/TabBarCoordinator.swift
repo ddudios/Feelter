@@ -27,26 +27,31 @@ final class TabBarCoordinator: Coordinator {
     }
 
     private func createViewControllers() -> [UIViewController] {
-        let homeNav = createNavigationController(
-            rootViewController: HomeViewController(),
-            tabType: .home
-        )
+        // Home 탭 - HomeCoordinator 사용
+        let homeNav = createNavigationController(tabType: .home)
+        let homeCoordinator = HomeCoordinator(navigationController: homeNav)
+        addChildCoordinator(homeCoordinator)
+        homeCoordinator.start()
 
+        // Feed 탭 - 새로운 FeedViewController (빈 화면)
         let feedNav = createNavigationController(tabType: .feed)
         let feedCoordinator = FeedCoordinator(navigationController: feedNav)
         addChildCoordinator(feedCoordinator)
         feedCoordinator.start()
 
+        // Filter 탭
         let filterNav = createNavigationController(
             rootViewController: FilterMakeViewController(),
             tabType: .filter
         )
 
+        // Search 탭
         let searchNav = createNavigationController(
             rootViewController: SearchViewController(),
             tabType: .search
         )
 
+        // Profile 탭
         let profileNav = createNavigationController(tabType: .profile)
         let profileCoordinator = ProfileCoordinator(navigationController: profileNav)
         addChildCoordinator(profileCoordinator)

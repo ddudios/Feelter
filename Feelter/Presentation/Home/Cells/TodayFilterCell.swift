@@ -10,6 +10,9 @@ import SnapKit
 import Kingfisher
 
 final class TodayFilterCell: BaseCollectionViewCell {
+
+    var onCategoryTapped: ((FilterCategory) -> Void)?
+
     private let backgroundImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
@@ -146,50 +149,84 @@ final class TodayFilterCell: BaseCollectionViewCell {
     }
     
     private func setupCategoryButtons() {
-        let categories: [(title: String, icon: UIImage?)] = [
-            ("푸드", UIImage.Category.food),
-            ("인물", UIImage.Category.people),
-            ("풍경", UIImage.Category.landscape),
-            ("야경", UIImage.Category.night),
-            ("별", UIImage.Category.star)
+        let categories: [(title: String, icon: UIImage?, category: FilterCategory)] = [
+            ("푸드", UIImage.Category.food, .food),
+            ("인물", UIImage.Category.people, .portrait),
+            ("풍경", UIImage.Category.landscape, .landscape),
+            ("야경", UIImage.Category.night, .night),
+            ("별", UIImage.Category.star, .star)
         ]
-        
+
         categories.forEach { category in
-            let button = createCategoryButton(title: category.title, icon: category.icon)
+            let button = createCategoryButton(
+                title: category.title,
+                icon: category.icon,
+                category: category.category
+            )
             categoryStackView.addArrangedSubview(button)
         }
     }
     
-    private func createCategoryButton(title: String, icon: UIImage?) -> UIView {
+    private func createCategoryButton(
+        title: String,
+        icon: UIImage?,
+        category: FilterCategory
+    ) -> UIView {
         let containerView = UIView()
         containerView.backgroundColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5)
         containerView.layer.cornerRadius = 12
-        
+
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(categoryButtonTapped(_:)))
+        containerView.addGestureRecognizer(tapGesture)
+        containerView.isUserInteractionEnabled = true
+        containerView.tag = category.hashValue
+
         let iconImageView = UIImageView(image: icon)
         iconImageView.tintColor = .Feelter.gray60
         iconImageView.contentMode = .scaleAspectFit
-        
+
         let label = UILabel()
         label.text = title
         label.font = TextStyle.Pretendard.semibold1
         label.textColor = .Feelter.gray60
         label.textAlignment = .center
-        
+
         containerView.addSubview(iconImageView)
         containerView.addSubview(label)
-        
+
         iconImageView.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.top.equalToSuperview().offset(5)
             make.size.equalTo(32)
         }
-        
+
         label.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.bottom.equalToSuperview().offset(-5.5)
         }
-        
+
         return containerView
+    }
+
+    @objc private func categoryButtonTapped(_ gesture: UITapGestureRecognizer) {
+        guard let tag = gesture.view?.tag else { return }
+
+        let category: FilterCategory
+        switch tag {
+        case FilterCategory.food.hashValue: category = .food
+        case FilterCategory.portrait.hashValue: category = .portrait
+        case FilterCategory.landscape.hashValue: category = .landscape
+        case FilterCategory.night.hashValue: category = .night
+        case FilterCategory.star.hashValue: category = .star
+        default: category = .food
+        }
+
+        onCategoryTapped?(category)
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onCategoryTapped = nil
     }
     
     func configure(with filter: TodayFilter) {
