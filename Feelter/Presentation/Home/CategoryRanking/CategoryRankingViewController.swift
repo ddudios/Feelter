@@ -146,7 +146,7 @@ final class CategoryRankingViewController: BaseViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "카테고리 랭킹"
+        title = "TRENDING"
         setupDataSource()
         bind()
         setupNotificationObservers()

@@ -33,6 +33,9 @@ func registerDependencies() {
     let paymentRepository = PaymentRepository(networkManager: networkManager)
     container.registerSingleton(PaymentRepositoryProtocol.self, instance: paymentRepository)
 
+    let videoRepository = VideoRepository(networkManager: networkManager)
+    container.registerSingleton(VideoRepositoryProtocol.self, instance: videoRepository)
+
     // Chat Repository는 CoreData와 Socket.IO도 필요
     let chatRepository = ChatRepository(
         networkManager: networkManager,
@@ -66,6 +69,11 @@ func registerDependencies() {
     container.registerFactory(PaymentUsecaseProtocol.self) {
         let repository = container.resolve(PaymentRepositoryProtocol.self)
         return PaymentUsecase(repository: repository)
+    }
+
+    container.registerFactory(VideoUsecaseProtocol.self) {
+        let repository = container.resolve(VideoRepositoryProtocol.self)
+        return VideoUsecase(repository: repository)
     }
 
     container.registerFactory(FetchChatRoomsUsecase.self) {
@@ -119,5 +127,10 @@ func registerDependencies() {
             fetchChatRoomsUsecase: fetchChatRoomsUsecase,
             repository: repository
         )
+    }
+
+    container.registerFactory(VideoViewModel.self) {
+        let usecase = container.resolve(VideoUsecaseProtocol.self)
+        return VideoViewModel(videoUsecase: usecase)
     }
 }

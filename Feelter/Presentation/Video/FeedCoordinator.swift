@@ -18,7 +18,8 @@ final class FeedCoordinator: Coordinator {
 
     @MainActor
     func start() {
-        let viewController = FeedViewController()
+        let viewModel = DIContainer.shared.resolve(VideoViewModel.self)
+        let viewController = VideoViewController(viewModel: viewModel)
         viewController.coordinator = self
         navigationController.setViewControllers([viewController], animated: false)
     }
