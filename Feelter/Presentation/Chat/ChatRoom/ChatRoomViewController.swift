@@ -61,8 +61,8 @@ final class ChatRoomViewController: BaseViewController {
     }
     private var pendingImages: [ChatImageSource] = []
     private var didScrollToBottomOnAppear = false
-    private var didStartInitialLoad = false
-    private var didFinishInitialLoad = false
+    private var needsInitialScrollOnAppear = false
+    private var shouldScrollToBottomAfterNextReload = false
     private var isTextViewBeingEdited = false  // TextView 편집 중 플래그
 
     private let dateFormatter: DateFormatter = {
@@ -144,6 +144,8 @@ final class ChatRoomViewController: BaseViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         setCustomTabBarHidden(true)
+        didScrollToBottomOnAppear = false
+        needsInitialScrollOnAppear = true
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -228,10 +230,10 @@ final class ChatRoomViewController: BaseViewController {
 
         inputStackView.axis = .horizontal
         inputStackView.spacing = Layout.messageSpacing
-        inputStackView.alignment = .bottom  // 버튼들이 하단에 정렬되도록
+        inputStackView.alignment = .center
         inputContainerView.addSubview(inputStackView)
 
-        attachmentButton.tintColor = .Feelter.blackTurquoise
+        attachmentButton.tintColor = .Feelter.brightTurquoise
         attachmentButton.setImage(UIImage.Icon.add, for: .normal)
         attachmentButton.addTarget(self, action: #selector(attachmentButtonTapped), for: .touchUpInside)
 
@@ -363,16 +365,8 @@ final class ChatRoomViewController: BaseViewController {
         // 로딩 상태
         output.isLoading
             .receive(on: DispatchQueue.main)
-            .removeDuplicates()
-            .sink { [weak self] isLoading in
-                guard let self = self else { return }
-                if isLoading {
-                    self.didStartInitialLoad = true
-                    self.didFinishInitialLoad = false
-                } else if self.didStartInitialLoad, !self.didFinishInitialLoad {
-                    self.didFinishInitialLoad = true
-                    self.scrollToBottomIfNeeded()
-                }
+            .sink { _ in
+                // TODO: 로딩 인디케이터 표시
             }
             .store(in: &cancellables)
 
@@ -397,6 +391,7 @@ final class ChatRoomViewController: BaseViewController {
         output.scrollToBottom
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
+                self?.shouldScrollToBottomAfterNextReload = true
                 self?.scrollToBottom(animated: false)
             }
             .store(in: &cancellables)
@@ -514,7 +509,13 @@ final class ChatRoomViewController: BaseViewController {
         messageTableView.reloadData()
 
         DispatchQueue.main.async { [weak self] in
-            self?.scrollToBottomIfNeeded()
+            guard let self = self else { return }
+            if self.shouldScrollToBottomAfterNextReload {
+                self.scrollToBottom(animated: false)
+                self.shouldScrollToBottomAfterNextReload = false
+                return
+            }
+            self.scrollToBottomIfNeeded()
         }
     }
 
@@ -568,10 +569,11 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     private func scrollToBottomIfNeeded() {
-        guard didFinishInitialLoad, !didScrollToBottomOnAppear, !messages.isEmpty, view.window != nil else { return }
+        guard needsInitialScrollOnAppear, !didScrollToBottomOnAppear, !messages.isEmpty, view.window != nil else { return }
         messageTableView.layoutIfNeeded()
         scrollToBottom(animated: false)
         didScrollToBottomOnAppear = true
+        needsInitialScrollOnAppear = false
     }
 
     private func setCustomTabBarHidden(_ hidden: Bool) {
@@ -822,9 +824,12 @@ final class ChatRoomViewController: BaseViewController {
         // 높이 초기화
         textViewHeightConstraint?.update(offset: Layout.textViewMinHeight)
         messageTextView.isScrollEnabled = false
-        UIView.animate(withDuration: 0.1) {
+        shouldScrollToBottomAfterNextReload = true
+        UIView.animate(withDuration: 0.1, animations: {
             self.view.layoutIfNeeded()
-        }
+        }, completion: { [weak self] _ in
+            self?.scrollToBottom(animated: false)
+        })
     }
 
     @objc private func searchButtonTapped() {
@@ -987,7 +992,7 @@ extension ChatRoomViewController: UITextViewDelegate {
 
         // placeholder 위치 조정 (멀티라인일 때 상단 정렬)
         placeholderLabel.snp.remakeConstraints { make in
-            make.leading.equalToSuperview().offset(16)
+            make.leading.equalToSuperview().offset(8)
             make.trailing.equalToSuperview().offset(-12)
             make.top.equalToSuperview().offset(textView.textContainerInset.top)
         }
@@ -1005,7 +1010,7 @@ extension ChatRoomViewController: UITextViewDelegate {
         // 텍스트가 비어있을 때 placeholder를 중앙으로 복귀
         if textView.text.isEmpty {
             placeholderLabel.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(16)
+                make.leading.equalToSuperview().offset(8)
                 make.trailing.equalToSuperview().offset(-12)
                 make.centerY.equalToSuperview()
             }

@@ -168,9 +168,22 @@ final class ChatMessageCell: UITableViewCell {
             while view != nil {
                 if let tableView = view as? UITableView {
                     guard tableView.window != nil else { break }
+                    let contentHeight = tableView.contentSize.height
+                    let scrollViewHeight = tableView.bounds.height
+                    let contentOffsetY = tableView.contentOffset.y
+                    let bottomInset = tableView.adjustedContentInset.bottom
+                    let isNearBottom = contentOffsetY + scrollViewHeight + bottomInset >= contentHeight - 50
                     UIView.performWithoutAnimation {
                         tableView.beginUpdates()
                         tableView.endUpdates()
+                    }
+                    if isNearBottom, tableView.numberOfSections > 0 {
+                        let lastSection = tableView.numberOfSections - 1
+                        let lastRow = tableView.numberOfRows(inSection: lastSection) - 1
+                        if lastRow >= 0 {
+                            let indexPath = IndexPath(row: lastRow, section: lastSection)
+                            tableView.scrollToRow(at: indexPath, at: .bottom, animated: false)
+                        }
                     }
                     break
                 }
@@ -229,7 +242,7 @@ final class ChatMessageCell: UITableViewCell {
         }
 
         retryButton.snp.makeConstraints { make in
-            make.width.height.equalTo(10)
+            make.width.height.equalTo(13)
         }
     }
 
@@ -254,7 +267,7 @@ final class ChatMessageCell: UITableViewCell {
         bubbleContainerView.backgroundColor = .clear
         bubbleContainerView.isUserInteractionEnabled = true  // 터치 이벤트 전달 허용
         bubbleContainerView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        bubbleContainerView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        bubbleContainerView.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         bubbleStackView.axis = .vertical
         bubbleStackView.spacing = Layout.bubbleSpacing
@@ -271,6 +284,7 @@ final class ChatMessageCell: UITableViewCell {
         textBubbleView.clipsToBounds = true
         textBubbleView.isUserInteractionEnabled = true  // 터치 이벤트 전달 허용
         textBubbleView.setContentHuggingPriority(.required, for: .horizontal)  // 텍스트 길이에 맞춤
+        textBubbleView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // UITextView 설정 (복사 가능)
         messageTextView.font = TextStyle.Pretendard.body2
@@ -284,6 +298,8 @@ final class ChatMessageCell: UITableViewCell {
         messageTextView.textContainer.lineFragmentPadding = 4
         messageTextView.setContentCompressionResistancePriority(.required, for: .vertical)
         messageTextView.setContentHuggingPriority(.required, for: .vertical)
+        messageTextView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        messageTextView.setContentHuggingPriority(.required, for: .horizontal)
 
         timeStackView.axis = .vertical
         timeStackView.spacing = 2
