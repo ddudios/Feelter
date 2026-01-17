@@ -97,6 +97,11 @@ final class ChatRoomViewController: BaseViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// 현재 채팅방 ID 반환 (푸시 알림 필터링용)
+    public func getCurrentChatRoomId() -> String {
+        return chatRoom.roomId
+    }
+
     deinit {
         NotificationCenter.default.removeObserver(self)
         NotificationCenter.default.removeObserver(
@@ -592,6 +597,23 @@ final class ChatRoomViewController: BaseViewController {
         scrollToBottom(animated: false)
         didScrollToBottomOnAppear = true
         needsInitialScrollOnAppear = false
+    }
+
+    /// 푸시 알림으로 진입 시 스크롤을 최하단으로 이동 (애니메이션 없음)
+    ///
+    /// ProfileCoordinator에서 푸시 알림을 통해 채팅방으로 이동할 때 호출됩니다.
+    /// 일반적인 조건 체크 없이 강제로 스크롤을 최하단으로 이동합니다.
+    public func scrollToBottomForPushNavigation() {
+        // 레이아웃 강제 완료
+        messageTableView.layoutIfNeeded()
+
+        // items가 비어있지 않으면 스크롤
+        guard !items.isEmpty else {
+            return
+        }
+
+        // 애니메이션 없이 최하단으로 스크롤
+        scrollToBottom(animated: false)
     }
 
     private func setCustomTabBarHidden(_ hidden: Bool) {

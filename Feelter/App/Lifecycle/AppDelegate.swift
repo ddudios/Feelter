@@ -92,8 +92,72 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = notification.request.content.userInfo
 
-        // 포그라운드에서도 배너, 사운드, 뱃지 표시
-        completionHandler([.banner, .sound, .badge])
+        // 푸시 알림에서 roomId 추출
+        guard let payload = NotificationPayload.from(userInfo: userInfo),
+              let pushRoomId = payload.roomId else {
+            // roomId가 없으면 기본 동작 (배너 표시)
+            completionHandler([.banner, .sound, .badge])
+            return
+        }
+
+        // 현재 표시 중인 채팅방 확인
+        if let currentChatRoomId = getCurrentVisibleChatRoomId() {
+            if currentChatRoomId == pushRoomId {
+                // 현재 보고 있는 채팅방의 푸시 알림은 표시하지 않음
+                completionHandler([])
+            } else {
+                // 다른 채팅방의 푸시 알림은 표시
+                completionHandler([.banner, .sound, .badge])
+            }
+        } else {
+            completionHandler([.banner, .sound, .badge])
+        }
+    }
+
+    /// 현재 화면에 표시 중인 ChatRoomViewController의 roomId 반환
+    ///
+    /// - Returns: 현재 표시 중인 채팅방 ID (없으면 nil)
+    private func getCurrentVisibleChatRoomId() -> String? {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+              let rootViewController = window.rootViewController else {
+            return nil
+        }
+
+        // 최상위 ViewController 찾기
+        var topViewController = rootViewController
+
+        while let presentedViewController = topViewController.presentedViewController {
+            topViewController = presentedViewController
+        }
+
+        // TabBarController인 경우 선택된 ViewController 확인
+        if let tabBarController = topViewController as? UITabBarController {
+            topViewController = tabBarController.selectedViewController ?? topViewController
+        }
+
+        // NavigationController인 경우 최상위 ViewController 확인
+        if let navigationController = topViewController as? UINavigationController {
+            topViewController = navigationController.viewControllers.last ?? topViewController
+
+            // TabBarController 안의 NavigationController인 경우 다시 확인
+            if let tabBarController = topViewController as? UITabBarController {
+                topViewController = tabBarController.selectedViewController ?? topViewController
+
+                // 다시 NavigationController 확인
+                if let innerNavController = topViewController as? UINavigationController {
+                    topViewController = innerNavController.viewControllers.last ?? topViewController
+                }
+            }
+        }
+
+        // ChatRoomViewController인지 확인하고 roomId 반환
+        if let chatRoomVC = topViewController as? ChatRoomViewController {
+            let roomId = chatRoomVC.getCurrentChatRoomId()
+            return roomId
+        }
+
+        return nil
     }
 
     /// 푸시 알림 탭 시 호출
@@ -104,7 +168,11 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
 
-        // TODO: 알림 탭 시 해당 화면으로 이동 처리
+        // SceneDelegate를 통해 딥링크 처리
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let sceneDelegate = windowScene.delegate as? SceneDelegate {
+            NotificationDeepLinkRouter.routeToChatRoom(from: userInfo, sceneDelegate: sceneDelegate)
+        }
 
         completionHandler()
     }
@@ -147,6 +215,13 @@ extension AppDelegate: MessagingDelegate {
             )
         } catch {
         }
+    }
+
+    // FCM 포그라운드 메시지 수신 (선택사항)
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) async -> UIBackgroundFetchResult {
+        print("🔥 [AppDelegate] didReceiveRemoteNotification 호출됨 (백그라운드)")
+        print("🔥 [AppDelegate] userInfo: \(userInfo)")
+        return .newData
     }
 }
 

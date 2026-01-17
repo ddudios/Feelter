@@ -13,6 +13,7 @@ final public class AppCoordinator: Coordinator {
     public var childCoordinators: [Coordinator] = []
     public var navigationController: UINavigationController
     private var isLoggingOut = false  // 로그아웃 진행 중 플래그
+    private var pendingChatRoomId: String?  // 로그인 전 대기 중인 채팅방 ID
 
     public init(navigationController: UINavigationController) {
         self.navigationController = navigationController
@@ -136,6 +137,49 @@ extension AppCoordinator: CoordinatorFinishDelegate {
             isLoggingOut = false
             setupNotifications()
             showMainFlow()
+
+            // 로그인 완료 후 대기 중인 채팅방이 있으면 이동
+            if let roomId = pendingChatRoomId {
+                pendingChatRoomId = nil
+                handleChatDeepLink(roomId: roomId)
+            }
+        }
+    }
+}
+
+// MARK: - Deep Link Handling
+extension AppCoordinator {
+    /// 푸시 알림을 통한 채팅방 딥링크 처리
+    ///
+    /// - Parameter roomId: 이동할 채팅방 ID
+    ///
+    /// 동작:
+    /// 1. 로그인 상태 확인
+    /// 2. 로그인 상태:
+    ///    - TabBarCoordinator를 찾아서 채팅방으로 이동
+    /// 3. 미로그인 상태:
+    ///    - pendingChatRoomId에 저장 후 로그인 완료 시 이동
+    public func handleChatDeepLink(roomId: String) {
+        // 로그인 상태 확인
+        let isLoggedIn = checkLoginStatus()
+
+        if isLoggedIn {
+            // TabBarCoordinator를 찾아서 채팅방으로 이동
+            if let tabBarCoordinator = childCoordinators.first(where: { $0 is TabBarCoordinator }) as? TabBarCoordinator {
+                tabBarCoordinator.showChatRoom(roomId: roomId)
+            } else {
+                // TabBarCoordinator가 아직 준비되지 않은 경우 잠시 대기 후 재시도
+                pendingChatRoomId = roomId
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    if let roomId = self?.pendingChatRoomId {
+                        self?.pendingChatRoomId = nil
+                        self?.handleChatDeepLink(roomId: roomId)
+                    }
+                }
+            }
+        } else {
+            // 미로그인 상태: 로그인 후 이동하도록 대기
+            pendingChatRoomId = roomId
         }
     }
 }

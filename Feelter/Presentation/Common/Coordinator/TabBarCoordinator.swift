@@ -73,4 +73,21 @@ final class TabBarCoordinator: Coordinator {
         )
         return navigationController
     }
+
+    /// 푸시 알림을 통한 채팅방으로 이동
+    ///
+    /// - Parameter roomId: 이동할 채팅방 ID
+    ///
+    /// 동작:
+    /// 1. Profile 탭으로 전환
+    /// 2. ProfileCoordinator를 통해 채팅방으로 이동
+    public func showChatRoom(roomId: String) {
+        // Profile 탭으로 전환 (index 4)
+        tabBarController.selectedIndex = 4
+
+        // ProfileCoordinator 찾기
+        if let profileCoordinator = childCoordinators.first(where: { $0 is ProfileCoordinator }) as? ProfileCoordinator {
+            profileCoordinator.showChatRoom(roomId: roomId)
+        }
+    }
 }

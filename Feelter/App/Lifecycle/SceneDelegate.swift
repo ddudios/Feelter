@@ -28,6 +28,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = navigationController
         window?.makeKeyAndVisible()
+
+        // 콜드 스타트 시 푸시 알림으로 앱이 실행된 경우 처리
+        if let notificationResponse = connectionOptions.notificationResponse {
+            let userInfo = notificationResponse.notification.request.content.userInfo
+
+            if let payload = NotificationPayload.from(userInfo: userInfo),
+               let roomId = payload.roomId {
+                // 앱 초기화 완료 후 딥링크 처리 (AppCoordinator가 준비된 후)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.handlePushDeepLink(roomId: roomId)
+                }
+            }
+        }
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -86,5 +99,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
+    /// 앱이 실행 중일 때 푸시 알림 탭 시 호출 (iOS 13+)
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        // Reserved for future use
+    }
+
+    /// 푸시 알림 딥링크 처리
+    ///
+    /// - Parameter roomId: 이동할 채팅방 ID
+    func handlePushDeepLink(roomId: String) {
+        appCoordinator?.handleChatDeepLink(roomId: roomId)
+    }
+
 }
+
 
