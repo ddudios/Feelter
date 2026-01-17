@@ -58,6 +58,22 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
         return (response.toDomain(), response.toToken())
     }
 
+    func loginWithKakao(oauthToken: String) async throws -> (User, AuthToken) {
+        let deviceToken = Messaging.messaging().fcmToken ?? ""
+
+        let request = KakaoLoginRequestDTO(
+            oauthToken: oauthToken,
+            deviceToken: deviceToken
+        )
+
+        let response = try await networkManager.request(
+            UserRouter.kakaoLogin(body: request),
+            type: AuthResponseDTO.self
+        )
+
+        return (response.toDomain(), response.toToken())
+    }
+
     func logout() async throws {
         // 1. 서버에 로그아웃 요청 (실패해도 로컬 데이터는 삭제)
         do {
@@ -66,7 +82,6 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
             )
         } catch {
             // 서버 로그아웃 실패해도 무시 (토큰 만료 등으로 인한 401은 정상)
-            print("서버 로그아웃 요청 실패 (무시됨): \(error.localizedDescription)")
         }
 
         // 2. Keychain에서 토큰 및 사용자 정보 삭제 (무조건 실행)
@@ -79,7 +94,7 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
             try CoreDataManager.shared.deleteAll(entityName: "ChatRoomEntity")
             try CoreDataManager.shared.deleteAll(entityName: "ChatMessageEntity")
         } catch {
-            print("CoreData 삭제 실패: \(error.localizedDescription)")
+            // CoreData 삭제 실패 무시
         }
     }
 }

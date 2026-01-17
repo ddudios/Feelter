@@ -10,12 +10,18 @@ import FirebaseCore
 import FirebaseMessaging
 import Kingfisher
 import iamport_ios
+import KakaoSDKCommon
+import KakaoSDKAuth
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
+
+        // Kakao SDK 초기화
+        let kakaoAppKey = Config.kakaoLoginKey
+        KakaoSDK.initSDK(appKey: kakaoAppKey)
+
         // Firebase 초기화
         FirebaseApp.configure()
         
@@ -162,6 +168,12 @@ extension AppDelegate: MessagingDelegate {
 
 extension AppDelegate {
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        // 카카오 로그인 URL 처리
+        if AuthApi.isKakaoTalkLoginUrl(url) {
+            return AuthController.handleOpenUrl(url: url)
+        }
+
+        // 아임포트 결제 URL 처리
         Iamport.shared.receivedURL(url)
         return true
     }

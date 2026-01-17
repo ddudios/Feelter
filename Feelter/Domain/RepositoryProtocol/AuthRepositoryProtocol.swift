@@ -10,5 +10,6 @@ import Foundation
 protocol AuthRepositoryProtocol {
     func login(email: String, password: String) async throws -> (User, AuthToken)
     func loginWithApple(idToken: String) async throws -> (User, AuthToken)
+    func loginWithKakao(oauthToken: String) async throws -> (User, AuthToken)
     func logout() async throws
 }

@@ -28,4 +28,8 @@ struct Config {
     static var apiKey: String {
         return infoDictionaryValue(for: "APIKey")
     }
+    
+    static var kakaoLoginKey: String {
+        return infoDictionaryValue(for: "KakaoLoginKey")
+    }
 }

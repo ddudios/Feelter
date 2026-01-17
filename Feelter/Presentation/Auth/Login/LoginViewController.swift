@@ -9,6 +9,8 @@ import UIKit
 import SnapKit
 import Combine
 import AuthenticationServices
+import KakaoSDKAuth
+import KakaoSDKUser
 
 final class LoginViewController: BaseViewController {
 
@@ -165,8 +167,118 @@ final class LoginViewController: BaseViewController {
     }
 
     @objc private func handleKakaoLoginTap() {
-        // TODO: 카카오 로그인 구현
-        showAlert(message: "카카오 로그인은 준비 중입니다.")
+        // 카카오톡 설치 여부 확인
+        if UserApi.isKakaoTalkLoginAvailable() {
+            // 카카오톡 앱으로 로그인
+            UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
+                self?.handleKakaoLoginResult(oauthToken: oauthToken, error: error)
+            }
+        } else {
+            // 카카오 계정으로 로그인 (웹뷰)
+            UserApi.shared.loginWithKakaoAccount { [weak self] (oauthToken, error) in
+                self?.handleKakaoLoginResult(oauthToken: oauthToken, error: error)
+            }
+        }
+    }
+
+    private func handleKakaoLoginResult(oauthToken: OAuthToken?, error: Error?) {
+        if let error = error {
+            showAlert(message: "카카오 로그인에 실패했습니다: \(error.localizedDescription)")
+            return
+        }
+
+        guard let oauthToken = oauthToken else {
+            showAlert(message: "카카오 로그인에 실패했습니다.")
+            return
+        }
+
+        // 카카오 사용자 정보 가져오기
+        UserApi.shared.me { [weak self] (user, error) in
+            if let error = error {
+                Task { @MainActor in
+                    self?.showAlert(message: "카카오 사용자 정보를 가져올 수 없습니다: \(error.localizedDescription)")
+                }
+                return
+            }
+
+            guard let user = user else {
+                Task { @MainActor in
+                    self?.showAlert(message: "카카오 사용자 정보를 가져올 수 없습니다.")
+                }
+                return
+            }
+
+            // 이메일이 없는 경우 추가 동의 요청
+            if user.kakaoAccount?.email == nil {
+                // 추가 동의 필요 여부 확인
+                if let emailNeedsAgreement = user.kakaoAccount?.emailNeedsAgreement, emailNeedsAgreement {
+                    // 이메일 scope를 포함하여 재로그인 (웹뷰 사용)
+                    UserApi.shared.loginWithKakaoAccount(scopes: ["account_email"]) { [weak self] (newOauthToken, error) in
+                        if let error = error {
+                            Task { @MainActor in
+                                self?.showAlert(message: "이메일 제공 동의가 필요합니다. 로그인을 다시 시도해주세요.")
+                            }
+                            return
+                        }
+
+                        guard let newOauthToken = newOauthToken else {
+                            Task { @MainActor in
+                                self?.showAlert(message: "이메일 제공 동의가 필요합니다.")
+                            }
+                            return
+                        }
+
+                        // 사용자 정보 재조회
+                        UserApi.shared.me { [weak self] (updatedUser, error) in
+                            if let error = error {
+                                return
+                            }
+
+                            if let email = updatedUser?.kakaoAccount?.email {
+                                self?.proceedWithKakaoLogin(oauthToken: newOauthToken.accessToken)
+                            } else {
+                                Task { @MainActor in
+                                    self?.showAlert(message: "카카오 계정에 이메일이 등록되어 있지 않습니다. 카카오톡 앱에서 이메일을 등록해주세요.")
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Task { @MainActor in
+                        self?.showAlert(message: "카카오 계정에 이메일이 등록되어 있지 않습니다. 카카오톡 앱에서 이메일을 등록해주세요.")
+                    }
+                }
+                return
+            }
+
+            // 서버에 OAuth 토큰 전달하여 로그인 처리
+            self?.proceedWithKakaoLogin(oauthToken: oauthToken.accessToken)
+        }
+    }
+
+    private func proceedWithKakaoLogin(oauthToken: String) {
+        Task {
+            do {
+                let result = try await authRepository.loginWithKakao(oauthToken: oauthToken)
+
+                // 토큰 저장
+                KeychainManager.shared.save(token: result.1.accessToken, account: "accessToken")
+                KeychainManager.shared.save(token: result.1.refreshToken, account: "refreshToken")
+                KeychainManager.shared.save(token: result.0.id, account: "userId")
+
+                await MainActor.run {
+                    coordinator?.loginDidFinish()
+                }
+            } catch let error as NetworkError {
+                await MainActor.run {
+                    showAlert(message: error.errorDescription ?? "카카오 로그인에 실패했습니다.")
+                }
+            } catch {
+                await MainActor.run {
+                    showAlert(message: "카카오 로그인에 실패했습니다: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     override func configureHierarchy() {

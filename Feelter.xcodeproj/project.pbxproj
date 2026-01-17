@@ -13,6 +13,9 @@
 		B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B056D4662EE9691500804650 /* FirebaseMessaging */; };
 		B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153B2F0557AB00AF5A81 /* SnapKit */; };
 		B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = B0CD153E2F05583100AF5A81 /* Alamofire */; };
+		B0E10B732F1AF4F1000C8F51 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B0E10B722F1AF4F1000C8F51 /* KakaoSDKAuth */; };
+		B0E10B752F1AF4F1000C8F51 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = B0E10B742F1AF4F1000C8F51 /* KakaoSDKCommon */; };
+		B0E10B772F1AF4F1000C8F51 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = B0E10B762F1AF4F1000C8F51 /* KakaoSDKUser */; };
 		B0E99F5F2F0C91280099B29B /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = B0E99F5E2F0C91280099B29B /* Kingfisher */; };
 /* End PBXBuildFile section */
 
@@ -48,12 +51,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0E10B752F1AF4F1000C8F51 /* KakaoSDKCommon in Frameworks */,
+				B0E10B732F1AF4F1000C8F51 /* KakaoSDKAuth in Frameworks */,
 				B0384ECC2F10E11500A1A962 /* iamport-ios in Frameworks */,
 				B0E99F5F2F0C91280099B29B /* Kingfisher in Frameworks */,
 				B0CD153F2F05583100AF5A81 /* Alamofire in Frameworks */,
 				B056D4672EE9691500804650 /* FirebaseMessaging in Frameworks */,
 				B0CD153C2F0557AB00AF5A81 /* SnapKit in Frameworks */,
 				B03CCA642F14092700CD207E /* SocketIO in Frameworks */,
+				B0E10B772F1AF4F1000C8F51 /* KakaoSDKUser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,6 +109,9 @@
 				B0E99F5E2F0C91280099B29B /* Kingfisher */,
 				B0384ECB2F10E11500A1A962 /* iamport-ios */,
 				B03CCA632F14092700CD207E /* SocketIO */,
+				B0E10B722F1AF4F1000C8F51 /* KakaoSDKAuth */,
+				B0E10B742F1AF4F1000C8F51 /* KakaoSDKCommon */,
+				B0E10B762F1AF4F1000C8F51 /* KakaoSDKUser */,
 			);
 			productName = Feelter;
 			productReference = B056D4472EE9644100804650 /* Feelter.app */;
@@ -139,6 +148,7 @@
 				B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				B0384ECA2F10E11500A1A962 /* XCRemoteSwiftPackageReference "iamport-ios" */,
 				B03CCA622F14092700CD207E /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+				B0E10B712F1AF4F1000C8F51 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B056D4482EE9644100804650 /* Products */;
@@ -429,6 +439,14 @@
 				minimumVersion = 5.11.0;
 			};
 		};
+		B0E10B712F1AF4F1000C8F51 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kakao/kakao-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.27.1;
+			};
+		};
 		B0E99F5D2F0C91280099B29B /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
@@ -464,6 +482,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B0CD153D2F05583100AF5A81 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
+		};
+		B0E10B722F1AF4F1000C8F51 /* KakaoSDKAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0E10B712F1AF4F1000C8F51 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKAuth;
+		};
+		B0E10B742F1AF4F1000C8F51 /* KakaoSDKCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0E10B712F1AF4F1000C8F51 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKCommon;
+		};
+		B0E10B762F1AF4F1000C8F51 /* KakaoSDKUser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0E10B712F1AF4F1000C8F51 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKUser;
 		};
 		B0E99F5E2F0C91280099B29B /* Kingfisher */ = {
 			isa = XCSwiftPackageProductDependency;
