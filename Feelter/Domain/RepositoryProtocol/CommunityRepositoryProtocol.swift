@@ -24,4 +24,9 @@ protocol CommunityRepositoryProtocol {
     func deletePost(postId: String) async throws
     func likePost(postId: String, status: Bool) async throws -> Bool
     func uploadFiles(_ files: [UploadFile]) async throws -> [String]
+
+    // Comments
+    func createComment(postId: String, content: String) async throws -> Comment
+    func updateComment(postId: String, commentId: String, content: String) async throws -> Comment
+    func deleteComment(postId: String, commentId: String) async throws
 }

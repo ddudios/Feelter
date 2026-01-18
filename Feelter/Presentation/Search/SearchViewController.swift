@@ -70,6 +70,7 @@ final class SearchViewController: BaseViewController {
     private let locationUpdatedSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()
     private let likeButtonTappedSubject = PassthroughSubject<(postId: String, isLiked: Bool), Never>()
     private let deletePostSubject = PassthroughSubject<String, Never>()
+    private let commentCountRefreshSubject = PassthroughSubject<String, Never>()
 
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
@@ -263,7 +264,8 @@ final class SearchViewController: BaseViewController {
             distanceChanged: distanceChangedSubject.eraseToAnyPublisher(),
             locationUpdated: locationUpdatedSubject.eraseToAnyPublisher(),
             likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher(),
-            deletePostRequested: deletePostSubject.eraseToAnyPublisher()
+            deletePostRequested: deletePostSubject.eraseToAnyPublisher(),
+            commentCountRefreshRequested: commentCountRefreshSubject.eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -431,6 +433,17 @@ final class SearchViewController: BaseViewController {
         applyDistanceSelection(index: allPostsIndex, shouldNotify: true)
         distanceSlider.isEnabled = false
     }
+
+    private func showCommentBottomSheet(for postId: String) {
+        let commentVC = CommentBottomSheetViewController(postId: postId)
+        commentVC.onCommentAdded = { [weak self] in
+            self?.commentCountRefreshSubject.send(postId)
+        }
+        commentVC.modalPresentationStyle = .overFullScreen
+        commentVC.modalTransitionStyle = .coverVertical
+
+        present(commentVC, animated: true)
+    }
 }
 
 extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
@@ -461,6 +474,9 @@ extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
                 return
             }
             self.showPostActionSheet(for: selectedItem, sourceView: sourceView)
+        }
+        cell.onCommentTapped = { [weak self] postId in
+            self?.showCommentBottomSheet(for: postId)
         }
         return cell
     }

@@ -111,4 +111,28 @@ final class CommunityRepository: CommunityRepositoryProtocol {
             endpoint: PostRouter.uploadFiles(imageData: dataList)
         )
     }
+
+    func createComment(postId: String, content: String) async throws -> Comment {
+        let requestDTO = CreateCommentRequestDTO(parentCommentId: nil, content: content)
+        let response = try await networkManager.request(
+            PostRouter.createComment(postId: postId, body: requestDTO),
+            type: CommentDTO.self
+        )
+        return response.toDomain()
+    }
+
+    func updateComment(postId: String, commentId: String, content: String) async throws -> Comment {
+        let requestDTO = UpdateCommentRequestDTO(content: content)
+        let response = try await networkManager.request(
+            PostRouter.updateComment(postId: postId, commentId: commentId, body: requestDTO),
+            type: CommentDTO.self
+        )
+        return response.toDomain()
+    }
+
+    func deleteComment(postId: String, commentId: String) async throws {
+        try await networkManager.requestWithEmptyResponse(
+            PostRouter.deleteComment(postId: postId, commentId: commentId)
+        )
+    }
 }

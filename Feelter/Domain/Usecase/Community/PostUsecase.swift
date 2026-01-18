@@ -22,6 +22,11 @@ protocol PostUsecaseProtocol {
     func createPost(input: CreatePostInput) async throws -> PostDetail
     func updatePost(input: UpdatePostInput) async throws -> PostDetail
     func deletePost(postId: String) async throws
+
+    // Comments
+    func createComment(postId: String, content: String) async throws -> Comment
+    func updateComment(postId: String, commentId: String, content: String) async throws -> Comment
+    func deleteComment(postId: String, commentId: String) async throws
 }
 
 struct CreatePostInput {
@@ -121,5 +126,17 @@ struct PostUsecase: PostUsecaseProtocol {
 
     func deletePost(postId: String) async throws {
         try await repository.deletePost(postId: postId)
+    }
+
+    func createComment(postId: String, content: String) async throws -> Comment {
+        try await repository.createComment(postId: postId, content: content)
+    }
+
+    func updateComment(postId: String, commentId: String, content: String) async throws -> Comment {
+        try await repository.updateComment(postId: postId, commentId: commentId, content: content)
+    }
+
+    func deleteComment(postId: String, commentId: String) async throws {
+        try await repository.deleteComment(postId: postId, commentId: commentId)
     }
 }

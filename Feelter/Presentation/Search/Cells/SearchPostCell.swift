@@ -12,6 +12,7 @@ final class SearchPostCell: UITableViewCell {
 
     var onLikeTapped: ((String, Bool) -> Void)?
     var onMoreTapped: ((String, UIView) -> Void)?
+    var onCommentTapped: ((String) -> Void)?
 
     private enum Layout {
         static let horizontalInset: CGFloat = 16
@@ -49,7 +50,7 @@ final class SearchPostCell: UITableViewCell {
 
     private let likeButton = UIButton(type: .custom)
     private let likeCountLabel = UILabel()
-    private let commentIconImageView = UIImageView()
+    private let commentButton = UIButton(type: .custom)
     private let commentCountLabel = UILabel()
 
     private let titleLabel = UILabel()
@@ -107,6 +108,7 @@ final class SearchPostCell: UITableViewCell {
         moreButton.isHidden = true
         onMoreTapped = nil
         onLikeTapped = nil
+        onCommentTapped = nil
         pageControl.currentPage = 0
         pageControl.numberOfPages = 0
         imageCollectionView.setContentOffset(.zero, animated: false)
@@ -133,6 +135,7 @@ final class SearchPostCell: UITableViewCell {
         titleLabel.text = item.title
         categoryLabel.text = "#\(item.category)"
         contentLabel.text = item.content
+        contentLabel.numberOfLines = 0
         timeLabel.text = item.timeText
         moreButton.isHidden = !isOwnedByCurrentUser
         moreButton.isUserInteractionEnabled = isOwnedByCurrentUser
@@ -152,7 +155,7 @@ final class SearchPostCell: UITableViewCell {
         contentView.addSubview(pageControl)
         contentView.addSubview(likeButton)
         contentView.addSubview(likeCountLabel)
-        contentView.addSubview(commentIconImageView)
+        contentView.addSubview(commentButton)
         contentView.addSubview(commentCountLabel)
         contentView.addSubview(titleStackView)
         contentView.addSubview(contentLabel)
@@ -206,7 +209,7 @@ final class SearchPostCell: UITableViewCell {
             make.leading.equalTo(likeButton.snp.trailing).offset(Layout.smallSpacing)
         }
 
-        commentIconImageView.snp.makeConstraints { make in
+        commentButton.snp.makeConstraints { make in
             make.centerY.equalTo(likeButton)
             make.leading.equalTo(likeCountLabel.snp.trailing).offset(Layout.sectionSpacing)
             make.size.equalTo(Layout.commentIconSize)
@@ -214,18 +217,18 @@ final class SearchPostCell: UITableViewCell {
 
         commentCountLabel.snp.makeConstraints { make in
             make.centerY.equalTo(likeButton)
-            make.leading.equalTo(commentIconImageView.snp.trailing).offset(Layout.smallSpacing)
+            make.leading.equalTo(commentButton.snp.trailing).offset(Layout.smallSpacing)
             make.trailing.lessThanOrEqualToSuperview().inset(Layout.horizontalInset)
         }
 
         titleStackView.snp.makeConstraints { make in
-            make.top.equalTo(likeButton.snp.bottom).offset(4)
+            make.top.equalTo(likeButton.snp.bottom).offset(6)
             make.leading.equalToSuperview().inset(Layout.horizontalInset)
             make.trailing.lessThanOrEqualToSuperview().inset(Layout.horizontalInset)
         }
 
         contentLabel.snp.makeConstraints { make in
-            make.top.equalTo(titleStackView.snp.bottom).offset(2)
+            make.top.equalTo(titleStackView.snp.bottom).offset(4)
             make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
         }
 
@@ -273,9 +276,9 @@ final class SearchPostCell: UITableViewCell {
         likeCountLabel.font = TextStyle.Pretendard.caption1
         likeCountLabel.textColor = .Feelter.gray45
 
-        commentIconImageView.image = UIImage(systemName: "message.fill")
-        commentIconImageView.tintColor = .Feelter.gray45
-        commentIconImageView.contentMode = .scaleAspectFit
+        commentButton.setImage(UIImage(systemName: "message.fill"), for: .normal)
+        commentButton.tintColor = .Feelter.gray45
+        commentButton.addTarget(self, action: #selector(commentButtonTapped), for: .touchUpInside)
 
         commentCountLabel.font = TextStyle.Pretendard.caption1
         commentCountLabel.textColor = .Feelter.gray45
@@ -304,6 +307,11 @@ final class SearchPostCell: UITableViewCell {
     @objc private func moreButtonTapped() {
         guard let postId = currentPostId else { return }
         onMoreTapped?(postId, moreButton)
+    }
+
+    @objc private func commentButtonTapped() {
+        guard let postId = currentPostId else { return }
+        onCommentTapped?(postId)
     }
 }
 

@@ -20,6 +20,7 @@ final class SearchViewModel: ViewModelProtocol {
         let locationUpdated: AnyPublisher<CLLocationCoordinate2D, Never>
         let likeButtonTapped: AnyPublisher<(postId: String, isLiked: Bool), Never>
         let deletePostRequested: AnyPublisher<String, Never>
+        let commentCountRefreshRequested: AnyPublisher<String, Never>
     }
 
     struct Output {
@@ -314,6 +315,30 @@ final class SearchViewModel: ViewModelProtocol {
                             postsSubject.send(self.posts)
                             errorMessageSubject.send("게시글 삭제에 실패했습니다.")
                         }
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        input.commentCountRefreshRequested
+            .sink { [weak self] postId in
+                guard let self = self else { return }
+
+                Task {
+                    do {
+                        let postDetail = try await self.postUsecase.fetchPostDetail(postId: postId)
+                        await MainActor.run {
+                            guard let index = self.posts.firstIndex(where: { $0.id == postId }) else { return }
+                            let originalPost = self.posts[index]
+                            self.commentCountCache[postId] = postDetail.comments.count
+                            self.posts[index] = self.updatedPostItem(
+                                originalPost,
+                                commentCount: postDetail.comments.count
+                            )
+                            postsSubject.send(self.posts)
+                        }
+                    } catch {
+                        // 에러는 무시 (댓글 개수만 업데이트되지 않음)
                     }
                 }
             }
