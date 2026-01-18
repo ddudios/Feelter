@@ -107,8 +107,8 @@ final class TabBarCoordinator: Coordinator, CustomTabBarControllerDelegate {
     @MainActor
     private func presentFilterSelectionActionSheet(from controller: CustomTabBarController) {
         let actionSheetController = UIAlertController(
-            title: "필터",
-            message: "생성할 항목을 선택해주세요.",
+            title: nil,
+            message: nil,
             preferredStyle: .actionSheet
         )
 

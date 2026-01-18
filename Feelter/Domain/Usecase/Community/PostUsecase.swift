@@ -20,6 +20,8 @@ protocol PostUsecaseProtocol {
     func searchPosts(title: String?) async throws -> [PostSummary]
     func fetchPostDetail(postId: String) async throws -> PostDetail
     func createPost(input: CreatePostInput) async throws -> PostDetail
+    func updatePost(input: UpdatePostInput) async throws -> PostDetail
+    func deletePost(postId: String) async throws
 }
 
 struct CreatePostInput {
@@ -29,6 +31,17 @@ struct CreatePostInput {
     let latitude: Double
     let longitude: Double
     let files: [UploadFile]
+}
+
+struct UpdatePostInput {
+    let postId: String
+    let category: String
+    let title: String
+    let content: String
+    let latitude: Double
+    let longitude: Double
+    let newFiles: [UploadFile]
+    let existingFilePaths: [String]
 }
 
 struct PostUsecase: PostUsecaseProtocol {
@@ -85,5 +98,28 @@ struct PostUsecase: PostUsecaseProtocol {
         )
 
         return try await repository.createPost(requestDTO: requestDTO)
+    }
+
+    func updatePost(input: UpdatePostInput) async throws -> PostDetail {
+        var fileURLs = input.existingFilePaths
+        if !input.newFiles.isEmpty {
+            let uploaded = try await repository.uploadFiles(input.newFiles)
+            fileURLs.append(contentsOf: uploaded)
+        }
+
+        let requestDTO = UpdatePostRequestDTO(
+            category: input.category,
+            title: input.title,
+            content: input.content,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            files: fileURLs
+        )
+
+        return try await repository.updatePost(postId: input.postId, requestDTO: requestDTO)
+    }
+
+    func deletePost(postId: String) async throws {
+        try await repository.deletePost(postId: postId)
     }
 }

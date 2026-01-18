@@ -13,6 +13,7 @@ import Combine
 @MainActor
 class FilterEngine: ObservableObject {
     private let context = CIContext(options: [.useSoftwareRenderer: false])
+    private let filterUsecase: FilterUsecaseProtocol?
 
     // 원본 (고화질, 저장용)
     private var originalCIImage: CIImage?
@@ -41,7 +42,8 @@ class FilterEngine: ObservableObject {
     let filterValuesSubject = CurrentValueSubject<FilterValues, Never>(.default)
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    init(filterUsecase: FilterUsecaseProtocol? = nil) {
+        self.filterUsecase = filterUsecase
         setupPipeline()
     }
 
@@ -418,5 +420,100 @@ class FilterEngine: ObservableObject {
             return UIImage(cgImage: cgImage)
         }
         return nil
+    }
+
+    // MARK: - Server Upload
+
+    /// 필터가 적용된 고화질 이미지를 서버에 업로드하고 필터를 생성합니다.
+    ///
+    /// 순서:
+    /// 1. saveOriginalImage()로 고화질 이미지 생성
+    /// 2. UIImage -> Data 변환 (JPEG 압축)
+    /// 3. POST /v1/filters/files - 파일 업로드, 경로 받기
+    /// 4. POST /v1/filters - 필터 생성 (경로, 메타데이터, 필터값 전송)
+    ///
+    /// - Parameters:
+    ///   - category: 필터 카테고리 (예: "portrait", "landscape")
+    ///   - title: 필터 제목
+    ///   - price: 가격 (0이면 무료)
+    ///   - description: 설명
+    ///   - photoMetadata: 사진 메타데이터 (카메라, 렌즈 등)
+    /// - Returns: 생성된 FilterDetail
+    func uploadFilterToServer(
+        category: String,
+        title: String,
+        price: Int,
+        description: String,
+        photoMetadata: PhotoMetadataDTO
+    ) async throws -> FilterDetail {
+        guard let usecase = filterUsecase else {
+            throw FilterUploadError.usecaseNotInjected
+        }
+
+        // 1. 고화질 이미지 생성
+        guard let finalImage = saveOriginalImage() else {
+            throw FilterUploadError.imageGenerationFailed
+        }
+
+        // 2. UIImage -> Data 변환 (JPEG, 품질 0.9)
+        guard let imageData = finalImage.jpegData(compressionQuality: 0.9) else {
+            throw FilterUploadError.imageCompressionFailed
+        }
+
+        // 3. 파일 업로드 (배열로 감싸서 전송)
+        let filePaths = try await usecase.uploadFiles([imageData])
+
+        guard !filePaths.isEmpty else {
+            throw FilterUploadError.fileUploadFailed
+        }
+
+        // 4. 현재 필터 값 가져오기
+        let currentFilterValues = filterValuesSubject.value
+
+        // 5. 필터 생성 요청 DTO 구성
+        let requestDTO = CreateFilterRequestDTO(
+            category: category,
+            title: title,
+            price: price,
+            description: description,
+            files: filePaths,
+            photoMetadata: photoMetadata,
+            filterValues: currentFilterValues.toDTO()
+        )
+
+        // 6. 필터 생성 API 호출
+        let filterDetail = try await usecase.createFilter(requestDTO: requestDTO)
+
+        return filterDetail
+    }
+
+    /// UIImage를 Data로 변환하는 헬퍼 메서드
+    /// - Parameter image: 변환할 UIImage
+    /// - Parameter quality: JPEG 압축 품질 (0.0 ~ 1.0)
+    /// - Returns: JPEG Data
+    private func imageToData(_ image: UIImage, quality: CGFloat = 0.9) -> Data? {
+        return image.jpegData(compressionQuality: quality)
+    }
+}
+
+// MARK: - Filter Upload Errors
+
+enum FilterUploadError: LocalizedError {
+    case usecaseNotInjected
+    case imageGenerationFailed
+    case imageCompressionFailed
+    case fileUploadFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .usecaseNotInjected:
+            return "FilterUsecase가 주입되지 않았습니다."
+        case .imageGenerationFailed:
+            return "고화질 이미지 생성에 실패했습니다."
+        case .imageCompressionFailed:
+            return "이미지 압축에 실패했습니다."
+        case .fileUploadFailed:
+            return "파일 업로드에 실패했습니다."
+        }
     }
 }

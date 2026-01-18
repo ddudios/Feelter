@@ -40,6 +40,7 @@ final class SearchViewController: BaseViewController {
 
     private let viewModel: SearchViewModel
     private var cancellables = Set<AnyCancellable>()
+    weak var coordinator: SearchCoordinator?
 
     private let topBarContainerView = UIView()
     private let logoImageView = UIImageView()
@@ -68,10 +69,15 @@ final class SearchViewController: BaseViewController {
     private let distanceChangedSubject = PassthroughSubject<Int?, Never>()
     private let locationUpdatedSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()
     private let likeButtonTappedSubject = PassthroughSubject<(postId: String, isLiked: Bool), Never>()
+    private let deletePostSubject = PassthroughSubject<String, Never>()
 
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
     private var hasReceivedInitialLocation = false
+
+    private var currentUserId: String? {
+        return KeychainManager.shared.read(account: "userId")
+    }
 
     init(viewModel: SearchViewModel = DIContainer.shared.resolve(SearchViewModel.self)) {
         self.viewModel = viewModel
@@ -118,7 +124,8 @@ final class SearchViewController: BaseViewController {
         super.configureLayout()
         topBarContainerView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(Layout.sectionSpacing)
-            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
+            make.leading.equalToSuperview()
+            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
             make.height.equalTo(Layout.topBarHeight)
         }
 
@@ -135,7 +142,7 @@ final class SearchViewController: BaseViewController {
         }
 
         searchTextField.snp.makeConstraints { make in
-            make.leading.equalTo(logoImageView.snp.trailing).offset(Layout.sectionSpacing)
+            make.leading.equalTo(logoImageView.snp.trailing)
             make.trailing.equalTo(searchButton.snp.leading).offset(-Layout.sectionSpacing)
             make.centerY.equalToSuperview()
             make.height.equalTo(Layout.searchFieldHeight)
@@ -255,7 +262,8 @@ final class SearchViewController: BaseViewController {
             searchRequested: searchRequestedSubject.eraseToAnyPublisher(),
             distanceChanged: distanceChangedSubject.eraseToAnyPublisher(),
             locationUpdated: locationUpdatedSubject.eraseToAnyPublisher(),
-            likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher()
+            likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher(),
+            deletePostRequested: deletePostSubject.eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -284,6 +292,58 @@ final class SearchViewController: BaseViewController {
                 self?.showErrorAlert(message: message)
             }
             .store(in: &cancellables)
+    }
+
+    private func showPostActionSheet(for item: SearchPostItem, sourceView: UIView) {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "수정", style: .default) { [weak self] _ in
+            self?.showEditPost(for: item)
+        })
+        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            self?.showDeleteConfirmation(for: item)
+        })
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+
+        if let popoverController = alert.popoverPresentationController {
+            popoverController.sourceView = sourceView
+            popoverController.sourceRect = sourceView.bounds
+            popoverController.permittedArrowDirections = .up
+        }
+
+        present(alert, animated: true)
+    }
+
+    private func showEditPost(for item: SearchPostItem) {
+        let editContext = CreatePostViewModel.EditContext(
+            postId: item.id,
+            category: item.category,
+            title: item.title,
+            content: item.content,
+            filePaths: item.imagePaths
+        )
+
+        if let coordinator {
+            coordinator.showEditPost(context: editContext)
+        } else {
+            let postUsecase = DIContainer.shared.resolve(PostUsecaseProtocol.self)
+            let viewModel = CreatePostViewModel(postUsecase: postUsecase, mode: .edit(editContext))
+            let viewController = CreatePostViewController(viewModel: viewModel)
+            navigationController?.pushViewController(viewController, animated: true)
+        }
+    }
+
+    private func showDeleteConfirmation(for item: SearchPostItem) {
+        let alert = UIAlertController(
+            title: "게시글 삭제",
+            message: "이 게시글을 삭제할까요?",
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            self?.deletePostSubject.send(item.id)
+        })
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        present(alert, animated: true)
     }
 
     private func updateLocationTitleLabel(for coordinate: CLLocationCoordinate2D) {
@@ -390,9 +450,17 @@ extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
         }
 
         let item = posts[indexPath.row]
-        cell.configure(with: item)
+        let isOwnedByCurrentUser = item.authorId == currentUserId
+        cell.configure(with: item, isOwnedByCurrentUser: isOwnedByCurrentUser)
         cell.onLikeTapped = { [weak self] postId, isLiked in
             self?.likeButtonTappedSubject.send((postId: postId, isLiked: isLiked))
+        }
+        cell.onMoreTapped = { [weak self] postId, sourceView in
+            guard let self = self,
+                  let selectedItem = self.posts.first(where: { $0.id == postId }) else {
+                return
+            }
+            self.showPostActionSheet(for: selectedItem, sourceView: sourceView)
         }
         return cell
     }

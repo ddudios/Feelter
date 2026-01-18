@@ -11,6 +11,7 @@ import SnapKit
 final class SearchPostCell: UITableViewCell {
 
     var onLikeTapped: ((String, Bool) -> Void)?
+    var onMoreTapped: ((String, UIView) -> Void)?
 
     private enum Layout {
         static let horizontalInset: CGFloat = 16
@@ -22,11 +23,14 @@ final class SearchPostCell: UITableViewCell {
         static let titleSpacing: CGFloat = 8
         static let smallSpacing: CGFloat = 2
         static let sectionSpacing: CGFloat = 12
+        static let moreButtonSize: CGFloat = 24
+        static let moreButtonTrailingInset: CGFloat = 20
     }
 
     private let profileImageView = UIImageView()
     private let authorNameLabel = UILabel()
     private let locationLabel = UILabel()
+    private let moreButton = UIButton(type: .system)
 
     private let imageCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -100,13 +104,16 @@ final class SearchPostCell: UITableViewCell {
         contentLabel.text = nil
         timeLabel.text = nil
         likeButton.isSelected = false
+        moreButton.isHidden = true
+        onMoreTapped = nil
+        onLikeTapped = nil
         pageControl.currentPage = 0
         pageControl.numberOfPages = 0
         imageCollectionView.setContentOffset(.zero, animated: false)
         imageCollectionView.reloadData()
     }
 
-    func configure(with item: SearchPostItem) {
+    func configure(with item: SearchPostItem, isOwnedByCurrentUser: Bool) {
         currentPostId = item.id
         imagePaths = item.imagePaths
 
@@ -127,6 +134,8 @@ final class SearchPostCell: UITableViewCell {
         categoryLabel.text = "#\(item.category)"
         contentLabel.text = item.content
         timeLabel.text = item.timeText
+        moreButton.isHidden = !isOwnedByCurrentUser
+        moreButton.isUserInteractionEnabled = isOwnedByCurrentUser
 
         pageControl.numberOfPages = imagePaths.count
         pageControl.isHidden = imagePaths.isEmpty
@@ -138,6 +147,7 @@ final class SearchPostCell: UITableViewCell {
         contentView.addSubview(profileImageView)
         contentView.addSubview(authorNameLabel)
         contentView.addSubview(locationLabel)
+        contentView.addSubview(moreButton)
         contentView.addSubview(imageCollectionView)
         contentView.addSubview(pageControl)
         contentView.addSubview(likeButton)
@@ -156,16 +166,22 @@ final class SearchPostCell: UITableViewCell {
             make.size.equalTo(Layout.profileSize)
         }
 
+        moreButton.snp.makeConstraints { make in
+            make.centerY.equalTo(profileImageView)
+            make.trailing.equalToSuperview().inset(Layout.moreButtonTrailingInset)
+            make.size.equalTo(Layout.moreButtonSize)
+        }
+
         authorNameLabel.snp.makeConstraints { make in
             make.top.equalTo(profileImageView.snp.top)
             make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.sectionSpacing)
-            make.trailing.lessThanOrEqualToSuperview().inset(Layout.horizontalInset)
+            make.trailing.lessThanOrEqualTo(moreButton.snp.leading).offset(-Layout.sectionSpacing)
         }
 
         locationLabel.snp.makeConstraints { make in
             make.top.equalTo(authorNameLabel.snp.bottom).offset(4)
             make.leading.equalTo(authorNameLabel)
-            make.trailing.lessThanOrEqualToSuperview().inset(Layout.horizontalInset)
+            make.trailing.lessThanOrEqualTo(moreButton.snp.leading).offset(-Layout.sectionSpacing)
         }
 
         imageCollectionView.snp.makeConstraints { make in
@@ -238,6 +254,11 @@ final class SearchPostCell: UITableViewCell {
         locationLabel.font = TextStyle.Pretendard.caption1
         locationLabel.textColor = .Feelter.gray60
 
+        moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        moreButton.tintColor = .Feelter.gray45
+        moreButton.isHidden = true
+        moreButton.addTarget(self, action: #selector(moreButtonTapped), for: .touchUpInside)
+
         imageCollectionView.dataSource = self
         imageCollectionView.delegate = self
 
@@ -278,6 +299,11 @@ final class SearchPostCell: UITableViewCell {
     @objc private func likeButtonTapped() {
         guard let postId = currentPostId else { return }
         onLikeTapped?(postId, likeButton.isSelected)
+    }
+
+    @objc private func moreButtonTapped() {
+        guard let postId = currentPostId else { return }
+        onMoreTapped?(postId, moreButton)
     }
 }
 

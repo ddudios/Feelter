@@ -128,6 +128,12 @@ final class CreatePostViewController: BaseViewController {
 
     private var categoryButtons: [SelectableCapsuleButton] = []
     private var baseScrollBottomInset: CGFloat = 0
+    private var editContext: CreatePostViewModel.EditContext? {
+        if case let .edit(context) = viewModel.mode {
+            return context
+        }
+        return nil
+    }
 
     // MARK: - Initializer
 
@@ -144,11 +150,19 @@ final class CreatePostViewController: BaseViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "CREATE"
+        title = editContext == nil ? "POST" : "EDIT"
         configureLocation()
         setupKeyboardObservers()
         bindViewModel()
         viewDidLoadSubject.send(())
+        applyEditContextIfNeeded()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if editContext != nil {
+            navigationController?.setNavigationBarHidden(false, animated: animated)
+        }
     }
 
     deinit {
@@ -301,6 +315,39 @@ final class CreatePostViewController: BaseViewController {
         contentStackView.setCustomSpacing(Layout.sectionSpacing, after: contentTextView)
     }
 
+    private func applyEditContextIfNeeded() {
+        guard let context = editContext else { return }
+        titleTextField.text = context.title
+        contentTextView.text = context.content
+        contentPlaceholderLabel.isHidden = !context.content.isEmpty
+        updateCategorySelection(selectedCategory: context.category)
+        attachmentItems = context.filePaths.map { makeExistingAttachmentItem(from: $0) }
+        updateAttachmentPreviews()
+    }
+
+    private func updateCategorySelection(selectedCategory: String) {
+        let trimmedCategory = selectedCategory.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let selectedButton = categoryButtons.first(where: { $0.titleLabel?.text == trimmedCategory }) {
+            categoryButtons.forEach { $0.isSelected = ($0 == selectedButton) }
+        }
+    }
+
+    private func makeExistingAttachmentItem(from path: String) -> AttachmentItem {
+        let isVideo = isVideoFilePath(path)
+        return AttachmentItem(
+            data: nil,
+            fileExtension: nil,
+            previewImage: nil,
+            remotePath: path,
+            isVideo: isVideo
+        )
+    }
+
+    private func isVideoFilePath(_ path: String) -> Bool {
+        let fileExtension = (path as NSString).pathExtension.lowercased()
+        return ["mp4", "mov", "m4v"].contains(fileExtension)
+    }
+
     private func configureLocation() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
@@ -336,14 +383,21 @@ final class CreatePostViewController: BaseViewController {
         output.saveResult
             .receive(on: DispatchQueue.main)
             .sink { [weak self] result in
+                let isEditing = self?.editContext != nil
                 switch result {
                 case .success:
-                    self?.showAlert(message: "게시글이 등록되었습니다.") {
-                        self?.clearPostForm()
+                    let message = isEditing == true ? "게시글이 수정되었습니다." : "게시글이 등록되었습니다."
+                    self?.showAlert(message: message) { [weak self] in
+                        if isEditing == false {
+                            self?.clearPostForm()
+                        }
                         self?.navigateToSearchAndRefresh()
                     }
                 case .failure(let error):
-                    self?.showAlert(message: "게시글 등록에 실패했습니다.\n\(error.localizedDescription)")
+                    let message = isEditing == true
+                    ? "게시글 수정에 실패했습니다.\n\(error.localizedDescription)"
+                    : "게시글 등록에 실패했습니다.\n\(error.localizedDescription)"
+                    self?.showAlert(message: message)
                 }
             }
             .store(in: &cancellables)
@@ -500,6 +554,9 @@ final class CreatePostViewController: BaseViewController {
         if let previewImage = item.previewImage {
             previewImageView.image = previewImage
             previewImageView.contentMode = .scaleAspectFill
+        } else if let remotePath = item.remotePath, !item.isVideo {
+            previewImageView.setFeelterImage(with: remotePath)
+            previewImageView.contentMode = .scaleAspectFill
         } else {
             let fallbackName = item.isVideo ? "video.fill" : "photo"
             previewImageView.image = UIImage(systemName: fallbackName)
@@ -596,9 +653,8 @@ final class CreatePostViewController: BaseViewController {
     }
 
     private func submitPost(fields: ValidatedPostFields, coordinate: CLLocationCoordinate2D) {
-        let uploadFiles = attachmentItems.map {
-            UploadFile(data: $0.data, fileExtension: $0.fileExtension)
-        }
+        let newFiles = attachmentItems.compactMap { $0.uploadFile }
+        let existingFilePaths = attachmentItems.compactMap { $0.remotePath }
 
         let input = CreatePostViewModel.ValidatedPostInput(
             category: fields.category,
@@ -606,7 +662,8 @@ final class CreatePostViewController: BaseViewController {
             content: fields.content,
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
-            files: uploadFiles
+            newFiles: newFiles,
+            existingFilePaths: existingFilePaths
         )
 
         saveButtonTappedSubject.send(input)
@@ -691,10 +748,16 @@ private struct ValidatedPostFields {
 }
 
 private struct AttachmentItem {
-    let data: Data
-    let fileExtension: String
+    let data: Data?
+    let fileExtension: String?
     let previewImage: UIImage?
+    let remotePath: String?
     let isVideo: Bool
+
+    var uploadFile: UploadFile? {
+        guard let data, let fileExtension else { return nil }
+        return UploadFile(data: data, fileExtension: fileExtension)
+    }
 }
 
 // MARK: - UIGestureRecognizerDelegate
@@ -829,6 +892,7 @@ extension CreatePostViewController: PHPickerViewControllerDelegate {
                     data: data,
                     fileExtension: "jpg",
                     previewImage: image,
+                    remotePath: nil,
                     isVideo: false
                 )
             }
@@ -873,6 +937,7 @@ extension CreatePostViewController: PHPickerViewControllerDelegate {
                 data: data,
                 fileExtension: fileExtension,
                 previewImage: previewImage,
+                remotePath: nil,
                 isVideo: true
             )
             completion(item)

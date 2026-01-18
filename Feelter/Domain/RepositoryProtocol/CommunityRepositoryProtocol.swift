@@ -20,6 +20,8 @@ protocol CommunityRepositoryProtocol {
     func searchPosts(title: String?) async throws -> [PostSummary]
     func fetchPostDetail(postId: String) async throws -> PostDetail
     func createPost(requestDTO: CreatePostRequestDTO) async throws -> PostDetail
+    func updatePost(postId: String, requestDTO: UpdatePostRequestDTO) async throws -> PostDetail
+    func deletePost(postId: String) async throws
     func likePost(postId: String, status: Bool) async throws -> Bool
     func uploadFiles(_ files: [UploadFile]) async throws -> [String]
 }

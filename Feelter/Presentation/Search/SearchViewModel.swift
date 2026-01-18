@@ -19,6 +19,7 @@ final class SearchViewModel: ViewModelProtocol {
         let distanceChanged: AnyPublisher<Int?, Never>
         let locationUpdated: AnyPublisher<CLLocationCoordinate2D, Never>
         let likeButtonTapped: AnyPublisher<(postId: String, isLiked: Bool), Never>
+        let deletePostRequested: AnyPublisher<String, Never>
     }
 
     struct Output {
@@ -297,6 +298,27 @@ final class SearchViewModel: ViewModelProtocol {
             }
             .store(in: &cancellables)
 
+        input.deletePostRequested
+            .sink { [weak self] postId in
+                guard let self = self else { return }
+                let originalPosts = self.posts
+                self.posts.removeAll { $0.id == postId }
+                postsSubject.send(self.posts)
+
+                Task {
+                    do {
+                        try await self.postUsecase.deletePost(postId: postId)
+                    } catch {
+                        await MainActor.run {
+                            self.posts = originalPosts
+                            postsSubject.send(self.posts)
+                            errorMessageSubject.send("게시글 삭제에 실패했습니다.")
+                        }
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
         return Output(
             posts: postsSubject.eraseToAnyPublisher(),
             isLoading: isLoadingSubject.eraseToAnyPublisher(),
@@ -374,6 +396,7 @@ final class SearchViewModel: ViewModelProtocol {
 
             return SearchPostItem(
                 id: post.id,
+                authorId: post.creator.id,
                 authorName: authorName,
                 profileImagePath: post.creator.profileImageURL,
                 locationText: locationText,
@@ -398,6 +421,7 @@ final class SearchViewModel: ViewModelProtocol {
     ) -> SearchPostItem {
         SearchPostItem(
             id: item.id,
+            authorId: item.authorId,
             authorName: item.authorName,
             profileImagePath: item.profileImagePath,
             locationText: locationText ?? item.locationText,

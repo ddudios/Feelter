@@ -71,6 +71,21 @@ final class CommunityRepository: CommunityRepositoryProtocol {
         return response.toDetailDomain()
     }
 
+    func updatePost(postId: String, requestDTO: UpdatePostRequestDTO) async throws -> PostDetail {
+        let response = try await networkManager.request(
+            PostRouter.updatePost(id: postId, body: requestDTO),
+            type: PostDTO.self
+        )
+
+        return response.toDetailDomain()
+    }
+
+    func deletePost(postId: String) async throws {
+        try await networkManager.requestWithEmptyResponse(
+            PostRouter.deletePost(id: postId)
+        )
+    }
+
     func likePost(postId: String, status: Bool) async throws -> Bool {
         // Router 호출
         let router = PostRouter.likePost(

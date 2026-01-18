@@ -19,6 +19,10 @@ protocol FilterUsecaseProtocol {
     func fetchTodayFilter() async throws -> TodayFilter
     func fetchHotTrends() async throws -> [FilterSummary]
     func likeFilter(id: String, status: Bool) async throws -> Bool
+
+    // 필터 생성
+    func uploadFiles(_ imageData: [Data]) async throws -> [String]
+    func createFilter(requestDTO: CreateFilterRequestDTO) async throws -> FilterDetail
 }
 
 struct FilterUsecase: FilterUsecaseProtocol {
@@ -57,5 +61,13 @@ struct FilterUsecase: FilterUsecaseProtocol {
 
     func likeFilter(id: String, status: Bool) async throws -> Bool {
         try await repository.likeFilter(id: id, status: status)
+    }
+
+    func uploadFiles(_ imageData: [Data]) async throws -> [String] {
+        try await repository.uploadFiles(imageData)
+    }
+
+    func createFilter(requestDTO: CreateFilterRequestDTO) async throws -> FilterDetail {
+        try await repository.createFilter(requestDTO: requestDTO)
     }
 }

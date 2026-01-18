@@ -10,6 +10,19 @@ import Combine
 
 final class CreatePostViewModel: ViewModelProtocol {
 
+    enum Mode {
+        case create
+        case edit(EditContext)
+    }
+
+    struct EditContext {
+        let postId: String
+        let category: String
+        let title: String
+        let content: String
+        let filePaths: [String]
+    }
+
     struct Input {
         let viewDidLoad: AnyPublisher<Void, Never>
         let saveButtonTapped: AnyPublisher<ValidatedPostInput, Never>
@@ -26,14 +39,20 @@ final class CreatePostViewModel: ViewModelProtocol {
         let content: String
         let latitude: Double
         let longitude: Double
-        let files: [UploadFile]
+        let newFiles: [UploadFile]
+        let existingFilePaths: [String]
     }
 
     private let postUsecase: PostUsecaseProtocol
+    let mode: Mode
     private var cancellables = Set<AnyCancellable>()
 
-    init(postUsecase: PostUsecaseProtocol = DIContainer.shared.resolve(PostUsecaseProtocol.self)) {
+    init(
+        postUsecase: PostUsecaseProtocol = DIContainer.shared.resolve(PostUsecaseProtocol.self),
+        mode: Mode = .create
+    ) {
         self.postUsecase = postUsecase
+        self.mode = mode
     }
 
     func transform(input: Input) -> Output {
@@ -47,16 +66,31 @@ final class CreatePostViewModel: ViewModelProtocol {
 
                 Task {
                     do {
-                        let postInput = CreatePostInput(
-                            category: validatedInput.category,
-                            title: validatedInput.title,
-                            content: validatedInput.content,
-                            latitude: validatedInput.latitude,
-                            longitude: validatedInput.longitude,
-                            files: validatedInput.files
-                        )
-
-                        let result = try await self.postUsecase.createPost(input: postInput)
+                        let result: PostDetail
+                        switch self.mode {
+                        case .create:
+                            let postInput = CreatePostInput(
+                                category: validatedInput.category,
+                                title: validatedInput.title,
+                                content: validatedInput.content,
+                                latitude: validatedInput.latitude,
+                                longitude: validatedInput.longitude,
+                                files: validatedInput.newFiles
+                            )
+                            result = try await self.postUsecase.createPost(input: postInput)
+                        case .edit(let context):
+                            let updateInput = UpdatePostInput(
+                                postId: context.postId,
+                                category: validatedInput.category,
+                                title: validatedInput.title,
+                                content: validatedInput.content,
+                                latitude: validatedInput.latitude,
+                                longitude: validatedInput.longitude,
+                                newFiles: validatedInput.newFiles,
+                                existingFilePaths: validatedInput.existingFilePaths
+                            )
+                            result = try await self.postUsecase.updatePost(input: updateInput)
+                        }
 
                         await MainActor.run {
                             isLoadingSubject.send(false)

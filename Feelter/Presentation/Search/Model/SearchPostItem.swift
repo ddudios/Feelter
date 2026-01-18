@@ -9,6 +9,7 @@ import Foundation
 
 struct SearchPostItem: Hashable {
     let id: String
+    let authorId: String
     let authorName: String
     let profileImagePath: String?
     let locationText: String?
