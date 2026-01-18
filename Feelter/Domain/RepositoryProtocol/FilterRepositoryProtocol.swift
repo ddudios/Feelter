@@ -15,6 +15,12 @@ protocol FilterRepositoryProtocol {
         limit: String?
     ) async throws -> FilterList
 
+    func fetchUserFilters(
+        userId: String,
+        next: String?,
+        limit: String?
+    ) async throws -> FilterList
+
     func fetchFilter(id: String) async throws -> FilterDetail
     func fetchTodayFilter() async throws -> TodayFilter
     func fetchHotTrends() async throws -> [FilterSummary]

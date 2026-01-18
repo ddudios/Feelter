@@ -39,6 +39,29 @@ final class FilterRepository: FilterRepositoryProtocol {
         )
     }
 
+    func fetchUserFilters(
+        userId: String,
+        next: String?,
+        limit: String?
+    ) async throws -> FilterList {
+        let requestDTO = FilterListRequestDTO(
+            next: next,
+            limit: limit,
+            category: nil,
+            orderBy: nil
+        )
+
+        let response = try await networkManager.request(
+            FilterRouter.getUserFilters(userId: userId, query: requestDTO),
+            type: FilterListResponseDTO.self
+        )
+
+        return FilterList(
+            filters: response.data.map { $0.toSummaryDomain() },
+            nextCursor: response.nextCursor
+        )
+    }
+
     func fetchFilter(id: String) async throws -> FilterDetail {
         let response = try await networkManager.request(
             FilterRouter.filter(id: id),

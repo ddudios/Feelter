@@ -23,6 +23,12 @@ final public class ProfileCoordinator: Coordinator {
         profileViewController.onChatListTapped = { [weak self] in
             self?.showChatRoomList()
         }
+        profileViewController.onMessageTapped = { [weak self] userId in
+            self?.showChatRoomForUser(userId: userId)
+        }
+        profileViewController.onEditProfileTapped = { [weak self] in
+            self?.showEditProfile()
+        }
         navigationController.pushViewController(profileViewController, animated: true)
     }
 
@@ -31,6 +37,34 @@ final public class ProfileCoordinator: Coordinator {
         let viewModel = DIContainer.shared.resolve(ChatRoomListViewModel.self)
         let chatRoomListViewController = ChatRoomListViewController(viewModel: viewModel)
         navigationController.pushViewController(chatRoomListViewController, animated: true)
+    }
+
+    private func showEditProfile() {
+        let editViewController = ProfileEditViewController()
+        navigationController.pushViewController(editViewController, animated: true)
+    }
+
+    private func showChatRoomForUser(userId: String) {
+        guard !userId.isEmpty else {
+            showErrorAlert(message: "채팅을 시작할 수 없습니다.")
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                let createChatRoomUsecase = DIContainer.shared.resolve(CreateChatRoomUsecase.self)
+                let chatRoom = try await createChatRoomUsecase.execute(opponentId: userId)
+                navigateToChatRoom(chatRoom)
+            } catch {
+                let errorMessage: String
+                if let createError = error as? CreateChatRoomUsecase.CreateChatRoomError {
+                    errorMessage = createError.errorDescription ?? "채팅방 생성에 실패했습니다."
+                } else {
+                    errorMessage = error.localizedDescription
+                }
+                showErrorAlert(message: errorMessage)
+            }
+        }
     }
 
     /// 푸시 알림을 통한 특정 채팅방으로 이동
@@ -115,6 +149,26 @@ final public class ProfileCoordinator: Coordinator {
         )
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         navigationController.present(alert, animated: true)
+    }
+
+    private func navigateToChatRoom(_ chatRoom: ChatRoom) {
+        let repository = DIContainer.shared.resolve(ChatRepositoryProtocol.self)
+        let fetchChatHistoryUsecase = DIContainer.shared.resolve(FetchChatHistoryUsecase.self)
+        let sendMessageUsecase = DIContainer.shared.resolve(SendMessageUsecase.self)
+
+        let chatRoomViewModel = ChatRoomViewModel(
+            chatRoom: chatRoom,
+            fetchChatHistoryUsecase: fetchChatHistoryUsecase,
+            sendMessageUsecase: sendMessageUsecase,
+            repository: repository
+        )
+
+        let chatRoomViewController = ChatRoomViewController(
+            chatRoom: chatRoom,
+            viewModel: chatRoomViewModel
+        )
+
+        navigationController.pushViewController(chatRoomViewController, animated: true)
     }
 
     func finish() {

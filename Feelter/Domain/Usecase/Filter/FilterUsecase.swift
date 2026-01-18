@@ -15,6 +15,12 @@ protocol FilterUsecaseProtocol {
         limit: String?
     ) async throws -> FilterList
 
+    func fetchUserFilters(
+        userId: String,
+        next: String?,
+        limit: String?
+    ) async throws -> FilterList
+
     func fetchFilter(id: String) async throws -> FilterDetail
     func fetchTodayFilter() async throws -> TodayFilter
     func fetchHotTrends() async throws -> [FilterSummary]
@@ -42,6 +48,18 @@ struct FilterUsecase: FilterUsecaseProtocol {
         try await repository.fetchFilterList(
             category: category,
             orderBy: orderBy,
+            next: next,
+            limit: limit
+        )
+    }
+
+    func fetchUserFilters(
+        userId: String,
+        next: String?,
+        limit: String?
+    ) async throws -> FilterList {
+        try await repository.fetchUserFilters(
+            userId: userId,
             next: next,
             limit: limit
         )

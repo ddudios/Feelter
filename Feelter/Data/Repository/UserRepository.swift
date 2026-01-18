@@ -22,4 +22,22 @@ final class UserRepository: UserRepositoryProtocol {
 
         return response.toDomain()
     }
+
+    func fetchMyProfile() async throws -> User {
+        let response = try await networkManager.request(
+            UserRouter.myProfile,
+            type: ProfileResponseDTO.self
+        )
+
+        return response.toDomain()
+    }
+
+    func fetchProfile(userId: String) async throws -> User {
+        let response = try await networkManager.request(
+            UserRouter.otherProfile(userId: userId),
+            type: ProfileResponseDTO.self
+        )
+
+        return response.toDomain()
+    }
 }

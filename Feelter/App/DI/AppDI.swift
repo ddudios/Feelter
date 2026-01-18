@@ -94,6 +94,11 @@ func registerDependencies() {
         return TodayAuthorUsecase(repository: repository)
     }
 
+    container.registerFactory(ProfileUsecaseProtocol.self) {
+        let repository = container.resolve(UserRepositoryProtocol.self)
+        return ProfileUsecase(repository: repository)
+    }
+
     container.registerFactory(FetchChatRoomsUsecase.self) {
         let repository = container.resolve(ChatRepositoryProtocol.self)
         return FetchChatRoomsUsecase(repository: repository)
@@ -122,8 +127,14 @@ func registerDependencies() {
     }
 
     container.registerFactory(ProfileViewModel.self) {
-        let usecase = container.resolve(LogoutUsecaseProtocol.self)
-        return ProfileViewModel(logoutUsecase: usecase)
+        let logoutUsecase = container.resolve(LogoutUsecaseProtocol.self)
+        let profileUsecase = container.resolve(ProfileUsecaseProtocol.self)
+        let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
+        return ProfileViewModel(
+            logoutUsecase: logoutUsecase,
+            profileUsecase: profileUsecase,
+            filterUsecase: filterUsecase
+        )
     }
 
     container.registerFactory(HomeViewModel.self) {
