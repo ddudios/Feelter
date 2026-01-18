@@ -7,6 +7,7 @@
 
 import UIKit
 import SnapKit
+import Combine
 
 @MainActor
 final class FilterEditViewController: BaseViewController {
@@ -27,6 +28,8 @@ final class FilterEditViewController: BaseViewController {
     private let selectedImage: UIImage
     private let imageContainerView = UIView()
     private let photoImageView = UIImageView()
+    private let filterEngine = FilterEngine()
+    private var cancellables = Set<AnyCancellable>()
 
     private let actionButtonStackView = UIStackView()
     private let undoButton = UIButton(type: .system)
@@ -76,6 +79,17 @@ final class FilterEditViewController: BaseViewController {
         photoImageView.clipsToBounds = true
         photoImageView.backgroundColor = .Feelter.gray100
         photoImageView.isUserInteractionEnabled = true
+
+        // FilterEngine 초기화
+        filterEngine.setImage(from: selectedImage)
+
+        // FilterEngine의 previewImage 구독
+        filterEngine.$previewImage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] image in
+                self?.photoImageView.image = image
+            }
+            .store(in: &cancellables)
 
         configureActionButton(undoButton, image: UIImage.Icon.undo)
         configureActionButton(redoButton, image: UIImage.Icon.redo)
@@ -236,6 +250,37 @@ final class FilterEditViewController: BaseViewController {
 
     @objc private func adjustmentSliderValueChanged(_ sender: FilterAdjustmentSlider) {
         sliderValues[selectedProperty] = sender.value
+
+        // 슬라이더 값을 internal value로 변환
+        let internalValue = selectedProperty.internalValue(forSliderValue: sender.value)
+
+        // 선택된 프로퍼티에 따라 FilterEngine의 해당 필터 업데이트
+        switch selectedProperty {
+        case .brightness:
+            filterEngine.updateBrightness(value: Float(internalValue))
+        case .exposure:
+            filterEngine.updateExposure(value: Float(internalValue))
+        case .contrast:
+            filterEngine.updateContrast(value: Float(internalValue))
+        case .saturation:
+            filterEngine.updateSaturation(value: Float(internalValue))
+        case .sharpness:
+            filterEngine.updateSharpness(value: Float(internalValue))
+        case .blur:
+            filterEngine.updateBlur(value: Float(internalValue))
+        case .vignette:
+            filterEngine.updateVignette(value: Float(internalValue))
+        case .noise:
+            filterEngine.updateNoiseReduction(value: Float(internalValue))
+        case .highlights:
+            filterEngine.updateHighlights(value: Float(internalValue))
+        case .shadows:
+            filterEngine.updateShadows(value: Float(internalValue))
+        case .temperature:
+            filterEngine.updateTemperature(value: Float(internalValue))
+        case .blackPoint:
+            filterEngine.updateBlackPoint(value: Float(internalValue))
+        }
     }
 }
 
