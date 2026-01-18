@@ -31,6 +31,9 @@ final class FilterEditViewController: BaseViewController {
     private let filterEngine = FilterEngine()
     private var cancellables = Set<AnyCancellable>()
 
+    // 저장 완료 콜백 (필터 이미지, 원본 이미지, 필터 값)
+    var onSaveComplete: ((UIImage, UIImage, FilterValues) -> Void)?
+
     private let actionButtonStackView = UIStackView()
     private let undoButton = UIButton(type: .system)
     private let redoButton = UIButton(type: .system)
@@ -195,7 +198,28 @@ final class FilterEditViewController: BaseViewController {
         }
     }
 
-    @objc private func saveButtonTapped() { }
+    @objc private func saveButtonTapped() {
+        // 1. 필터 적용된 고화질 이미지 생성
+        guard let filteredImage = filterEngine.saveOriginalImage() else {
+            showErrorAlert("이미지 처리에 실패했습니다.")
+            return
+        }
+
+        // 2. 현재 필터 값 가져오기
+        let currentFilterValues = filterEngine.filterValuesSubject.value
+
+        // 3. 콜백으로 데이터 전달
+        onSaveComplete?(filteredImage, selectedImage, currentFilterValues)
+
+        // 4. 이전 화면으로 돌아가기
+        navigationController?.popViewController(animated: true)
+    }
+
+    private func showErrorAlert(_ message: String) {
+        let alert = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        present(alert, animated: true)
+    }
 
     private func setCustomTabBarHidden(_ hidden: Bool) {
         (tabBarController as? CustomTabBarController)?.setCustomTabBarHidden(hidden, animated: false)

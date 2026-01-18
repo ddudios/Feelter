@@ -40,7 +40,7 @@ final class SearchPostCell: UITableViewCell {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.isPagingEnabled = true
         collectionView.showsHorizontalScrollIndicator = false
-        collectionView.backgroundColor = .Feelter.gray90
+        collectionView.backgroundColor = .clear
         collectionView.register(SearchPostImageCell.self, forCellWithReuseIdentifier: SearchPostImageCell.identifier)
         return collectionView
     }()

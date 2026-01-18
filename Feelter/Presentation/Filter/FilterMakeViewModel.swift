@@ -41,8 +41,10 @@ final class FilterMakeViewModel: ViewModelProtocol {
         let category: String
         let description: String
         let price: Int
-        let photo: UIImage
+        let filteredPhoto: UIImage      // 필터 적용된 이미지
+        let originalPhoto: UIImage      // 원본 이미지
         let metadata: PhotoMetadata
+        let filterValues: FilterValues  // 실제 필터 값
     }
 
     // MARK: - Properties
@@ -137,30 +139,35 @@ final class FilterMakeViewModel: ViewModelProtocol {
     // MARK: - Private Methods
 
     private func createFilter(with input: ValidatedFilterInput) async throws -> FilterDetail {
-        // 1. 이미지 데이터 변환
-        guard let imageData = input.photo.jpegData(compressionQuality: 0.8) else {
+        // 1. 필터 적용 이미지 변환
+        guard let filteredImageData = input.filteredPhoto.jpegData(compressionQuality: 0.8) else {
             throw FilterMakeError.imageConversionFailed
         }
 
-        // 2. 파일 업로드 (원본, 필터 적용 - 현재 동일 이미지)
-        let fileURLs = try await repository.uploadFiles([imageData, imageData])
+        // 2. 원본 이미지 변환
+        guard let originalImageData = input.originalPhoto.jpegData(compressionQuality: 0.8) else {
+            throw FilterMakeError.imageConversionFailed
+        }
 
-        // 3. DTO 변환
+        // 3. 파일 업로드 (필터 적용본, 원본 순서)
+        let fileURLs = try await repository.uploadFiles([filteredImageData, originalImageData])
+
+        // 4. DTO 변환
         let photoMetadataDTO = input.metadata.toDTO()
-        let filterValuesDTO = FilterValues.default.toDTO()
+        let filterValuesDTO = input.filterValues.toDTO()  // 실제 필터값 사용
 
-        // 4. 요청 DTO 생성
+        // 5. 요청 DTO 생성
         let requestDTO = CreateFilterRequestDTO(
             category: input.category,
             title: input.title,
             price: input.price,
             description: input.description,
-            files: fileURLs,
+            files: fileURLs,  // [필터적용본URL, 원본URL]
             photoMetadata: photoMetadataDTO,
             filterValues: filterValuesDTO
         )
 
-        // 5. API 호출
+        // 6. API 호출
         return try await repository.createFilter(requestDTO: requestDTO)
     }
 

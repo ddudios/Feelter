@@ -125,6 +125,14 @@ final class FilterMakeViewController: BaseViewController {
     private weak var activeTextField: UITextField?
     private var selectedPhotoImage: UIImage?
     private var currentPhotoMetadata: PhotoMetadata?
+
+    // 원본 이미지 보관 (여러 번 편집을 위해)
+    private var originalPhotoImage: UIImage?
+    // 필터 적용된 이미지 (서버 업로드용)
+    private var filteredPhotoImage: UIImage?
+    // 현재 필터 값 (서버 전송용)
+    private var currentFilterValues: FilterValues?
+
     private var photoUploadButtonHeightConstraint: Constraint?
     private var photoUploadButtonSquareConstraint: NSLayoutConstraint?
     private var baseScrollBottomInset: CGFloat = 0
@@ -473,8 +481,10 @@ final class FilterMakeViewController: BaseViewController {
                 category: validatedInput.category,
                 description: validatedInput.description,
                 price: validatedInput.price,
-                photo: validatedInput.photo,
-                metadata: validatedInput.metadata
+                filteredPhoto: filteredPhotoImage ?? validatedInput.photo,  // 필터 적용본 우선
+                originalPhoto: originalPhotoImage ?? validatedInput.photo,   // 원본
+                metadata: validatedInput.metadata,
+                filterValues: currentFilterValues ?? .default  // 실제 필터값 또는 기본값
             )
             saveButtonTappedSubject.send(viewModelInput)
 
@@ -519,8 +529,24 @@ final class FilterMakeViewController: BaseViewController {
     }
 
     @objc private func photoEditButtonTapped() {
-        guard let selectedPhotoImage else { return }
-        let viewController = FilterEditViewController(image: selectedPhotoImage)
+        // 원본 이미지 확인 (첫 편집: selectedPhotoImage, 재편집: originalPhotoImage)
+        guard let imageToEdit = originalPhotoImage ?? selectedPhotoImage else { return }
+
+        let viewController = FilterEditViewController(image: imageToEdit)
+
+        // 콜백 설정
+        viewController.onSaveComplete = { [weak self] filteredImage, originalImage, filterValues in
+            guard let self else { return }
+
+            // 데이터 저장
+            self.originalPhotoImage = originalImage
+            self.filteredPhotoImage = filteredImage
+            self.currentFilterValues = filterValues
+
+            // UI 업데이트 (필터 적용 이미지를 미리보기로 표시)
+            self.updatePhotoUploadButton(with: filteredImage)
+        }
+
         navigationController?.pushViewController(viewController, animated: true)
     }
 
@@ -773,6 +799,9 @@ extension FilterMakeViewController: PHPickerViewControllerDelegate {
         itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
             guard let self, let image = object as? UIImage else { return }
             Task { @MainActor in
+                // 원본 저장 추가
+                self.originalPhotoImage = image
+                self.selectedPhotoImage = image
                 self.updatePhotoUploadButton(with: image)
             }
             self.loadPhotoMetadata(
