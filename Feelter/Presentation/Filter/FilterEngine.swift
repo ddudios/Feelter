@@ -13,8 +13,11 @@ import CoreImage.CIFilterBuiltins
 class FilterEngine: ObservableObject {
     private let context = CIContext(options: [.useSoftwareRenderer: false])
 
-    // 원본 (메모리를 거의 차지하지 않음)
+    // 원본 (고화질, 저장용)
     private var originalCIImage: CIImage?
+
+    // 축소본 (저화질, 화면 표시 및 편집용)
+    private var smallCIImage: CIImage?
 
     private let brightnessFilter = CIFilter.colorControls()
     private let contrastFilter = CIFilter.colorControls()
@@ -53,9 +56,14 @@ class FilterEngine: ObservableObject {
         // contentsOf: url -> 이 시점엔 메모리에 로딩하지 않고 준비만 합니다. (Lazy)
         guard let ciImage = CIImage(contentsOf: url) else { return }
 
+        // 원본 보관
         self.originalCIImage = ciImage
 
-        // 초기화 시 한 번 그려주기
+        // 다운샘플링 실행 (화면용 작은 이미지 만들기)
+        // 목표: 긴 쪽의 길이가 1024 픽셀 정도면 충분함 (아이폰 화면용)
+        self.smallCIImage = downsampleCIImage(ciImage, targetLength: 1024)
+
+        // 초기화 시 한 번 그려주기 (작은 이미지로 필터 적용)
         applyFilters()
     }
 
@@ -63,7 +71,28 @@ class FilterEngine: ObservableObject {
     func setImage(from image: UIImage) {
         guard let ciImage = CIImage(image: image) else { return }
         self.originalCIImage = ciImage
+        self.smallCIImage = downsampleCIImage(ciImage, targetLength: 1024)
         applyFilters()
+    }
+
+    // 다운샘플링 함수 (Core Image 방식)
+    private func downsampleCIImage(_ image: CIImage, targetLength: CGFloat) -> CIImage? {
+        // 이미지의 현재 크기
+        let extent = image.extent
+        let maxDimension = max(extent.width, extent.height)
+
+        // 이미지가 목표보다 작으면 굳이 줄일 필요 없음
+        if maxDimension <= targetLength {
+            return image
+        }
+
+        // 줄여야 할 비율 계산 (예: 4000px -> 1000px 이면 0.25배)
+        let scale = targetLength / maxDimension
+
+        // 변환 행렬(Transform Matrix)을 사용해 크기 조절 필터 적용
+        // 이 방식이 메모리 효율이 가장 좋음
+        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        return image.transformed(by: transform)
     }
 
     func updateBrightness(value: Float) {
@@ -132,7 +161,8 @@ class FilterEngine: ObservableObject {
     }
 
     private func applyFilters() {
-        guard let inputImage = originalCIImage else { return }
+        // [중요] 필터 적용 대상이 'original'이 아니라 'small'입니다!
+        guard let inputImage = smallCIImage else { return }
 
         var outputImage = inputImage
 
@@ -257,5 +287,111 @@ class FilterEngine: ObservableObject {
         noiseReduction = 0.0
         blackPoint = 0.0
         applyFilters()
+    }
+
+    // [저장 기능] 최종 저장할 때는 원본에 적용!
+    // 이 함수는 사용자가 '저장' 버튼을 눌렀을 때 호출하면 됩니다.
+    func saveOriginalImage() -> UIImage? {
+        guard let inputImage = originalCIImage else { return nil }
+
+        var outputImage = inputImage
+
+        // 원본에 모든 필터 값 적용 (applyFilters와 동일한 로직)
+        // Brightness, Contrast, Saturation (CIColorControls)
+        if brightness != 0.0 || contrast != 1.0 || saturation != 1.0 {
+            brightnessFilter.inputImage = outputImage
+            brightnessFilter.brightness = brightness
+            brightnessFilter.contrast = contrast
+            brightnessFilter.saturation = saturation
+            if let result = brightnessFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Exposure
+        if exposure != 0.0 {
+            exposureFilter.inputImage = outputImage
+            exposureFilter.ev = exposure
+            if let result = exposureFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Highlights & Shadows
+        if highlights != 0.0 || shadows != 0.0 {
+            highlightsFilter.inputImage = outputImage
+            highlightsFilter.highlightAmount = highlights
+            highlightsFilter.shadowAmount = shadows
+            if let result = highlightsFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Temperature & Tint
+        if temperature != 6500 || tint != 0.0 {
+            temperatureFilter.inputImage = outputImage
+            temperatureFilter.neutral = CIVector(x: CGFloat(temperature), y: CGFloat(tint))
+            temperatureFilter.targetNeutral = CIVector(x: 6500, y: 0)
+            if let result = temperatureFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Sharpness
+        if sharpness > 0.0 {
+            sharpenFilter.inputImage = outputImage
+            sharpenFilter.sharpness = sharpness
+            if let result = sharpenFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Vignette
+        if vignette > 0.0 {
+            vignetteFilter.inputImage = outputImage
+            vignetteFilter.intensity = vignette
+            vignetteFilter.radius = 1.0
+            if let result = vignetteFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Blur
+        if blur > 0.0 {
+            blurFilter.inputImage = outputImage
+            blurFilter.radius = blur
+            if let result = blurFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Noise Reduction
+        if noiseReduction > 0.0 {
+            noiseReductionFilter.inputImage = outputImage
+            noiseReductionFilter.noiseLevel = noiseReduction
+            noiseReductionFilter.sharpness = 0.4
+            if let result = noiseReductionFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Black Point (using Tone Curve)
+        if blackPoint > 0.0 {
+            toneCurveFilter.inputImage = outputImage
+            toneCurveFilter.point0 = CGPoint(x: 0, y: CGFloat(blackPoint))
+            toneCurveFilter.point1 = CGPoint(x: 0.25, y: 0.25)
+            toneCurveFilter.point2 = CGPoint(x: 0.5, y: 0.5)
+            toneCurveFilter.point3 = CGPoint(x: 0.75, y: 0.75)
+            toneCurveFilter.point4 = CGPoint(x: 1, y: 1)
+            if let result = toneCurveFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // 고화질 렌더링 (시간이 좀 걸려도 됨)
+        if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
+            return UIImage(cgImage: cgImage)
+        }
+        return nil
     }
 }
