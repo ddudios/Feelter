@@ -36,24 +36,10 @@ class FilterEngine: ObservableObject {
 
     @Published var previewImage: UIImage?
 
-    // [핵심] 렌더링 트리거 Subject - 어떤 값이 변경되든 이것으로 신호를 보냄
-    private let renderTrigger = PassthroughSubject<Void, Never>()
+    // [핵심] 필터 값을 받을 Subject
+    // CurrentValueSubject를 사용하면 현재 상태를 추적할 수 있고, .value로 현재 값 접근 가능
+    let filterValuesSubject = CurrentValueSubject<FilterValues, Never>(.default)
     private var cancellables = Set<AnyCancellable>()
-
-    // 필터 값 저장 (FilterAdjustmentProperty의 defaultInternalValue 참고)
-    private var brightness: Float = 0.0
-    private var contrast: Float = 1.0
-    private var saturation: Float = 1.0
-    private var exposure: Float = 0.0
-    private var highlights: Float = 0.0
-    private var shadows: Float = 0.0
-    private var temperature: Float = 6500
-    private var tint: Float = 0.0
-    private var sharpness: Float = 0.0
-    private var vignette: Float = 0.0
-    private var blur: Float = 0.0
-    private var noiseReduction: Float = 0.0
-    private var blackPoint: Float = 0.0
 
     init() {
         setupPipeline()
@@ -61,23 +47,27 @@ class FilterEngine: ObservableObject {
 
     // 렌더링 파이프라인 설정
     private func setupPipeline() {
-        renderTrigger
-            // 1. [최적화] 디바운스: 값이 막 들어와도 0.05초 동안 조용할 때까지 기다림
-            // 슬라이더를 미친듯이 흔들 때 렌더링을 안 해서 배터리/발열을 잡음
+        filterValuesSubject
+            // [Safety 1] 디바운스: 0.05초 동안 값 변화가 멈출 때까지 대기
+            // 슬라이더를 0.1 -> 0.5 -> 0.9로 빠르게 움직이면 0.1, 0.5는 무시하고 0.9만 처리함
+            // 이것만으로도 "작업 취소"와 유사한 효과(리소스 절약)를 냅니다.
             .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
 
-            // 2. 여기서부터 백그라운드 스레드로 보냄
+            // [Safety 2] 여기서부터 백그라운드 스레드(주방)로 보냄
             .receive(on: DispatchQueue.global(qos: .userInteractive))
 
-            // 3. 무거운 렌더링 작업 (Map)
-            .map { [weak self] _ -> UIImage? in
-                return self?.renderImage()
+            // [Safety 3] 렌더링 (순서 보장)
+            // Combine의 map은 "직렬(Serial)"로 동작합니다.
+            // 0.5 밝기 처리가 끝나기 전에는 절대 0.9 밝기 처리를 시작하지 않습니다.
+            // 따라서 "0.9가 먼저 화면에 뜨고 나중에 0.5가 덮어씌우는" 버그가 원천 차단됩니다.
+            .map { [weak self] (values: FilterValues) -> UIImage? in
+                return self?.renderImage(with: values)
             }
 
-            // 4. 결과가 나오면 다시 메인 스레드로 복귀
+            // 메인 스레드 복귀
             .receive(on: DispatchQueue.main)
 
-            // 5. 이미지 뷰에 할당
+            // UI 반영
             .sink { [weak self] image in
                 self?.previewImage = image
             }
@@ -85,45 +75,45 @@ class FilterEngine: ObservableObject {
     }
 
     // 렌더링 로직 분리 (순수 함수에 가깝게)
-    private func renderImage() -> UIImage? {
+    private func renderImage(with values: FilterValues) -> UIImage? {
         guard let inputImage = smallCIImage else { return nil }
 
         var outputImage = inputImage
 
         // Brightness, Contrast, Saturation (CIColorControls)
-        if brightness != 0.0 || contrast != 1.0 || saturation != 1.0 {
+        if values.brightness != 0.0 || values.contrast != 1.0 || values.saturation != 1.0 {
             brightnessFilter.inputImage = outputImage
-            brightnessFilter.brightness = brightness
-            brightnessFilter.contrast = contrast
-            brightnessFilter.saturation = saturation
+            brightnessFilter.brightness = Float(values.brightness)
+            brightnessFilter.contrast = Float(values.contrast)
+            brightnessFilter.saturation = Float(values.saturation)
             if let result = brightnessFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Exposure
-        if exposure != 0.0 {
+        if values.exposure != 0.0 {
             exposureFilter.inputImage = outputImage
-            exposureFilter.ev = exposure
+            exposureFilter.ev = Float(values.exposure)
             if let result = exposureFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Highlights & Shadows
-        if highlights != 0.0 || shadows != 0.0 {
+        if values.highlights != 0.0 || values.shadows != 0.0 {
             highlightsFilter.inputImage = outputImage
-            highlightsFilter.highlightAmount = highlights
-            highlightsFilter.shadowAmount = shadows
+            highlightsFilter.highlightAmount = Float(values.highlights)
+            highlightsFilter.shadowAmount = Float(values.shadows)
             if let result = highlightsFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Temperature & Tint
-        if temperature != 6500 || tint != 0.0 {
+        if values.temperature != 6500 || values.tint != 0.0 {
             temperatureFilter.inputImage = outputImage
-            temperatureFilter.neutral = CIVector(x: CGFloat(temperature), y: CGFloat(tint))
+            temperatureFilter.neutral = CIVector(x: CGFloat(values.temperature), y: CGFloat(values.tint))
             temperatureFilter.targetNeutral = CIVector(x: 6500, y: 0)
             if let result = temperatureFilter.outputImage {
                 outputImage = result
@@ -131,18 +121,18 @@ class FilterEngine: ObservableObject {
         }
 
         // Sharpness
-        if sharpness > 0.0 {
+        if values.sharpness > 0.0 {
             sharpenFilter.inputImage = outputImage
-            sharpenFilter.sharpness = sharpness
+            sharpenFilter.sharpness = Float(values.sharpness)
             if let result = sharpenFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Vignette
-        if vignette > 0.0 {
+        if values.vignette > 0.0 {
             vignetteFilter.inputImage = outputImage
-            vignetteFilter.intensity = vignette
+            vignetteFilter.intensity = Float(values.vignette)
             vignetteFilter.radius = 1.0
             if let result = vignetteFilter.outputImage {
                 outputImage = result
@@ -150,18 +140,18 @@ class FilterEngine: ObservableObject {
         }
 
         // Blur
-        if blur > 0.0 {
+        if values.blur > 0.0 {
             blurFilter.inputImage = outputImage
-            blurFilter.radius = blur
+            blurFilter.radius = Float(values.blur)
             if let result = blurFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Noise Reduction
-        if noiseReduction > 0.0 {
+        if values.noiseReduction > 0.0 {
             noiseReductionFilter.inputImage = outputImage
-            noiseReductionFilter.noiseLevel = noiseReduction
+            noiseReductionFilter.noiseLevel = Float(values.noiseReduction)
             noiseReductionFilter.sharpness = 0.4
             if let result = noiseReductionFilter.outputImage {
                 outputImage = result
@@ -169,9 +159,9 @@ class FilterEngine: ObservableObject {
         }
 
         // Black Point (using Tone Curve)
-        if blackPoint > 0.0 {
+        if values.blackPoint > 0.0 {
             toneCurveFilter.inputImage = outputImage
-            toneCurveFilter.point0 = CGPoint(x: 0, y: CGFloat(blackPoint))
+            toneCurveFilter.point0 = CGPoint(x: 0, y: CGFloat(values.blackPoint))
             toneCurveFilter.point1 = CGPoint(x: 0.25, y: 0.25)
             toneCurveFilter.point2 = CGPoint(x: 0.5, y: 0.5)
             toneCurveFilter.point3 = CGPoint(x: 0.75, y: 0.75)
@@ -201,8 +191,8 @@ class FilterEngine: ObservableObject {
         // 목표: 긴 쪽의 길이가 1024 픽셀 정도면 충분함 (아이폰 화면용)
         self.smallCIImage = downsampleCIImage(ciImage, targetLength: 1024)
 
-        // 초기화 시 한 번 그려주기 (렌더링 트리거 발동)
-        renderTrigger.send()
+        // 이미지 로딩 완료되면 초기값(기본 필터 값)으로 한 번 렌더링 트리거
+        filterValuesSubject.send(.default)
     }
 
     // URL이 없고 UIImage만 있는 경우를 위한 대비책 (보조용)
@@ -210,7 +200,7 @@ class FilterEngine: ObservableObject {
         guard let ciImage = CIImage(image: image) else { return }
         self.originalCIImage = ciImage
         self.smallCIImage = downsampleCIImage(ciImage, targetLength: 1024)
-        renderTrigger.send()
+        filterValuesSubject.send(.default)
     }
 
     // 다운샘플링 함수 (Core Image 방식)
@@ -234,68 +224,81 @@ class FilterEngine: ObservableObject {
     }
 
     func updateBrightness(value: Float) {
-        brightness = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.brightness = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateContrast(value: Float) {
-        contrast = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.contrast = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateSaturation(value: Float) {
-        saturation = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.saturation = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateExposure(value: Float) {
-        exposure = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.exposure = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateHighlights(value: Float) {
-        highlights = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.highlights = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateShadows(value: Float) {
-        shadows = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.shadows = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateTemperature(value: Float) {
-        temperature = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.temperature = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateTint(value: Float) {
-        tint = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.tint = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateSharpness(value: Float) {
-        sharpness = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.sharpness = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateVignette(value: Float) {
-        vignette = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.vignette = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateBlur(value: Float) {
-        blur = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.blur = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateNoiseReduction(value: Float) {
-        noiseReduction = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.noiseReduction = Double(value)
+        filterValuesSubject.send(current)
     }
 
     func updateBlackPoint(value: Float) {
-        blackPoint = value
-        renderTrigger.send()
+        var current = filterValuesSubject.value
+        current.blackPoint = Double(value)
+        filterValuesSubject.send(current)
     }
 
     // 현재 적용된 필터의 최종 이미지 반환
@@ -305,20 +308,7 @@ class FilterEngine: ObservableObject {
 
     // 모든 필터 초기화
     func resetAllFilters() {
-        brightness = 0.0
-        contrast = 1.0
-        saturation = 1.0
-        exposure = 0.0
-        highlights = 0.0
-        shadows = 0.0
-        temperature = 6500
-        tint = 0.0
-        sharpness = 0.0
-        vignette = 0.0
-        blur = 0.0
-        noiseReduction = 0.0
-        blackPoint = 0.0
-        renderTrigger.send()
+        filterValuesSubject.send(.default)
     }
 
     // [저장 기능] 최종 저장할 때는 원본에 적용!
@@ -326,43 +316,46 @@ class FilterEngine: ObservableObject {
     func saveOriginalImage() -> UIImage? {
         guard let inputImage = originalCIImage else { return nil }
 
+        // 현재 필터 값 가져오기 (.value로 현재 상태 접근)
+        let values = filterValuesSubject.value
+
         var outputImage = inputImage
 
-        // 원본에 모든 필터 값 적용 (applyFilters와 동일한 로직)
+        // 원본에 모든 필터 값 적용 (renderImage와 동일한 로직)
         // Brightness, Contrast, Saturation (CIColorControls)
-        if brightness != 0.0 || contrast != 1.0 || saturation != 1.0 {
+        if values.brightness != 0.0 || values.contrast != 1.0 || values.saturation != 1.0 {
             brightnessFilter.inputImage = outputImage
-            brightnessFilter.brightness = brightness
-            brightnessFilter.contrast = contrast
-            brightnessFilter.saturation = saturation
+            brightnessFilter.brightness = Float(values.brightness)
+            brightnessFilter.contrast = Float(values.contrast)
+            brightnessFilter.saturation = Float(values.saturation)
             if let result = brightnessFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Exposure
-        if exposure != 0.0 {
+        if values.exposure != 0.0 {
             exposureFilter.inputImage = outputImage
-            exposureFilter.ev = exposure
+            exposureFilter.ev = Float(values.exposure)
             if let result = exposureFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Highlights & Shadows
-        if highlights != 0.0 || shadows != 0.0 {
+        if values.highlights != 0.0 || values.shadows != 0.0 {
             highlightsFilter.inputImage = outputImage
-            highlightsFilter.highlightAmount = highlights
-            highlightsFilter.shadowAmount = shadows
+            highlightsFilter.highlightAmount = Float(values.highlights)
+            highlightsFilter.shadowAmount = Float(values.shadows)
             if let result = highlightsFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Temperature & Tint
-        if temperature != 6500 || tint != 0.0 {
+        if values.temperature != 6500 || values.tint != 0.0 {
             temperatureFilter.inputImage = outputImage
-            temperatureFilter.neutral = CIVector(x: CGFloat(temperature), y: CGFloat(tint))
+            temperatureFilter.neutral = CIVector(x: CGFloat(values.temperature), y: CGFloat(values.tint))
             temperatureFilter.targetNeutral = CIVector(x: 6500, y: 0)
             if let result = temperatureFilter.outputImage {
                 outputImage = result
@@ -370,18 +363,18 @@ class FilterEngine: ObservableObject {
         }
 
         // Sharpness
-        if sharpness > 0.0 {
+        if values.sharpness > 0.0 {
             sharpenFilter.inputImage = outputImage
-            sharpenFilter.sharpness = sharpness
+            sharpenFilter.sharpness = Float(values.sharpness)
             if let result = sharpenFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Vignette
-        if vignette > 0.0 {
+        if values.vignette > 0.0 {
             vignetteFilter.inputImage = outputImage
-            vignetteFilter.intensity = vignette
+            vignetteFilter.intensity = Float(values.vignette)
             vignetteFilter.radius = 1.0
             if let result = vignetteFilter.outputImage {
                 outputImage = result
@@ -389,18 +382,18 @@ class FilterEngine: ObservableObject {
         }
 
         // Blur
-        if blur > 0.0 {
+        if values.blur > 0.0 {
             blurFilter.inputImage = outputImage
-            blurFilter.radius = blur
+            blurFilter.radius = Float(values.blur)
             if let result = blurFilter.outputImage {
                 outputImage = result
             }
         }
 
         // Noise Reduction
-        if noiseReduction > 0.0 {
+        if values.noiseReduction > 0.0 {
             noiseReductionFilter.inputImage = outputImage
-            noiseReductionFilter.noiseLevel = noiseReduction
+            noiseReductionFilter.noiseLevel = Float(values.noiseReduction)
             noiseReductionFilter.sharpness = 0.4
             if let result = noiseReductionFilter.outputImage {
                 outputImage = result
@@ -408,9 +401,9 @@ class FilterEngine: ObservableObject {
         }
 
         // Black Point (using Tone Curve)
-        if blackPoint > 0.0 {
+        if values.blackPoint > 0.0 {
             toneCurveFilter.inputImage = outputImage
-            toneCurveFilter.point0 = CGPoint(x: 0, y: CGFloat(blackPoint))
+            toneCurveFilter.point0 = CGPoint(x: 0, y: CGFloat(values.blackPoint))
             toneCurveFilter.point1 = CGPoint(x: 0.25, y: 0.25)
             toneCurveFilter.point2 = CGPoint(x: 0.5, y: 0.5)
             toneCurveFilter.point3 = CGPoint(x: 0.75, y: 0.75)

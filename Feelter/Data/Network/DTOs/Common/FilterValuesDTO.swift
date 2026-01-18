@@ -19,10 +19,11 @@ struct FilterValuesDTO: Codable {
     let highlights: Double?
     let shadows: Double?
     let temperature: Double?
+    let tint: Double?
     let blackPoint: Double?
-    
+
     enum CodingKeys: String, CodingKey {
-        case brightness, exposure, contrast, saturation, sharpness, blur, vignette, highlights, shadows, temperature
+        case brightness, exposure, contrast, saturation, sharpness, blur, vignette, highlights, shadows, temperature, tint
         case noiseReduction = "noise_reduction"
         case blackPoint = "black_point"
     }

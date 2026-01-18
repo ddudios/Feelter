@@ -7,19 +7,20 @@
 
 import Foundation
 
-struct FilterValues {
-    let brightness: Double
-    let exposure: Double
-    let contrast: Double
-    let saturation: Double
-    let sharpness: Double
-    let blur: Double
-    let vignette: Double
-    let noiseReduction: Double
-    let highlights: Double
-    let shadows: Double
-    let temperature: Double
-    let blackPoint: Double
+struct FilterValues: Equatable {
+    var brightness: Double
+    var exposure: Double
+    var contrast: Double
+    var saturation: Double
+    var sharpness: Double
+    var blur: Double
+    var vignette: Double
+    var noiseReduction: Double
+    var highlights: Double
+    var shadows: Double
+    var temperature: Double
+    var tint: Double
+    var blackPoint: Double
 }
 
 extension FilterValues {
@@ -36,7 +37,8 @@ extension FilterValues {
         noiseReduction: 0.0,
         highlights: 0.0,
         shadows: 0.0,
-        temperature: 0.0,
+        temperature: 6500.0,
+        tint: 0.0,
         blackPoint: 0.0
     )
 }

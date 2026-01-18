@@ -21,7 +21,8 @@ extension FilterValuesDTO {
             noiseReduction: noiseReduction ?? 0,
             highlights: highlights ?? 0,
             shadows: shadows ?? 0,
-            temperature: temperature ?? 0,
+            temperature: temperature ?? 6500,
+            tint: tint ?? 0,
             blackPoint: blackPoint ?? 0
         )
     }
@@ -42,6 +43,7 @@ extension FilterValues {
             highlights: highlights,
             shadows: shadows,
             temperature: temperature,
+            tint: tint,
             blackPoint: blackPoint
         )
     }
