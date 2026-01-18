@@ -9,7 +9,7 @@ import UIKit
 import SnapKit
 import Combine
 
-final class VideoViewController: BaseViewController {
+final class VideoListViewController: BaseViewController {
 
     weak var coordinator: FeedCoordinator?
 
@@ -26,6 +26,7 @@ final class VideoViewController: BaseViewController {
 
     private let viewModel: VideoViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
+    private let loadMoreVideosSubject = PassthroughSubject<Void, Never>()
     private let likeButtonTappedSubject = PassthroughSubject<(videoId: String, isLiked: Bool), Never>()
     private var cancellables = Set<AnyCancellable>()
     private var safeAreaTopInset: CGFloat = 0
@@ -58,8 +59,13 @@ final class VideoViewController: BaseViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupDataSource()
+        setupCollectionView()
         bind()
         viewDidLoadSubject.send(())
+    }
+
+    private func setupCollectionView() {
+        collectionView.delegate = self
     }
 
     override func viewDidLayoutSubviews() {
@@ -108,7 +114,7 @@ final class VideoViewController: BaseViewController {
         section.contentInsets = NSDirectionalEdgeInsets(
             top: 0,
             leading: 0,
-            bottom: Layout.sectionInset,
+            bottom: 120,
             trailing: 0
         )
 
@@ -171,6 +177,7 @@ final class VideoViewController: BaseViewController {
     private func bind() {
         let input = VideoViewModel.Input(
             viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
+            loadMoreVideos: loadMoreVideosSubject.eraseToAnyPublisher(),
             likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher()
         )
 
@@ -214,5 +221,25 @@ final class VideoViewController: BaseViewController {
         )
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+}
+
+// MARK: - UICollectionViewDelegate
+extension VideoListViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let video = dataSource.itemIdentifier(for: indexPath) else { return }
+        coordinator?.showVideoDetail(videoId: video.id, videoSummary: video)
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let height = scrollView.frame.size.height
+
+        let triggerPoint = contentHeight - height - 200
+
+        if offsetY > triggerPoint && contentHeight > 0 {
+            loadMoreVideosSubject.send(())
+        }
     }
 }

@@ -12,6 +12,7 @@ final class VideoViewModel: ViewModelProtocol {
     
     struct Input {
         let viewDidLoad: AnyPublisher<Void, Never>
+        let loadMoreVideos: AnyPublisher<Void, Never>
         let likeButtonTapped: AnyPublisher<(videoId: String, isLiked: Bool), Never>
     }
     
@@ -25,6 +26,7 @@ final class VideoViewModel: ViewModelProtocol {
     private var cancellables = Set<AnyCancellable>()
     private var videos: [VideoSummary] = []
     private var nextCursor: String?
+    private var isLoadingMore = false
     
     init(videoUsecase: VideoUsecaseProtocol) {
         self.videoUsecase = videoUsecase
@@ -59,6 +61,37 @@ final class VideoViewModel: ViewModelProtocol {
         input.viewDidLoad
             .sink {
                 loadVideos()
+            }
+            .store(in: &cancellables)
+
+        input.loadMoreVideos
+            .sink { [weak self] in
+                guard let self = self else { return }
+
+                guard !self.isLoadingMore else { return }
+                guard let nextCursor = self.nextCursor else { return }
+
+                self.isLoadingMore = true
+                isLoadingSubject.send(true)
+
+                Task {
+                    do {
+                        let result = try await self.videoUsecase.fetchVideoList(next: nextCursor, limit: 20)
+                        await MainActor.run {
+                            self.videos.append(contentsOf: result.videos)
+                            self.nextCursor = result.nextCursor
+                            self.isLoadingMore = false
+                            isLoadingSubject.send(false)
+                            videosSubject.send(self.videos)
+                        }
+                    } catch {
+                        await MainActor.run {
+                            self.isLoadingMore = false
+                            isLoadingSubject.send(false)
+                            errorMessageSubject.send("추가 영상을 불러오는데 실패했습니다: \(error.localizedDescription)")
+                        }
+                    }
+                }
             }
             .store(in: &cancellables)
 

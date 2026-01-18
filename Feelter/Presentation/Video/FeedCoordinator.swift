@@ -19,8 +19,20 @@ final class FeedCoordinator: Coordinator {
     @MainActor
     func start() {
         let viewModel = DIContainer.shared.resolve(VideoViewModel.self)
-        let viewController = VideoViewController(viewModel: viewModel)
+        let viewController = VideoListViewController(viewModel: viewModel)
         viewController.coordinator = self
         navigationController.setViewControllers([viewController], animated: false)
+    }
+
+    func showVideoDetail(videoId: String, videoSummary: VideoSummary) {
+        let videoUsecase = DIContainer.shared.resolve(VideoUsecaseProtocol.self)
+        let viewModel = VideoDetailViewModel(
+            videoId: videoId,
+            videoSummary: videoSummary,
+            videoUsecase: videoUsecase
+        )
+        let viewController = VideoDetailViewController(viewModel: viewModel)
+        viewController.coordinator = self
+        navigationController.pushViewController(viewController, animated: true)
     }
 }
