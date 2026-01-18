@@ -175,6 +175,8 @@ final class TodayFilterCell: BaseCollectionViewCell {
         let containerView = UIView()
         containerView.backgroundColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5)
         containerView.layer.cornerRadius = 12
+        containerView.layer.borderColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5).cgColor
+        containerView.layer.borderWidth = 1
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(categoryButtonTapped(_:)))
         containerView.addGestureRecognizer(tapGesture)

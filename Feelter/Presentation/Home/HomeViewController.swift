@@ -18,16 +18,33 @@ final class HomeViewController: BaseViewController {
     enum Section {
         case todayFilter
         case banner
+        case hotTrend
+    }
+
+    struct IndexedFilter: Hashable {
+        let filter: FilterSummary
+        let index: Int
+
+        static func == (lhs: IndexedFilter, rhs: IndexedFilter) -> Bool {
+            lhs.filter.id == rhs.filter.id && lhs.index == rhs.index
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(filter.id)
+            hasher.combine(index)
+        }
     }
 
     enum Item: Hashable {
         case todayFilter(TodayFilter)
         case banner(Banner)
+        case hotTrend(IndexedFilter)
     }
 
     private let viewModel: HomeViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let bannerTappedSubject = PassthroughSubject<Banner, Never>()
+    private let hotTrendTappedSubject = PassthroughSubject<FilterSummary, Never>()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Components
@@ -39,6 +56,12 @@ final class HomeViewController: BaseViewController {
         collectionView.delegate = self
         collectionView.register(TodayFilterCell.self, forCellWithReuseIdentifier: TodayFilterCell.identifier)
         collectionView.register(BannerCell.self, forCellWithReuseIdentifier: BannerCell.identifier)
+        collectionView.register(HotTrendCell.self, forCellWithReuseIdentifier: HotTrendCell.identifier)
+        collectionView.register(
+            SectionHeaderView.self,
+            forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+            withReuseIdentifier: SectionHeaderView.identifier
+        )
         return collectionView
     }()
 
@@ -60,6 +83,10 @@ final class HomeViewController: BaseViewController {
     private var totalBannerCount = 0
     private var currentBannerPage = 0
     private var bannerAutoScrollTimer: Timer?
+    private let hotTrendLoopCount = 5
+    private var hotTrendBaseCount = 0
+    private var hotTrendMiddleStartIndex = 0
+    private var isHotTrendRepositioning = false
 
     // MARK: - Initializer
     init(viewModel: HomeViewModel = DIContainer.shared.resolve(HomeViewModel.self)) {
@@ -111,6 +138,9 @@ final class HomeViewController: BaseViewController {
         collectionView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+
+        // 커스텀 탭바와 겹치지 않도록 하단 여백 추가
+        collectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
     }
 
     // MARK: - Private Methods
@@ -137,7 +167,7 @@ final class HomeViewController: BaseViewController {
                 let section = NSCollectionLayoutSection(group: group)
                 return section
 
-            } else {
+            } else if sectionIndex == 1 {
                 // Section 1: Banner - 가로 스크롤
                 let screenHeight = environment.container.effectiveContentSize.height
                 let bannerHeight = screenHeight * 0.13
@@ -158,6 +188,7 @@ final class HomeViewController: BaseViewController {
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 section.interGroupSpacing = 20
+                section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 38, trailing: 0)
 
                 // 가로 스크롤 시 페이지 업데이트
                 section.visibleItemsInvalidationHandler = { [weak self] visibleItems, scrollOffset, environment in
@@ -177,6 +208,86 @@ final class HomeViewController: BaseViewController {
                         self.pageIndicatorLabel.text = "\(pageIndex + 1) / \(self.totalBannerCount)"
                     }
                 }
+
+                return section
+
+            } else {
+                // Section 2: HotTrend - 캐러셀 (가로 스크롤)
+                let screenHeight = environment.container.effectiveContentSize.height
+                let hotTrendHeight = screenHeight * 0.35
+
+                let itemSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .fractionalHeight(1.0)
+                )
+                let item = NSCollectionLayoutItem(layoutSize: itemSize)
+
+                let groupWidthRatio: CGFloat = 0.55  // 셀 너비: 화면의 55%
+                let groupSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(groupWidthRatio),
+                    heightDimension: .absolute(hotTrendHeight)
+                )
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
+
+                let section = NSCollectionLayoutSection(group: group)
+                section.orthogonalScrollingBehavior = .groupPagingCentered
+                section.interGroupSpacing = 12  // 셀 간격: 12pt
+                section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 40, trailing: 0)
+
+                // 가로 스크롤 시 dimming 효과 적용
+                section.visibleItemsInvalidationHandler = { [weak self] visibleItems, scrollOffset, environment in
+                    guard let self = self else { return }
+
+                    let containerWidth = environment.container.contentSize.width
+                    let centerX = scrollOffset.x + (containerWidth / 2)
+                    let maxDimmingAlpha = HotTrendCell.maximumDimmingAlpha
+                    var closestItem: NSCollectionLayoutVisibleItem?
+                    var minimumDistance = CGFloat.greatestFiniteMagnitude
+
+                    for item in visibleItems {
+                        guard let cell = self.collectionView.cellForItem(at: item.indexPath) as? HotTrendCell else {
+                            continue
+                        }
+
+                        // 셀의 중심 X 좌표
+                        let cellCenterX = item.center.x
+
+                        // 화면 중앙과 셀 중앙의 거리
+                        let distance = abs(centerX - cellCenterX)
+
+                        // 기준값: 셀의 너비 (frame에서 가져오기)
+                        let transitionDistance = item.frame.width
+
+                        // 비율 계산 (0.0 ~ 1.0)
+                        let ratio = min(distance / transitionDistance, 1.0)
+
+                        // alpha 값 적용 (최대까지 어두워짐)
+                        let dimmingAlpha = ratio * maxDimmingAlpha
+
+                        cell.setDimming(alpha: dimmingAlpha)
+
+                        if distance < minimumDistance {
+                            minimumDistance = distance
+                            closestItem = item
+                        }
+                    }
+
+                    if let indexPath = closestItem?.indexPath {
+                        self.recenterHotTrendIfNeeded(currentIndex: indexPath.item)
+                    }
+                }
+
+                // 헤더 추가
+                let headerSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .absolute(44)
+                )
+                let header = NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: headerSize,
+                    elementKind: UICollectionView.elementKindSectionHeader,
+                    alignment: .top
+                )
+                section.boundarySupplementaryItems = [header]
 
                 return section
             }
@@ -220,14 +331,53 @@ final class HomeViewController: BaseViewController {
                     self?.bannerTappedSubject.send(tappedBanner)
                 }
                 return cell
+
+            case .hotTrend(let indexedFilter):
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: HotTrendCell.identifier,
+                    for: indexPath
+                ) as? HotTrendCell else {
+                    return UICollectionViewCell()
+                }
+                cell.configure(with: indexedFilter.filter)
+                cell.onTap = { [weak self] tappedFilter in
+                    self?.hotTrendTappedSubject.send(tappedFilter)
+                }
+                return cell
             }
         }
+
+        // Supplementary View Provider (헤더)
+        dataSource.supplementaryViewProvider = { collectionView, kind, indexPath in
+            guard kind == UICollectionView.elementKindSectionHeader else {
+                return nil
+            }
+
+            let header = collectionView.dequeueReusableSupplementaryView(
+                ofKind: kind,
+                withReuseIdentifier: SectionHeaderView.identifier,
+                for: indexPath
+            ) as? SectionHeaderView
+
+            // Section 2 (HotTrend)에만 헤더 표시
+            if indexPath.section == 2 {
+                header?.configure(with: "핫 트렌드")
+            }
+
+            return header
+        }
+
+        // 초기 스냅샷: 모든 섹션을 순서대로 추가
+        var initialSnapshot = NSDiffableDataSourceSnapshot<Section, Item>()
+        initialSnapshot.appendSections([.todayFilter, .banner, .hotTrend])
+        dataSource.apply(initialSnapshot, animatingDifferences: false)
     }
 
     private func bind() {
         let input = HomeViewModel.Input(
             viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
-            bannerTapped: bannerTappedSubject.eraseToAnyPublisher()
+            bannerTapped: bannerTappedSubject.eraseToAnyPublisher(),
+            hotTrendTapped: hotTrendTappedSubject.eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -243,6 +393,13 @@ final class HomeViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] banners in
                 self?.updateBanners(with: banners)
+            }
+            .store(in: &cancellables)
+
+        output.hotTrends
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] filters in
+                self?.updateHotTrends(with: filters)
             }
             .store(in: &cancellables)
 
@@ -267,15 +424,17 @@ final class HomeViewController: BaseViewController {
                 self?.presentWebViewController(urlString: urlString)
             }
             .store(in: &cancellables)
+
+        output.presentFilterDetail
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] filterId in
+                self?.coordinator?.showFilterDetail(filterId: filterId)
+            }
+            .store(in: &cancellables)
     }
 
     private func updateTodayFilter(with filter: TodayFilter) {
         var snapshot = dataSource.snapshot()
-
-        // Section 0이 없으면 추가
-        if !snapshot.sectionIdentifiers.contains(.todayFilter) {
-            snapshot.appendSections([.todayFilter])
-        }
 
         // 기존 아이템 삭제 후 새로 추가
         snapshot.deleteItems(snapshot.itemIdentifiers(inSection: .todayFilter))
@@ -286,11 +445,6 @@ final class HomeViewController: BaseViewController {
 
     private func updateBanners(with banners: [Banner]) {
         var snapshot = dataSource.snapshot()
-
-        // Section 1이 없으면 추가
-        if !snapshot.sectionIdentifiers.contains(.banner) {
-            snapshot.appendSections([.banner])
-        }
 
         // 기존 아이템 삭제 후 새로 추가
         snapshot.deleteItems(snapshot.itemIdentifiers(inSection: .banner))
@@ -307,6 +461,112 @@ final class HomeViewController: BaseViewController {
         DispatchQueue.main.async {
             self.updatePageIndicatorPosition()
             self.startBannerAutoScroll()
+        }
+    }
+
+    private func updateHotTrends(with filters: [FilterSummary]) {
+        guard !filters.isEmpty else { return }
+
+        hotTrendBaseCount = filters.count
+        hotTrendMiddleStartIndex = hotTrendBaseCount * (hotTrendLoopCount / 2)
+        isHotTrendRepositioning = false
+
+        var snapshot = dataSource.snapshot()
+
+        // 기존 아이템 삭제 후 새로 추가
+        snapshot.deleteItems(snapshot.itemIdentifiers(inSection: .hotTrend))
+
+        // 무한 스크롤을 위한 데이터 복제 (고유한 index 부여)
+        var indexedFilters: [IndexedFilter] = []
+
+        // 원본 데이터를 여러 번 반복하여 양방향 무한 스크롤을 만든다
+        for repeatIndex in 0..<hotTrendLoopCount {
+            for (filterIndex, filter) in filters.enumerated() {
+                let uniqueIndex = repeatIndex * filters.count + filterIndex
+                indexedFilters.append(IndexedFilter(filter: filter, index: uniqueIndex))
+            }
+        }
+
+        let hotTrendItems = indexedFilters.map { Item.hotTrend($0) }
+        snapshot.appendItems(hotTrendItems, toSection: .hotTrend)
+
+        dataSource.apply(snapshot, animatingDifferences: false)
+
+        // 초기 스크롤 위치 설정 및 dimming 적용
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let initialIndexPath = IndexPath(item: self.hotTrendMiddleStartIndex, section: 2)
+            self.collectionView.scrollToItem(at: initialIndexPath, at: .centeredHorizontally, animated: false)
+            self.collectionView.layoutIfNeeded()
+            self.applyHotTrendDimmingEffect()
+        }
+    }
+
+    private func applyHotTrendDimmingEffect() {
+        guard let hotTrendScrollView = findHotTrendScrollView() else { return }
+
+        let centerX = hotTrendScrollView.contentOffset.x + (hotTrendScrollView.bounds.width / 2)
+        let maxDimmingAlpha = HotTrendCell.maximumDimmingAlpha
+
+        let visibleCells = collectionView.visibleCells.compactMap { cell -> HotTrendCell? in
+            guard let hotTrendCell = cell as? HotTrendCell,
+                  let indexPath = collectionView.indexPath(for: hotTrendCell),
+                  indexPath.section == 2 else {
+                return nil
+            }
+            return hotTrendCell
+        }
+
+        for cell in visibleCells {
+            guard let cellSuperview = cell.superview else { continue }
+            let cellCenterX = hotTrendScrollView.convert(cell.center, from: cellSuperview).x
+            let distance = abs(centerX - cellCenterX)
+            let transitionDistance = cell.bounds.width
+            let ratio = min(distance / transitionDistance, 1.0)
+            cell.setDimming(alpha: ratio * maxDimmingAlpha)
+        }
+    }
+
+    private func findHotTrendScrollView() -> UIScrollView? {
+        for cell in collectionView.visibleCells {
+            guard let indexPath = collectionView.indexPath(for: cell),
+                  indexPath.section == 2 else { continue }
+            var view: UIView? = cell
+            while let superview = view?.superview {
+                if let scrollView = superview as? UIScrollView, scrollView != collectionView {
+                    return scrollView
+                }
+                view = superview
+            }
+        }
+        return nil
+    }
+
+    private func recenterHotTrendIfNeeded(currentIndex: Int) {
+        guard hotTrendBaseCount > 0 else { return }
+
+        let totalItemCount = hotTrendBaseCount * hotTrendLoopCount
+        guard totalItemCount > 0 else { return }
+
+        let lowerBound = hotTrendBaseCount
+        let upperBound = totalItemCount - hotTrendBaseCount - 1
+
+        guard currentIndex < lowerBound || currentIndex > upperBound else { return }
+        guard !isHotTrendRepositioning else { return }
+
+        let indexInLoop = currentIndex % hotTrendBaseCount
+        let targetIndex = hotTrendMiddleStartIndex + indexInLoop
+        let targetIndexPath = IndexPath(item: targetIndex, section: 2)
+
+        isHotTrendRepositioning = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if targetIndexPath.item < totalItemCount {
+                self.collectionView.scrollToItem(at: targetIndexPath, at: .centeredHorizontally, animated: false)
+                self.collectionView.layoutIfNeeded()
+                self.applyHotTrendDimmingEffect()
+            }
+            self.isHotTrendRepositioning = false
         }
     }
 
@@ -422,6 +682,8 @@ extension HomeViewController: UICollectionViewDelegate {
             bannerTappedSubject.send(banner)
         case .todayFilter:
             break
+        case .hotTrend(let indexedFilter):
+            hotTrendTappedSubject.send(indexedFilter.filter)
         }
     }
 

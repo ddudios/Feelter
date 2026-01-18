@@ -13,14 +13,17 @@ final class HomeViewModel: ViewModelProtocol {
     struct Input {
         let viewDidLoad: AnyPublisher<Void, Never>
         let bannerTapped: AnyPublisher<Banner, Never>
+        let hotTrendTapped: AnyPublisher<FilterSummary, Never>
     }
 
     struct Output {
         let todayFilter: AnyPublisher<TodayFilter, Never>
         let banners: AnyPublisher<[Banner], Never>
+        let hotTrends: AnyPublisher<[FilterSummary], Never>
         let isLoading: AnyPublisher<Bool, Never>
         let errorMessage: AnyPublisher<String?, Never>
         let presentWebView: AnyPublisher<String, Never>
+        let presentFilterDetail: AnyPublisher<String, Never>
     }
 
     private let filterUsecase: FilterUsecaseProtocol
@@ -38,8 +41,10 @@ final class HomeViewModel: ViewModelProtocol {
         let isLoadingSubject = CurrentValueSubject<Bool, Never>(false)
         let todayFilterSubject = PassthroughSubject<TodayFilter, Never>()
         let bannersSubject = PassthroughSubject<[Banner], Never>()
+        let hotTrendsSubject = PassthroughSubject<[FilterSummary], Never>()
         let errorMessageSubject = PassthroughSubject<String?, Never>()
         let presentWebViewSubject = PassthroughSubject<String, Never>()
+        let presentFilterDetailSubject = PassthroughSubject<String, Never>()
 
         input.viewDidLoad
             .sink { [weak self] in
@@ -49,16 +54,18 @@ final class HomeViewModel: ViewModelProtocol {
 
                 Task {
                     do {
-                        // 오늘의 필터와 배너를 동시에 가져오기
+                        // 오늘의 필터, 배너, 핫 트렌드를 동시에 가져오기
                         async let filter = self.filterUsecase.fetchTodayFilter()
                         async let banners = self.bannerUsecase.fetchBanners()
+                        async let hotTrends = self.filterUsecase.fetchHotTrends()
 
-                        let (filterResult, bannersResult) = try await (filter, banners)
+                        let (filterResult, bannersResult, hotTrendsResult) = try await (filter, banners, hotTrends)
 
                         await MainActor.run {
                             isLoadingSubject.send(false)
                             todayFilterSubject.send(filterResult)
                             bannersSubject.send(bannersResult)
+                            hotTrendsSubject.send(hotTrendsResult)
                         }
                     } catch {
                         await MainActor.run {
@@ -121,12 +128,21 @@ final class HomeViewModel: ViewModelProtocol {
             }
             .store(in: &cancellables)
 
+        // 핫 트렌드 탭 처리: 필터 상세 화면으로 이동
+        input.hotTrendTapped
+            .sink { filter in
+                presentFilterDetailSubject.send(filter.id)
+            }
+            .store(in: &cancellables)
+
         return Output(
             todayFilter: todayFilterSubject.eraseToAnyPublisher(),
             banners: bannersSubject.eraseToAnyPublisher(),
+            hotTrends: hotTrendsSubject.eraseToAnyPublisher(),
             isLoading: isLoadingSubject.eraseToAnyPublisher(),
             errorMessage: errorMessageSubject.eraseToAnyPublisher(),
-            presentWebView: presentWebViewSubject.eraseToAnyPublisher()
+            presentWebView: presentWebViewSubject.eraseToAnyPublisher(),
+            presentFilterDetail: presentFilterDetailSubject.eraseToAnyPublisher()
         )
     }
 }

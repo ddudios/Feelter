@@ -17,6 +17,7 @@ protocol FilterRepositoryProtocol {
 
     func fetchFilter(id: String) async throws -> FilterDetail
     func fetchTodayFilter() async throws -> TodayFilter
+    func fetchHotTrends() async throws -> [FilterSummary]
     func likeFilter(id: String, status: Bool) async throws -> Bool
     func createFilter(requestDTO: CreateFilterRequestDTO) async throws -> FilterDetail
     func updateFilter(id: String, requestDTO: UpdateFilterRequestDTO) async throws -> FilterDetail

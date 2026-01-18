@@ -17,7 +17,7 @@ final class FilterEditViewController: BaseViewController {
         static let sliderBottomSpacing: CGFloat = 12
         static let propertyItemSpacing: CGFloat = 8
         static let propertyIconSize: CGFloat = 28
-        static let actionButtonWidth: CGFloat = 36
+        static let actionButtonWidth: CGFloat = 40
         static let actionButtonHeight: CGFloat = 34
         static let actionButtonSpacing: CGFloat = 8
         static let actionButtonInset: CGFloat = 20

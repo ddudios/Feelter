@@ -57,6 +57,15 @@ final class FilterRepository: FilterRepositoryProtocol {
         return response.toDomain()
     }
 
+    func fetchHotTrends() async throws -> [FilterSummary] {
+        let response = try await networkManager.request(
+            FilterRouter.hotTrend,
+            type: FilterListResponseDTO.self
+        )
+
+        return response.data.map { $0.toSummaryDomain() }
+    }
+
     func likeFilter(id: String, status: Bool) async throws -> Bool {
         let response = try await networkManager.request(
             FilterRouter.likeFilter(id: id, body: LikeRequestDTO(likeStatus: status)),

@@ -32,4 +32,10 @@ final class HomeCoordinator: Coordinator {
         addChildCoordinator(categoryRankingCoordinator)
         categoryRankingCoordinator.showCategoryRanking(initialCategory: initialCategory)
     }
+
+    @MainActor
+    func showFilterDetail(filterId: String) {
+        let filterDetailViewController = FilterDetailViewController(filterId: filterId)
+        navigationController.pushViewController(filterDetailViewController, animated: true)
+    }
 }
