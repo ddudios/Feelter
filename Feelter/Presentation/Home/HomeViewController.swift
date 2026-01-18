@@ -19,6 +19,7 @@ final class HomeViewController: BaseViewController {
         case todayFilter
         case banner
         case hotTrend
+        case todayAuthor
     }
 
     struct IndexedFilter: Hashable {
@@ -39,12 +40,13 @@ final class HomeViewController: BaseViewController {
         case todayFilter(TodayFilter)
         case banner(Banner)
         case hotTrend(IndexedFilter)
+        case todayAuthor(TodayAuthor)
     }
 
     private let viewModel: HomeViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let bannerTappedSubject = PassthroughSubject<Banner, Never>()
-    private let hotTrendTappedSubject = PassthroughSubject<FilterSummary, Never>()
+    private let filterTappedSubject = PassthroughSubject<FilterSummary, Never>()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Components
@@ -57,6 +59,7 @@ final class HomeViewController: BaseViewController {
         collectionView.register(TodayFilterCell.self, forCellWithReuseIdentifier: TodayFilterCell.identifier)
         collectionView.register(BannerCell.self, forCellWithReuseIdentifier: BannerCell.identifier)
         collectionView.register(HotTrendCell.self, forCellWithReuseIdentifier: HotTrendCell.identifier)
+        collectionView.register(TodayAuthorCell.self, forCellWithReuseIdentifier: TodayAuthorCell.identifier)
         collectionView.register(
             SectionHeaderView.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
@@ -211,7 +214,7 @@ final class HomeViewController: BaseViewController {
 
                 return section
 
-            } else {
+            } else if sectionIndex == 2 {
                 // Section 2: HotTrend - 캐러셀 (가로 스크롤)
                 let screenHeight = environment.container.effectiveContentSize.height
                 let hotTrendHeight = screenHeight * 0.35
@@ -232,7 +235,7 @@ final class HomeViewController: BaseViewController {
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 section.interGroupSpacing = 12  // 셀 간격: 12pt
-                section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 40, trailing: 0)
+                section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 20, trailing: 0)
 
                 // 가로 스크롤 시 dimming 효과 적용
                 section.visibleItemsInvalidationHandler = { [weak self] visibleItems, scrollOffset, environment in
@@ -277,7 +280,35 @@ final class HomeViewController: BaseViewController {
                     }
                 }
 
-                // 헤더 추가
+                let headerSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .absolute(44)
+                )
+                let header = NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: headerSize,
+                    elementKind: UICollectionView.elementKindSectionHeader,
+                    alignment: .top
+                )
+                section.boundarySupplementaryItems = [header]
+
+                return section
+            } else {
+                // Section 3: TodayAuthor
+                let itemSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .estimated(460)
+                )
+                let item = NSCollectionLayoutItem(layoutSize: itemSize)
+
+                let groupSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .estimated(460)
+                )
+                let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
+
+                let section = NSCollectionLayoutSection(group: group)
+                section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 30, trailing: 0)
+
                 let headerSize = NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1.0),
                     heightDimension: .absolute(44)
@@ -341,7 +372,20 @@ final class HomeViewController: BaseViewController {
                 }
                 cell.configure(with: indexedFilter.filter)
                 cell.onTap = { [weak self] tappedFilter in
-                    self?.hotTrendTappedSubject.send(tappedFilter)
+                    self?.filterTappedSubject.send(tappedFilter)
+                }
+                return cell
+
+            case .todayAuthor(let todayAuthor):
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: TodayAuthorCell.identifier,
+                    for: indexPath
+                ) as? TodayAuthorCell else {
+                    return UICollectionViewCell()
+                }
+                cell.configure(with: todayAuthor)
+                cell.onFilterTapped = { [weak self] filter in
+                    self?.filterTappedSubject.send(filter)
                 }
                 return cell
             }
@@ -359,9 +403,11 @@ final class HomeViewController: BaseViewController {
                 for: indexPath
             ) as? SectionHeaderView
 
-            // Section 2 (HotTrend)에만 헤더 표시
+            // Section 2 (HotTrend), Section 3 (TodayAuthor)에만 헤더 표시
             if indexPath.section == 2 {
                 header?.configure(with: "핫 트렌드")
+            } else if indexPath.section == 3 {
+                header?.configure(with: "오늘의 작가 소개")
             }
 
             return header
@@ -369,7 +415,7 @@ final class HomeViewController: BaseViewController {
 
         // 초기 스냅샷: 모든 섹션을 순서대로 추가
         var initialSnapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-        initialSnapshot.appendSections([.todayFilter, .banner, .hotTrend])
+        initialSnapshot.appendSections([.todayFilter, .banner, .hotTrend, .todayAuthor])
         dataSource.apply(initialSnapshot, animatingDifferences: false)
     }
 
@@ -377,7 +423,7 @@ final class HomeViewController: BaseViewController {
         let input = HomeViewModel.Input(
             viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
             bannerTapped: bannerTappedSubject.eraseToAnyPublisher(),
-            hotTrendTapped: hotTrendTappedSubject.eraseToAnyPublisher()
+            filterTapped: filterTappedSubject.eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -400,6 +446,13 @@ final class HomeViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] filters in
                 self?.updateHotTrends(with: filters)
+            }
+            .store(in: &cancellables)
+
+        output.todayAuthor
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] todayAuthor in
+                self?.updateTodayAuthor(with: todayAuthor)
             }
             .store(in: &cancellables)
 
@@ -500,6 +553,15 @@ final class HomeViewController: BaseViewController {
             self.collectionView.layoutIfNeeded()
             self.applyHotTrendDimmingEffect()
         }
+    }
+
+    private func updateTodayAuthor(with todayAuthor: TodayAuthor) {
+        var snapshot = dataSource.snapshot()
+
+        snapshot.deleteItems(snapshot.itemIdentifiers(inSection: .todayAuthor))
+        snapshot.appendItems([.todayAuthor(todayAuthor)], toSection: .todayAuthor)
+
+        dataSource.apply(snapshot, animatingDifferences: false)
     }
 
     private func applyHotTrendDimmingEffect() {
@@ -683,7 +745,9 @@ extension HomeViewController: UICollectionViewDelegate {
         case .todayFilter:
             break
         case .hotTrend(let indexedFilter):
-            hotTrendTappedSubject.send(indexedFilter.filter)
+            filterTappedSubject.send(indexedFilter.filter)
+        case .todayAuthor:
+            break
         }
     }
 

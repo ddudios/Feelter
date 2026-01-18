@@ -7,12 +7,12 @@
 
 import Foundation
 
-struct TodayAuthor {
+struct TodayAuthor: Hashable {
     let author: AuthorInfo
     let filters: [FilterSummary]
 }
 
-struct AuthorInfo {
+struct AuthorInfo: Hashable {
     let id: String
     let nickname: String
     let name: String

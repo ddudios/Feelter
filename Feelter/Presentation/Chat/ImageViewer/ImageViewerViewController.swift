@@ -2,7 +2,7 @@
 //  ImageViewerViewController.swift
 //  Feelter
 //
-//  Created by Claude Code on 1/17/26.
+//  Created by Suji Jang Code on 1/17/26.
 //
 
 import UIKit

@@ -16,6 +16,23 @@ extension TodayAuthorResponseDTO {
     }
 }
 
+extension TodayAuthorFilterDTO {
+    func toSummaryDomain() -> FilterSummary {
+        return FilterSummary(
+            id: filterId,
+            category: FilterCategory(rawValue: category ?? "") ?? .unknown,
+            title: title,
+            description: description,
+            mainImageURL: files.first ?? "",
+            creator: creator.toDomain(),
+            photographerName: creator.nick,
+            likeCount: likeCount ?? 0,
+            isLiked: isLiked ?? false,
+            createdAt: createdAt.toDate() ?? Date()
+        )
+    }
+}
+
 extension AuthorInfoDTO {
     func toDomain() -> AuthorInfo {
         return AuthorInfo(

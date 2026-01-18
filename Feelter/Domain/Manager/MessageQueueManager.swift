@@ -2,7 +2,7 @@
 //  MessageQueueManager.swift
 //  Feelter
 //
-//  Created by Claude on 1/18/26.
+//  Created by Suji Jang on 1/18/26.
 //
 
 import Foundation

@@ -11,7 +11,7 @@ import Kingfisher
 
 final class HotTrendCell: BaseCollectionViewCell {
 
-    static let maximumDimmingAlpha: CGFloat = 0.8
+    static let maximumDimmingAlpha: CGFloat = 0.75
 
     var onTap: ((FilterSummary) -> Void)?
     private var currentFilter: FilterSummary?

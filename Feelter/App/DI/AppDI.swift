@@ -36,6 +36,9 @@ func registerDependencies() {
     let videoRepository = VideoRepository(networkManager: networkManager)
     container.registerSingleton(VideoRepositoryProtocol.self, instance: videoRepository)
 
+    let userRepository = UserRepository(networkManager: networkManager)
+    container.registerSingleton(UserRepositoryProtocol.self, instance: userRepository)
+
     // Chat Repository는 CoreData와 Socket.IO도 필요
     let chatRepository = ChatRepository(
         networkManager: networkManager,
@@ -76,6 +79,11 @@ func registerDependencies() {
         return VideoUsecase(repository: repository)
     }
 
+    container.registerFactory(TodayAuthorUsecaseProtocol.self) {
+        let repository = container.resolve(UserRepositoryProtocol.self)
+        return TodayAuthorUsecase(repository: repository)
+    }
+
     container.registerFactory(FetchChatRoomsUsecase.self) {
         let repository = container.resolve(ChatRepositoryProtocol.self)
         return FetchChatRoomsUsecase(repository: repository)
@@ -112,7 +120,13 @@ func registerDependencies() {
         let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
         let bannerUsecase = container.resolve(BannerUsecaseProtocol.self)
         let tokenRepository = container.resolve(TokenRepositoryProtocol.self)
-        return HomeViewModel(filterUsecase: filterUsecase, bannerUsecase: bannerUsecase, tokenRepository: tokenRepository)
+        let todayAuthorUsecase = container.resolve(TodayAuthorUsecaseProtocol.self)
+        return HomeViewModel(
+            filterUsecase: filterUsecase,
+            bannerUsecase: bannerUsecase,
+            tokenRepository: tokenRepository,
+            todayAuthorUsecase: todayAuthorUsecase
+        )
     }
 
     container.registerFactory(CategoryRankingViewModel.self) {
