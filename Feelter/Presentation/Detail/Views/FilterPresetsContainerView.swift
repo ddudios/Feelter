@@ -16,12 +16,6 @@ final class FilterPresetsContainerView: UIView {
         static let lockIconSize: CGFloat = 32
     }
 
-    private enum TemperatureRange {
-        static let minKelvin: Double = 2000
-        static let maxKelvin: Double = 10000
-        static let midKelvin: Double = 6000
-    }
-
     private let cardView = FilterDetailCardContainerView()
     private let rowsStackView = UIStackView()
     private let lockOverlayView = UIView()
@@ -149,21 +143,14 @@ final class FilterPresetsContainerView: UIView {
         guard let values else {
             return emptyPresetItems()
         }
-
-        return [
-            PresetItem(icon: UIImage.FilterProps.brightness, valueText: formattedValue(values.brightness)),
-            PresetItem(icon: UIImage.FilterProps.exposure, valueText: formattedValue(values.exposure)),
-            PresetItem(icon: UIImage.FilterProps.contrast, valueText: formattedValue(values.contrast)),
-            PresetItem(icon: UIImage.FilterProps.saturation, valueText: formattedValue(values.saturation)),
-            PresetItem(icon: UIImage.FilterProps.sharpness, valueText: formattedValue(values.sharpness)),
-            PresetItem(icon: UIImage.FilterProps.noise, valueText: formattedValue(values.noiseReduction)),
-            PresetItem(icon: UIImage.FilterProps.vignette, valueText: formattedValue(values.vignette)),
-            PresetItem(icon: UIImage.FilterProps.blur, valueText: formattedValue(values.blur)),
-            PresetItem(icon: UIImage.FilterProps.highlights, valueText: formattedValue(values.highlights)),
-            PresetItem(icon: UIImage.FilterProps.shadows, valueText: formattedValue(values.shadows)),
-            PresetItem(icon: UIImage.FilterProps.temperature, valueText: formattedTemperature(values.temperature)),
-            PresetItem(icon: UIImage.FilterProps.blackPoint, valueText: formattedValue(values.blackPoint))
-        ]
+        return FilterAdjustmentProperty.ordered.map { property in
+            let internalValue = property.internalValue(from: values)
+            let uiValue = property.displayValue(forInternalValue: internalValue)
+            return PresetItem(
+                icon: property.icon,
+                valueText: formattedValue(uiValue)
+            )
+        }
     }
 
     private func emptyPresetItems() -> [PresetItem] {
@@ -174,28 +161,6 @@ final class FilterPresetsContainerView: UIView {
 
     private func formattedValue(_ value: Double) -> String {
         return String(format: "%.1f", value)
-    }
-
-    private func formattedTemperature(_ kelvin: Double) -> String {
-        let minKelvin = TemperatureRange.minKelvin
-        let maxKelvin = TemperatureRange.maxKelvin
-        let midKelvin = TemperatureRange.midKelvin
-
-        guard maxKelvin > minKelvin, midKelvin >= minKelvin, midKelvin <= maxKelvin else {
-            return formattedValue(kelvin)
-        }
-
-        let normalized: Double
-        if kelvin >= midKelvin {
-            let denominator = maxKelvin - midKelvin
-            normalized = denominator > 0 ? (kelvin - midKelvin) / denominator : 0
-        } else {
-            let denominator = midKelvin - minKelvin
-            normalized = denominator > 0 ? (kelvin - midKelvin) / denominator : 0
-        }
-
-        let clamped = min(max(normalized, -1.0), 1.0)
-        return String(format: "%.1f", clamped)
     }
 }
 

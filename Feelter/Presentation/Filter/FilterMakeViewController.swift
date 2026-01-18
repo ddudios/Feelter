@@ -519,7 +519,8 @@ final class FilterMakeViewController: BaseViewController {
     }
 
     @objc private func photoEditButtonTapped() {
-        let viewController = FilterEditViewController()
+        guard let selectedPhotoImage else { return }
+        let viewController = FilterEditViewController(image: selectedPhotoImage)
         navigationController?.pushViewController(viewController, animated: true)
     }
 
