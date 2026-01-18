@@ -44,6 +44,10 @@ final class FilterDetailCardContainerView: UIView {
         tagLabel.text = tag
     }
 
+    func setTagHidden(_ isHidden: Bool) {
+        tagLabel.isHidden = isHidden
+    }
+
     private func configureHierarchy() {
         addSubview(headerView)
         addSubview(dividerView)

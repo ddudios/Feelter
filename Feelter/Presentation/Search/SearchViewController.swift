@@ -12,12 +12,10 @@ import CoreLocation
 
 final class SearchViewController: BaseViewController {
 
-    weak var coordinator: SearchCoordinator?
-
     private enum Layout {
         static let horizontalInset: CGFloat = 16
         static let topBarHeight: CGFloat = 44
-        static let logoSize: CGFloat = 28
+        static let logoSize: CGFloat = 80
         static let searchFieldHeight: CGFloat = 36
         static let searchButtonSize: CGFloat = 32
         static let sectionSpacing: CGFloat = 12
@@ -72,6 +70,7 @@ final class SearchViewController: BaseViewController {
     private let likeButtonTappedSubject = PassthroughSubject<(postId: String, isLiked: Bool), Never>()
 
     private let locationManager = CLLocationManager()
+    private let geocoder = CLGeocoder()
     private var hasReceivedInitialLocation = false
 
     init(viewModel: SearchViewModel = DIContainer.shared.resolve(SearchViewModel.self)) {
@@ -221,7 +220,7 @@ final class SearchViewController: BaseViewController {
     private func configureTableHeaderView() {
         distanceHeaderView.backgroundColor = .Feelter.gray100
 
-        distanceTitleLabel.text = "반경"
+        distanceTitleLabel.text = "현재 위치 반경"
         distanceTitleLabel.font = TextStyle.Pretendard.body2
         distanceTitleLabel.textColor = .Feelter.gray15
 
@@ -285,6 +284,38 @@ final class SearchViewController: BaseViewController {
                 self?.showErrorAlert(message: message)
             }
             .store(in: &cancellables)
+    }
+
+    private func updateLocationTitleLabel(for coordinate: CLLocationCoordinate2D) {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        geocoder.cancelGeocode()
+        geocoder.reverseGeocodeLocation(location, preferredLocale: Locale(identifier: "ko_KR")) { [weak self] placemarks, _ in
+            guard let self else { return }
+            let locationName = self.makeLocationName(from: placemarks?.first) ?? "현재 위치"
+            Task { @MainActor in
+                self.distanceTitleLabel.text = "\(locationName) 반경"
+            }
+        }
+    }
+
+    private func makeLocationName(from placemark: CLPlacemark?) -> String? {
+        guard let placemark else { return nil }
+        if let subLocality = placemark.subLocality, !subLocality.isEmpty {
+            return subLocality
+        }
+        if let locality = placemark.locality, !locality.isEmpty {
+            return locality
+        }
+        if let administrativeArea = placemark.administrativeArea, !administrativeArea.isEmpty {
+            return administrativeArea
+        }
+        return nil
+    }
+
+    @MainActor
+    func refreshPosts() {
+        refreshControl.beginRefreshing()
+        refreshSubject.send(())
     }
 
     @objc private func handleRefresh() {
@@ -408,6 +439,7 @@ extension SearchViewController: CLLocationManagerDelegate {
         guard let coordinate = locations.last?.coordinate else { return }
         hasReceivedInitialLocation = true
         locationUpdatedSubject.send(coordinate)
+        updateLocationTitleLabel(for: coordinate)
         manager.stopUpdatingLocation()
     }
 

@@ -20,7 +20,7 @@ final class SearchPostCell: UITableViewCell {
         static let iconSize: CGFloat = 22
         static let commentIconSize: CGFloat = 18
         static let titleSpacing: CGFloat = 8
-        static let smallSpacing: CGFloat = 6
+        static let smallSpacing: CGFloat = 2
         static let sectionSpacing: CGFloat = 12
     }
 
@@ -129,7 +129,7 @@ final class SearchPostCell: UITableViewCell {
         timeLabel.text = item.timeText
 
         pageControl.numberOfPages = imagePaths.count
-        pageControl.isHidden = imagePaths.count <= 1
+        pageControl.isHidden = imagePaths.isEmpty
         pageControl.currentPage = 0
         imageCollectionView.reloadData()
     }
@@ -180,7 +180,7 @@ final class SearchPostCell: UITableViewCell {
         }
 
         likeButton.snp.makeConstraints { make in
-            make.top.equalTo(pageControl.snp.bottom).offset(Layout.sectionSpacing)
+            make.top.equalTo(pageControl.snp.bottom)
             make.leading.equalToSuperview().inset(Layout.horizontalInset)
             make.size.equalTo(Layout.iconSize)
         }
@@ -203,18 +203,18 @@ final class SearchPostCell: UITableViewCell {
         }
 
         titleStackView.snp.makeConstraints { make in
-            make.top.equalTo(likeButton.snp.bottom).offset(Layout.sectionSpacing)
+            make.top.equalTo(likeButton.snp.bottom).offset(4)
             make.leading.equalToSuperview().inset(Layout.horizontalInset)
             make.trailing.lessThanOrEqualToSuperview().inset(Layout.horizontalInset)
         }
 
         contentLabel.snp.makeConstraints { make in
-            make.top.equalTo(titleStackView.snp.bottom).offset(Layout.titleSpacing)
+            make.top.equalTo(titleStackView.snp.bottom).offset(2)
             make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
         }
 
         timeLabel.snp.makeConstraints { make in
-            make.top.equalTo(contentLabel.snp.bottom).offset(Layout.titleSpacing)
+            make.top.equalTo(contentLabel.snp.bottom).offset(2)
             make.leading.equalTo(contentLabel)
             make.bottom.equalToSuperview().inset(Layout.verticalInset)
         }
@@ -259,7 +259,7 @@ final class SearchPostCell: UITableViewCell {
         commentCountLabel.font = TextStyle.Pretendard.caption1
         commentCountLabel.textColor = .Feelter.gray45
 
-        titleLabel.font = TextStyle.Mulgyeol.body1
+        titleLabel.font = TextStyle.Pretendard.body1
         titleLabel.textColor = .Feelter.gray15
         titleLabel.numberOfLines = 2
 

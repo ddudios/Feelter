@@ -109,6 +109,7 @@ enum FileUploadError: LocalizedError {
     case tooManyFiles(max: Int, actual: Int)
     case fileTooLarge(index: Int, sizeInMB: Double, maxSizeInMB: Double)
     case unsupportedExtension(extension: String, allowed: [String])
+    case invalidFileExtensionCount(expected: Int, actual: Int)
 
     var errorDescription: String? {
         switch self {
@@ -120,6 +121,8 @@ enum FileUploadError: LocalizedError {
             return "\(index + 1)번째 파일이 너무 큽니다. (현재: \(String(format: "%.2f", size))MB, 최대: \(String(format: "%.1f", maxSize))MB)"
         case .unsupportedExtension(let ext, let allowed):
             return "지원하지 않는 파일 형식입니다. (\(ext)) 허용된 확장자: \(allowed.joined(separator: ", "))"
+        case .invalidFileExtensionCount(let expected, let actual):
+            return "파일 확장자 정보가 부족합니다. (필요: \(expected)개, 현재: \(actual)개)"
         }
     }
 }

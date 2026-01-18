@@ -20,7 +20,6 @@ final class SearchCoordinator: Coordinator {
     func start() {
         let viewModel = DIContainer.shared.resolve(SearchViewModel.self)
         let viewController = SearchViewController(viewModel: viewModel)
-        viewController.coordinator = self
         navigationController.setViewControllers([viewController], animated: false)
     }
 }

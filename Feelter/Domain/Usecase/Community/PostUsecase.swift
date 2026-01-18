@@ -19,6 +19,16 @@ protocol PostUsecaseProtocol {
     ) async throws -> (posts: [PostSummary], nextCursor: String?)
     func searchPosts(title: String?) async throws -> [PostSummary]
     func fetchPostDetail(postId: String) async throws -> PostDetail
+    func createPost(input: CreatePostInput) async throws -> PostDetail
+}
+
+struct CreatePostInput {
+    let category: String
+    let title: String
+    let content: String
+    let latitude: Double
+    let longitude: Double
+    let files: [UploadFile]
 }
 
 struct PostUsecase: PostUsecaseProtocol {
@@ -55,5 +65,25 @@ struct PostUsecase: PostUsecaseProtocol {
 
     func fetchPostDetail(postId: String) async throws -> PostDetail {
         try await repository.fetchPostDetail(postId: postId)
+    }
+
+    func createPost(input: CreatePostInput) async throws -> PostDetail {
+        let fileURLs: [String]?
+        if input.files.isEmpty {
+            fileURLs = nil
+        } else {
+            fileURLs = try await repository.uploadFiles(input.files)
+        }
+
+        let requestDTO = CreatePostRequestDTO(
+            category: input.category,
+            title: input.title,
+            content: input.content,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            files: fileURLs
+        )
+
+        return try await repository.createPost(requestDTO: requestDTO)
     }
 }

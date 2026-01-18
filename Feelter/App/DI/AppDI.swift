@@ -153,6 +153,11 @@ func registerDependencies() {
         )
     }
 
+    container.registerFactory(CreatePostViewModel.self) {
+        let postUsecase = container.resolve(PostUsecaseProtocol.self)
+        return CreatePostViewModel(postUsecase: postUsecase)
+    }
+
     container.registerFactory(ChatRoomListViewModel.self) {
         let fetchChatRoomsUsecase = container.resolve(FetchChatRoomsUsecase.self)
         let repository = container.resolve(ChatRepositoryProtocol.self)

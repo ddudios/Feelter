@@ -16,6 +16,12 @@ protocol NetworkManagerProtocol {
 
     // 설정 기반 파일 업로드
     func uploadFiles(_ dataList: [Data], config: FileUploadConfig, endpoint: URLRequestConvertible) async throws -> [String]
+    func uploadFiles(
+        _ dataList: [Data],
+        fileExtensions: [String],
+        config: FileUploadConfig,
+        endpoint: URLRequestConvertible
+    ) async throws -> [String]
 
     // 프로필 이미지 전용 업로드
     func uploadProfileImage(_ imageData: Data, endpoint: URLRequestConvertible) async throws -> String
@@ -156,6 +162,63 @@ final class NetworkManager: NetworkManagerProtocol {
         }
     }
 
+    func uploadFiles(
+        _ dataList: [Data],
+        fileExtensions: [String],
+        config: FileUploadConfig,
+        endpoint: URLRequestConvertible
+    ) async throws -> [String] {
+        try config.validate(dataList)
+
+        guard dataList.count == fileExtensions.count else {
+            throw FileUploadError.invalidFileExtensionCount(
+                expected: dataList.count,
+                actual: fileExtensions.count
+            )
+        }
+
+        let normalizedExtensions = fileExtensions.map { normalizeFileExtension($0) }
+        for fileExtension in normalizedExtensions {
+            guard config.allowedExtensions.contains(fileExtension) else {
+                throw FileUploadError.unsupportedExtension(
+                    extension: fileExtension,
+                    allowed: config.allowedExtensions
+                )
+            }
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            session.upload(
+                multipartFormData: { multipartFormData in
+                    for (index, data) in dataList.enumerated() {
+                        let fileExtension = normalizedExtensions[index]
+                        let mimeType = FileUploadConfig.mimeType(for: fileExtension)
+                        let timestamp = Date().timeIntervalSince1970
+                        let fileName = "\(config.parameterName)_\(index)_\(timestamp).\(fileExtension)"
+
+                        multipartFormData.append(
+                            data,
+                            withName: config.parameterName,
+                            fileName: fileName,
+                            mimeType: mimeType
+                        )
+                    }
+                },
+                with: endpoint
+            )
+            .validate()
+            .responseDecodable(of: FileUploadResponseDTO.self) { response in
+                switch response.result {
+                case .success(let value):
+                    continuation.resume(returning: value.files)
+                case .failure(let error):
+                    let networkError = self.parseError(error, response: response.response, data: response.data)
+                    continuation.resume(throwing: networkError)
+                }
+            }
+        }
+    }
+
     // 6-2. 프로필 이미지 업로드 (단일 파일, 다른 응답 형식)
     /// - Parameters:
     ///   - imageData: 업로드할 이미지 데이터
@@ -197,5 +260,13 @@ final class NetworkManager: NetworkManagerProtocol {
                 }
             }
         }
+    }
+
+    private func normalizeFileExtension(_ fileExtension: String) -> String {
+        let trimmed = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if trimmed.hasPrefix(".") {
+            return String(trimmed.dropFirst())
+        }
+        return trimmed
     }
 }

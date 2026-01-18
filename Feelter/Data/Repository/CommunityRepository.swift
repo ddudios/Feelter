@@ -62,6 +62,15 @@ final class CommunityRepository: CommunityRepositoryProtocol {
         return response.toDetailDomain()
     }
 
+    func createPost(requestDTO: CreatePostRequestDTO) async throws -> PostDetail {
+        let response = try await networkManager.request(
+            PostRouter.createPost(body: requestDTO),
+            type: PostDTO.self
+        )
+
+        return response.toDetailDomain()
+    }
+
     func likePost(postId: String, status: Bool) async throws -> Bool {
         // Router 호출
         let router = PostRouter.likePost(
@@ -74,5 +83,17 @@ final class CommunityRepository: CommunityRepositoryProtocol {
 
         // DTO -> Domain(Bool) 변환
         return response.likeStatus
+    }
+
+    func uploadFiles(_ files: [UploadFile]) async throws -> [String] {
+        let dataList = files.map { $0.data }
+        let fileExtensions = files.map { $0.normalizedFileExtension }
+
+        return try await networkManager.uploadFiles(
+            dataList,
+            fileExtensions: fileExtensions,
+            config: .post,
+            endpoint: PostRouter.uploadFiles(imageData: dataList)
+        )
     }
 }

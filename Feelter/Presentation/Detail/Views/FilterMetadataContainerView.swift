@@ -48,6 +48,12 @@ final class FilterMetadataContainerView: UIView {
         updateMapAndAddress(latitude: metadata.latitude, longitude: metadata.longitude)
     }
 
+    func configureForLocation() {
+        cardView.setTagHidden(true)
+        primaryInfoLabel.isHidden = true
+        secondaryInfoLabel.isHidden = true
+    }
+
     func reset() {
         geocoder.cancelGeocode()
         currentCoordinate = nil
@@ -143,16 +149,16 @@ final class FilterMetadataContainerView: UIView {
         infoStackView.alignment = .leading
         infoStackView.spacing = 6
 
-        primaryInfoLabel.font = TextStyle.Pretendard.body2
+        primaryInfoLabel.font = TextStyle.Pretendard.body3
         primaryInfoLabel.textColor = .Feelter.gray60
         primaryInfoLabel.numberOfLines = 1
 
-        secondaryInfoLabel.font = TextStyle.Pretendard.body2
+        secondaryInfoLabel.font = TextStyle.Pretendard.body3
         secondaryInfoLabel.textColor = .Feelter.gray60
         secondaryInfoLabel.numberOfLines = 2
 
         locationLabel.font = TextStyle.Pretendard.body3
-        locationLabel.textColor = .Feelter.gray75
+        locationLabel.textColor = .Feelter.gray60
         locationLabel.numberOfLines = 2
     }
 

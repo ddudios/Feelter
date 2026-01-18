@@ -8,6 +8,10 @@
 import UIKit
 import SnapKit
 
+protocol CustomTabBarControllerDelegate: AnyObject {
+    func customTabBarControllerDidSelectFilter(_ controller: CustomTabBarController)
+}
+
 final class CustomTabBarController: UITabBarController {
 
     // MARK: - Types
@@ -53,6 +57,7 @@ final class CustomTabBarController: UITabBarController {
     private let customTabBar = UIView()
     private let indicatorView = UIView()
     private var tabButtons: [UIButton] = []
+    weak var tabBarActionDelegate: CustomTabBarControllerDelegate?
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -138,6 +143,9 @@ final class CustomTabBarController: UITabBarController {
         let index = sender.tag
         selectedIndex = index
         selectTab(at: index)
+        if TabType(rawValue: index) == .filter {
+            tabBarActionDelegate?.customTabBarControllerDidSelectFilter(self)
+        }
     }
 
     private func selectTab(at index: Int) {
@@ -205,6 +213,14 @@ final class CustomTabBarController: UITabBarController {
             customTabBar.isHidden = hidden
             updateVisibility()
         }
+    }
+
+    func actionSheetAnchorView() -> UIView {
+        return customTabBar
+    }
+
+    func actionSheetAnchorRect() -> CGRect {
+        return CGRect(x: customTabBar.bounds.midX, y: 0, width: 1, height: 1)
     }
 }
 

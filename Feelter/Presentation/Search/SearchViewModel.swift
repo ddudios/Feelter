@@ -39,6 +39,9 @@ final class SearchViewModel: ViewModelProtocol {
     private var currentLocation: CLLocationCoordinate2D?
     private var commentCountCache: [String: Int] = [:]
     private var commentFetchInProgress = Set<String>()
+    private var locationNameCache: [String: String] = [:]
+    private var locationRequestInProgress = Set<String>()
+    private var locationKeyByPostId: [String: String] = [:]
 
     private let fetchLimit = 10
 
@@ -105,6 +108,7 @@ final class SearchViewModel: ViewModelProtocol {
             if reset {
                 nextCursor = nil
                 isLoadingMore = false
+                locationKeyByPostId.removeAll()
             }
 
             let locationRequired = currentMaxDistance != nil
@@ -155,6 +159,7 @@ final class SearchViewModel: ViewModelProtocol {
                         postsSubject.send(posts)
                         isLoadingMore = false
                         fetchCommentCountsIfNeeded(for: newItems.map { $0.id })
+                        resolveLocationNamesIfNeeded(for: result.posts, postsSubject: postsSubject)
                     }
                 } catch {
                     await MainActor.run {
@@ -168,6 +173,7 @@ final class SearchViewModel: ViewModelProtocol {
 
         func searchPosts(query: String) {
             isLoadingSubject.send(true)
+            locationKeyByPostId.removeAll()
 
             Task {
                 do {
@@ -179,6 +185,7 @@ final class SearchViewModel: ViewModelProtocol {
                         isLoadingSubject.send(false)
                         postsSubject.send(posts)
                         fetchCommentCountsIfNeeded(for: newItems.map { $0.id })
+                        resolveLocationNamesIfNeeded(for: result, postsSubject: postsSubject)
                     }
                 } catch {
                     await MainActor.run {
@@ -297,17 +304,73 @@ final class SearchViewModel: ViewModelProtocol {
         )
     }
 
+    private func resolveLocationNamesIfNeeded(
+        for posts: [PostSummary],
+        postsSubject: CurrentValueSubject<[SearchPostItem], Never>
+    ) {
+        for post in posts {
+            let coordinate = CLLocationCoordinate2D(
+                latitude: post.geolocation.latitude,
+                longitude: post.geolocation.longitude
+            )
+            let locationKey = locationCacheKey(for: coordinate)
+
+            if locationNameCache[locationKey] != nil || locationRequestInProgress.contains(locationKey) {
+                continue
+            }
+
+            locationRequestInProgress.insert(locationKey)
+            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            let geocoder = CLGeocoder()
+            geocoder.reverseGeocodeLocation(location, preferredLocale: Locale(identifier: "ko_KR")) { [weak self] placemarks, _ in
+                guard let self else { return }
+                let locationName = self.makeLocationName(from: placemarks?.first) ?? "위치 정보 없음"
+                Task { @MainActor in
+                    self.locationRequestInProgress.remove(locationKey)
+                    self.locationNameCache[locationKey] = locationName
+                    self.posts = self.posts.map { item in
+                        guard self.locationKeyByPostId[item.id] == locationKey else { return item }
+                        return self.updatedPostItem(item, locationText: locationName)
+                    }
+                    postsSubject.send(self.posts)
+                }
+            }
+        }
+    }
+
+    private func locationCacheKey(for coordinate: CLLocationCoordinate2D) -> String {
+        let latitude = String(format: "%.4f", coordinate.latitude)
+        let longitude = String(format: "%.4f", coordinate.longitude)
+        return "\(latitude),\(longitude)"
+    }
+
+    private func makeLocationName(from placemark: CLPlacemark?) -> String? {
+        guard let placemark else { return nil }
+        if let subLocality = placemark.subLocality, !subLocality.isEmpty {
+            return subLocality
+        }
+        if let locality = placemark.locality, !locality.isEmpty {
+            return locality
+        }
+        if let administrativeArea = placemark.administrativeArea, !administrativeArea.isEmpty {
+            return administrativeArea
+        }
+        return nil
+    }
+
     private func makePostItems(from posts: [PostSummary]) -> [SearchPostItem] {
         posts.map { post in
             let nickname = post.creator.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
             let name = post.creator.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let authorName = nickname.isEmpty ? name : nickname
 
-            let locationText = String(
-                format: "%.4f, %.4f",
-                post.geolocation.latitude,
-                post.geolocation.longitude
+            let coordinate = CLLocationCoordinate2D(
+                latitude: post.geolocation.latitude,
+                longitude: post.geolocation.longitude
             )
+            let locationKey = locationCacheKey(for: coordinate)
+            locationKeyByPostId[post.id] = locationKey
+            let locationText = locationNameCache[locationKey] ?? "위치 확인 중"
 
             return SearchPostItem(
                 id: post.id,
@@ -330,13 +393,14 @@ final class SearchViewModel: ViewModelProtocol {
         _ item: SearchPostItem,
         isLiked: Bool? = nil,
         likeCount: Int? = nil,
-        commentCount: Int? = nil
+        commentCount: Int? = nil,
+        locationText: String? = nil
     ) -> SearchPostItem {
         SearchPostItem(
             id: item.id,
             authorName: item.authorName,
             profileImagePath: item.profileImagePath,
-            locationText: item.locationText,
+            locationText: locationText ?? item.locationText,
             imagePaths: item.imagePaths,
             isLiked: isLiked ?? item.isLiked,
             likeCount: likeCount ?? item.likeCount,

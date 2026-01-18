@@ -7,11 +7,12 @@
 
 import UIKit
 
-final class TabBarCoordinator: Coordinator {
+final class TabBarCoordinator: Coordinator, CustomTabBarControllerDelegate {
 
     var childCoordinators: [Coordinator] = []
     var navigationController: UINavigationController
     private let tabBarController: CustomTabBarController
+    private weak var filterNavigationController: UINavigationController?
 
     init(navigationController: UINavigationController) {
         self.navigationController = navigationController
@@ -22,6 +23,7 @@ final class TabBarCoordinator: Coordinator {
     func start() {
         let viewControllers = createViewControllers()
         tabBarController.setViewControllers(viewControllers, animated: false)
+        tabBarController.tabBarActionDelegate = self
         navigationController.setNavigationBarHidden(true, animated: false)
         navigationController.setViewControllers([tabBarController], animated: false)
     }
@@ -44,6 +46,7 @@ final class TabBarCoordinator: Coordinator {
             rootViewController: FilterMakeViewController(),
             tabType: .filter
         )
+        filterNavigationController = filterNav
 
         // Search 탭
         let searchNav = createNavigationController(tabType: .search)
@@ -94,5 +97,53 @@ final class TabBarCoordinator: Coordinator {
         if let profileCoordinator = childCoordinators.first(where: { $0 is ProfileCoordinator }) as? ProfileCoordinator {
             profileCoordinator.showChatRoom(roomId: roomId)
         }
+    }
+
+    @MainActor
+    func customTabBarControllerDidSelectFilter(_ controller: CustomTabBarController) {
+        presentFilterSelectionActionSheet(from: controller)
+    }
+
+    @MainActor
+    private func presentFilterSelectionActionSheet(from controller: CustomTabBarController) {
+        let actionSheetController = UIAlertController(
+            title: "필터",
+            message: "생성할 항목을 선택해주세요.",
+            preferredStyle: .actionSheet
+        )
+
+        let filterAction = UIAlertAction(title: "필터 생성", style: .default) { [weak self] _ in
+            self?.showFilterMake()
+        }
+        let postAction = UIAlertAction(title: "게시글 작성", style: .default) { [weak self] _ in
+            self?.showCreatePost()
+        }
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        actionSheetController.addAction(filterAction)
+        actionSheetController.addAction(postAction)
+        actionSheetController.addAction(cancelAction)
+
+        if let popoverController = actionSheetController.popoverPresentationController {
+            let anchorView = controller.actionSheetAnchorView()
+            popoverController.sourceView = anchorView
+            popoverController.sourceRect = controller.actionSheetAnchorRect()
+            popoverController.permittedArrowDirections = .down
+        }
+        controller.present(actionSheetController, animated: true)
+    }
+
+    @MainActor
+    private func showFilterMake() {
+        let viewController = FilterMakeViewController()
+        filterNavigationController?.setViewControllers([viewController], animated: false)
+    }
+
+    @MainActor
+    private func showCreatePost() {
+        guard let filterNavigationController else { return }
+        let viewModel = DIContainer.shared.resolve(CreatePostViewModel.self)
+        let viewController = CreatePostViewController(viewModel: viewModel)
+        filterNavigationController.setViewControllers([viewController], animated: false)
     }
 }
