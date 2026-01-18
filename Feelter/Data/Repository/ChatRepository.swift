@@ -368,6 +368,13 @@ final class ChatRepository: ChatRepositoryProtocol {
         }
     }
 
+    /// CoreData의 변경사항을 디스크에 저장
+    ///
+    /// - Note: ensureChatRoomExists 호출 후 즉시 호출하여 relationship 설정 완료 보장
+    func saveChatRoomContext() throws {
+        try coreDataManager.saveContext()
+    }
+
     /// 마지막 읽은 시간 업데이트
     ///
     /// - Parameter roomId: 채팅방 ID

@@ -46,10 +46,10 @@ final class TabBarCoordinator: Coordinator {
         )
 
         // Search 탭
-        let searchNav = createNavigationController(
-            rootViewController: SearchViewController(),
-            tabType: .search
-        )
+        let searchNav = createNavigationController(tabType: .search)
+        let searchCoordinator = SearchCoordinator(navigationController: searchNav)
+        addChildCoordinator(searchCoordinator)
+        searchCoordinator.start()
 
         // Profile 탭
         let profileNav = createNavigationController(tabType: .profile)

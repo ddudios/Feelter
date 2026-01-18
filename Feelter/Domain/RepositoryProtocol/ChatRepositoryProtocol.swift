@@ -133,6 +133,15 @@ protocol ChatRepositoryProtocol {
     /// - Throws: CoreData 에러
     func ensureChatRoomExists(_ chatRoom: ChatRoom) throws
 
+    /// CoreData의 변경사항을 디스크에 저장
+    ///
+    /// 사용처:
+    /// - ensureChatRoomExists 호출 후 즉시 호출하여 relationship 설정 완료 보장
+    /// - 메시지 fetch 전에 chatRoom이 디스크에 저장되어 있어야 함
+    ///
+    /// - Throws: CoreData 에러
+    func saveChatRoomContext() throws
+
     /// 채팅방의 마지막 읽은 시간 업데이트 (로컬 전용)
     ///
     /// 사용처:

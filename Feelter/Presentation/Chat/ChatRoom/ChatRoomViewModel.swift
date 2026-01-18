@@ -91,8 +91,11 @@ final class ChatRoomViewModel {
 
         // 채팅방 정보를 먼저 CoreData에 저장
         // 이렇게 해야 메시지를 저장할 때 chatRoom relationship을 설정할 수 있음
+        // ✅ 저장 완료를 기다린 후 다음 작업 진행 (relationship 설정 완료 보장)
         do {
             try repository.ensureChatRoomExists(chatRoom)
+            // ✅ 명시적으로 저장 완료 (디스크에 기록)
+            try repository.saveChatRoomContext()
         } catch {
         }
 

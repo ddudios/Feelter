@@ -74,6 +74,16 @@ func registerDependencies() {
         return PaymentUsecase(repository: repository)
     }
 
+    container.registerFactory(PostUsecaseProtocol.self) {
+        let repository = container.resolve(CommunityRepositoryProtocol.self)
+        return PostUsecase(repository: repository)
+    }
+
+    container.registerFactory(LikePostUsecaseProtocol.self) {
+        let repository = container.resolve(CommunityRepositoryProtocol.self)
+        return LikePostUsecase(repository: repository)
+    }
+
     container.registerFactory(VideoUsecaseProtocol.self) {
         let repository = container.resolve(VideoRepositoryProtocol.self)
         return VideoUsecase(repository: repository)
@@ -132,6 +142,15 @@ func registerDependencies() {
     container.registerFactory(CategoryRankingViewModel.self) {
         let filterUsecase = container.resolve(FilterUsecaseProtocol.self)
         return CategoryRankingViewModel(filterUsecase: filterUsecase)
+    }
+
+    container.registerFactory(SearchViewModel.self) {
+        let postUsecase = container.resolve(PostUsecaseProtocol.self)
+        let likePostUsecase = container.resolve(LikePostUsecaseProtocol.self)
+        return SearchViewModel(
+            postUsecase: postUsecase,
+            likePostUsecase: likePostUsecase
+        )
     }
 
     container.registerFactory(ChatRoomListViewModel.self) {
