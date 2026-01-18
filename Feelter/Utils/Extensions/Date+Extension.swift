@@ -22,4 +22,24 @@ extension Date {
         formatter.dateFormat = format
         return formatter.string(from: self)
     }
+
+    func relativeDescription(referenceDate: Date = Date()) -> String {
+        let seconds = max(0, Int(referenceDate.timeIntervalSince(self)))
+        if seconds < 60 {
+            return "방금 전"
+        }
+
+        let minutes = seconds / 60
+        if minutes < 60 {
+            return "\(minutes)분 전"
+        }
+
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours)시간 전"
+        }
+
+        let days = hours / 24
+        return "\(days)일 전"
+    }
 }
