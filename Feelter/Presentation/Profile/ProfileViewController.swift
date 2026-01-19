@@ -271,9 +271,9 @@ final class ProfileViewController: BaseViewController {
         tagCollectionView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         tagCollectionView.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        messageButton.backgroundColor = .Feelter.brightTurquoise
+        messageButton.backgroundColor = .Feelter.gray60?.withAlphaComponent(0.5)
         messageButton.tintColor = .Feelter.gray0
-        messageButton.layer.cornerRadius = Layout.messageButtonSize / 2
+        messageButton.layer.cornerRadius = 8
         messageButton.clipsToBounds = true
         messageButton.setImage(UIImage.Icon.message, for: .normal)
         messageButton.addTarget(self, action: #selector(handleMessageButtonTapped), for: .touchUpInside)

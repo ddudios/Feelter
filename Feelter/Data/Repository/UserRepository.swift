@@ -40,4 +40,36 @@ final class UserRepository: UserRepositoryProtocol {
 
         return response.toDomain()
     }
+
+    func updateProfile(
+        nick: String?,
+        name: String?,
+        introduction: String?,
+        phoneNum: String?,
+        profileImage: String?,
+        hashTags: [String]?
+    ) async throws -> User {
+        let requestDTO = ProfileUpdateRequestDTO(
+            nick: nick,
+            name: name,
+            introduction: introduction,
+            phoneNum: phoneNum,
+            profileImage: profileImage,
+            hashTags: hashTags
+        )
+
+        let response = try await networkManager.request(
+            UserRouter.updateProfile(body: requestDTO),
+            type: ProfileResponseDTO.self
+        )
+
+        return response.toDomain()
+    }
+
+    func uploadProfileImage(_ imageData: Data) async throws -> String {
+        return try await networkManager.uploadProfileImage(
+            imageData,
+            endpoint: UserRouter.uploadProfileImage(imageData: imageData)
+        )
+    }
 }
