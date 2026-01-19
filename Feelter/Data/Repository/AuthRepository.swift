@@ -16,6 +16,47 @@ final class AuthRepository: AuthRepositoryProtocol, TokenRepositoryProtocol {
         self.networkManager = networkManager
     }
 
+    func validateEmail(email: String) async throws -> String {
+        let request = EmailValidationRequestDTO(email: email)
+
+        let response = try await networkManager.request(
+            UserRouter.validateEmail(body: request),
+            type: EmailValidationResponseDTO.self
+        )
+
+        return response.message
+    }
+
+    func join(
+        email: String,
+        password: String,
+        nick: String,
+        name: String,
+        introduction: String?,
+        phoneNum: String?,
+        hashTags: [String]?
+    ) async throws -> (User, AuthToken) {
+        let deviceToken = Messaging.messaging().fcmToken ?? ""
+
+        let request = JoinRequestDTO(
+            email: email,
+            password: password,
+            nick: nick,
+            name: name,
+            introduction: introduction ?? "",
+            phoneNum: phoneNum ?? "",
+            hashTags: hashTags ?? [],
+            deviceToken: deviceToken
+        )
+
+        let response = try await networkManager.request(
+            UserRouter.join(body: request),
+            type: AuthResponseDTO.self
+        )
+
+        return (response.toDomain(), response.toToken())
+    }
+
     func login(email: String, password: String) async throws -> (User, AuthToken) {
         let deviceToken = Messaging.messaging().fcmToken ?? ""
 

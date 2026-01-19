@@ -29,6 +29,13 @@ final public class AuthCoordinator: Coordinator {
         navigationController.setViewControllers([loginVC], animated: false)
     }
 
+    @MainActor
+    func showJoin() {
+        let joinVC = JoinViewController()
+        joinVC.coordinator = self
+        navigationController.pushViewController(joinVC, animated: true)
+    }
+
     func loginDidFinish() {
         finishDelegate?.coordinatorDidFinish(childCoordinator: self)
     }

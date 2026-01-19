@@ -342,6 +342,11 @@ final class LoginViewController: BaseViewController {
     override func configureView() {
         super.configureView()
         bind()
+        signUpButton.addTarget(self, action: #selector(signUpButtonTapped), for: .touchUpInside)
+    }
+
+    @objc private func signUpButtonTapped() {
+        coordinator?.showJoin()
     }
 
     private func bind() {
