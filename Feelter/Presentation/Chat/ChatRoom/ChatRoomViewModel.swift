@@ -97,6 +97,9 @@ final class ChatRoomViewModel {
             // ✅ 명시적으로 저장 완료 (디스크에 기록)
             try repository.saveChatRoomContext()
         } catch {
+            print("❌ [ChatRoomViewModel] 채팅방 저장 실패: \(error)")
+            // ⚠️ 채팅방 저장 실패 시 앱이 정상 작동하지 않을 수 있음
+            // TODO: 사용자에게 알림 또는 재시도 로직 필요
         }
 
         // Repository의 실시간 업데이트 구독

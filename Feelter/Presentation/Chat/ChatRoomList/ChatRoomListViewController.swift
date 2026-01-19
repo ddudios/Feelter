@@ -195,11 +195,18 @@ final class ChatRoomListViewController: BaseViewController {
         emptyStateImageView.image = UIImage.Icon.message
         emptyStateImageView.tintColor = .Feelter.gray75
         emptyStateImageView.contentMode = .scaleAspectFit
+        // ✅ 크기 고정 (AutoLayout 충돌 방지)
+        emptyStateImageView.setContentHuggingPriority(.required, for: .horizontal)
+        emptyStateImageView.setContentHuggingPriority(.required, for: .vertical)
+        emptyStateImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        emptyStateImageView.setContentCompressionResistancePriority(.required, for: .vertical)
 
         emptyStateLabel.text = "대화를 시작해 보세요"
         emptyStateLabel.font = TextStyle.Pretendard.body1
         emptyStateLabel.textColor = .Feelter.gray75
         emptyStateLabel.textAlignment = .center
+        emptyStateLabel.setContentHuggingPriority(.required, for: .horizontal)
+        emptyStateLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         let stackView = UIStackView(arrangedSubviews: [emptyStateImageView, emptyStateLabel])
         stackView.axis = .vertical
@@ -208,13 +215,12 @@ final class ChatRoomListViewController: BaseViewController {
 
         emptyStateView.addSubview(stackView)
         stackView.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.leading.trailing.equalToSuperview().inset(Layout.emptyStateHorizontalInset)
             make.centerY.equalToSuperview().offset(-50)
+            make.centerX.equalToSuperview()
         }
 
         emptyStateImageView.snp.makeConstraints { make in
-            make.width.height.equalTo(Layout.emptyIconSize)
+            make.width.height.equalTo(Layout.emptyIconSize).priority(.high)
         }
     }
 
