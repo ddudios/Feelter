@@ -39,6 +39,9 @@ func registerDependencies() {
     let userRepository = UserRepository(networkManager: networkManager)
     container.registerSingleton(UserRepositoryProtocol.self, instance: userRepository)
 
+    let orderRepository = OrderRepository(networkManager: networkManager)
+    container.registerSingleton(OrderRepositoryProtocol.self, instance: orderRepository)
+
     // Chat Repository는 CoreData와 Socket.IO도 필요
     let chatRepository = ChatRepository(
         networkManager: networkManager,
@@ -117,6 +120,15 @@ func registerDependencies() {
     container.registerFactory(CreateChatRoomUsecase.self) {
         let repository = container.resolve(ChatRepositoryProtocol.self)
         return CreateChatRoomUsecase(repository: repository)
+    }
+
+    container.registerFactory(FetchMyFiltersUsecase.self) {
+        let filterRepository = container.resolve(FilterRepositoryProtocol.self)
+        let orderRepository = container.resolve(OrderRepositoryProtocol.self)
+        return FetchMyFiltersUsecase(
+            filterRepository: filterRepository,
+            orderRepository: orderRepository
+        )
     }
 
     //MARK: - ViewModel

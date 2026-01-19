@@ -50,3 +50,12 @@ enum FilterCategory: String, CaseIterable, Hashable {
     case star = "별"
     case unknown = "기타"
 }
+
+/// 주문 내역 (결제 완료한 필터)
+struct Order: Identifiable {
+    let id: String // order_id
+    let orderCode: String
+    let filter: FilterDetail
+    let paidAt: Date
+    let createdAt: Date
+}

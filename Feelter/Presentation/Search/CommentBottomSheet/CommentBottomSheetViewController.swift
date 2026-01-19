@@ -2,7 +2,7 @@
 //  CommentBottomSheetViewController.swift
 //  Feelter
 //
-//  Created by Claude on 1/19/26.
+//  Created by Suji Jang on 1/19/26.
 //
 
 import UIKit

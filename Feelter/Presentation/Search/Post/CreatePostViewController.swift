@@ -339,7 +339,8 @@ final class CreatePostViewController: BaseViewController {
             fileExtension: nil,
             previewImage: nil,
             remotePath: path,
-            isVideo: isVideo
+            isVideo: isVideo,
+            appliedFilter: nil
         )
     }
 
@@ -449,7 +450,54 @@ final class CreatePostViewController: BaseViewController {
     @objc private func applyFilterButtonTapped(_ sender: UIButton) {
         let index = sender.tag
         guard index < attachmentItems.count else { return }
-        let viewController = ApplyFilterViewController()
+        let item = attachmentItems[index]
+
+        // 비디오는 필터 적용 불가
+        guard !item.isVideo else {
+            showAlert(message: "비디오에는 필터를 적용할 수 없습니다.")
+            return
+        }
+
+        // 이미지 추출
+        let image: UIImage?
+        if let previewImage = item.previewImage {
+            image = previewImage
+        } else if let remotePath = item.remotePath {
+            // 원격 이미지를 먼저 로드해야 함
+            showAlert(message: "기존 이미지는 필터를 적용할 수 없습니다.")
+            return
+        } else {
+            showAlert(message: "이미지를 불러올 수 없습니다.")
+            return
+        }
+
+        guard let originalImage = image else {
+            showAlert(message: "이미지를 불러올 수 없습니다.")
+            return
+        }
+
+        // DIContainer에서 의존성 주입
+        let fetchMyFiltersUsecase = DIContainer.shared.resolve(FetchMyFiltersUsecase.self)
+        let viewModel = ApplyFilterViewModel(
+            originalImage: originalImage,
+            fetchMyFiltersUsecase: fetchMyFiltersUsecase
+        )
+        let viewController = ApplyFilterViewController(viewModel: viewModel)
+
+        // 필터 적용 완료 시 이미지 업데이트
+        viewController.onFilterApplied = { [weak self] filteredImage, appliedFilter in
+            guard let self else { return }
+            guard let data = filteredImage.jpegData(compressionQuality: 0.8) else { return }
+
+            // 첨부 아이템 업데이트
+            self.attachmentItems[index].data = data
+            self.attachmentItems[index].previewImage = filteredImage
+            self.attachmentItems[index].appliedFilter = appliedFilter
+
+            // UI 업데이트
+            self.updateAttachmentPreviews()
+        }
+
         navigationController?.pushViewController(viewController, animated: true)
     }
 
@@ -748,11 +796,12 @@ private struct ValidatedPostFields {
 }
 
 private struct AttachmentItem {
-    let data: Data?
-    let fileExtension: String?
-    let previewImage: UIImage?
+    var data: Data?
+    var fileExtension: String?
+    var previewImage: UIImage?
     let remotePath: String?
     let isVideo: Bool
+    var appliedFilter: FilterDetail?
 
     var uploadFile: UploadFile? {
         guard let data, let fileExtension else { return nil }
@@ -893,7 +942,8 @@ extension CreatePostViewController: PHPickerViewControllerDelegate {
                     fileExtension: "jpg",
                     previewImage: image,
                     remotePath: nil,
-                    isVideo: false
+                    isVideo: false,
+                    appliedFilter: nil
                 )
             }
         }
@@ -938,7 +988,8 @@ extension CreatePostViewController: PHPickerViewControllerDelegate {
                 fileExtension: fileExtension,
                 previewImage: previewImage,
                 remotePath: nil,
-                isVideo: true
+                isVideo: true,
+                appliedFilter: nil
             )
             completion(item)
         }
