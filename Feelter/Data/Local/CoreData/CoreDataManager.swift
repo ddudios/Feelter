@@ -292,22 +292,18 @@ extension CoreDataManager {
 
         message.status = status
 
-        // 4. ChatRoom relationship 설정
+        // 4. ChatRoom relationship 설정 (필수!)
         let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
         chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
 
-        if let chatRoom = try contextToUse.fetch(chatRoomFetchRequest).first {
-            // 채팅방을 찾았으면 relationship 설정
-            message.chatRoom = chatRoom
-        } else {
-            // ⚠️ 채팅방을 찾지 못했음 (경고 로그만 출력하고 진행)
-            // - 새 메시지: relationship은 nil로 유지 (나중에 설정 가능)
-            // - 기존 메시지: 기존 relationship 유지
-            print("⚠️ [CoreDataManager] 채팅방을 찾지 못함 (roomId: \(roomId)), 메시지는 저장하지만 relationship은 설정되지 않음")
-
-            // ✅ nil relationship을 허용하여 크래시 방지
-            // CoreData 모델에서 chatRoom relationship은 optional이므로 nil 허용
+        guard let chatRoom = try contextToUse.fetch(chatRoomFetchRequest).first else {
+            // ❌ 채팅방을 찾지 못하면 에러 발생 (크래시 방지)
+            // 메시지를 저장하기 전에 반드시 ChatRoom이 존재해야 함
+            throw CoreDataError.chatRoomNotFound(roomId: roomId)
         }
+
+        // 채팅방을 찾았으면 relationship 설정
+        message.chatRoom = chatRoom
 
         return message
     }

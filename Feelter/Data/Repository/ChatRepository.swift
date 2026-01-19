@@ -625,8 +625,27 @@ final class ChatRepository: ChatRepositoryProtocol {
 
     /// ChatMessage를 CoreData에 저장
     ///
-    /// - Note: files는 이제 Transformable 타입으로 자동 변환되므로 직접 전달
+    /// - Note:
+    ///   1. files는 이제 Transformable 타입으로 자동 변환되므로 직접 전달
+    ///   2. 메시지 저장 전에 항상 ChatRoom이 존재하는지 확인 (크래시 방지)
     private func saveMessageToCoreData(_ message: ChatMessage) throws {
+        // ✅ 1. ChatRoom이 존재하는지 확인
+        let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
+        chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", message.roomId)
+        let existingChatRooms = try coreDataManager.viewContext.fetch(chatRoomFetchRequest)
+
+        // ✅ 2. ChatRoom이 없으면 최소한의 정보로 생성
+        if existingChatRooms.isEmpty {
+            _ = try coreDataManager.upsertChatRoom(
+                roomId: message.roomId,
+                createdAt: message.createdAt,
+                updatedAt: message.createdAt
+            )
+            // 즉시 저장하여 relationship 설정 가능하도록 보장
+            try coreDataManager.saveContext()
+        }
+
+        // ✅ 3. 메시지 저장 (이제 ChatRoom이 확실히 존재함)
         _ = try coreDataManager.upsertChatMessage(
             chatId: message.chatId,
             roomId: message.roomId,

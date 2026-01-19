@@ -175,6 +175,16 @@ final class ChatRoomListViewController: BaseViewController {
         let fetchChatHistoryUsecase = DIContainer.shared.resolve(FetchChatHistoryUsecase.self)
         let sendMessageUsecase = DIContainer.shared.resolve(SendMessageUsecase.self)
 
+        // ✅ 채팅방이 CoreData에 저장되어 있는지 확인하고, 없으면 저장
+        // 이렇게 하지 않으면 메시지 저장 시 relationship 설정에서 크래시 발생
+        do {
+            try repository.ensureChatRoomExists(chatRoom)
+            try repository.saveChatRoomContext()
+        } catch {
+            showErrorAlert(message: "채팅방 정보를 저장하는데 실패했습니다.")
+            return
+        }
+
         // ChatRoomViewModel은 chatRoom 파라미터가 필요하므로 직접 생성
         let chatRoomViewModel = ChatRoomViewModel(
             chatRoom: chatRoom,
