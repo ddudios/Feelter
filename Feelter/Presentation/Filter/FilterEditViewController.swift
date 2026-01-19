@@ -34,6 +34,14 @@ final class FilterEditViewController: BaseViewController {
     // 저장 완료 콜백 (필터 이미지, 원본 이미지, 필터 값)
     var onSaveComplete: ((UIImage, UIImage, FilterValues) -> Void)?
 
+    // MARK: - History Management
+    private var historyStack: [FilterValues] = []
+    private var currentHistoryIndex: Int = -1
+    private let maxHistoryCount = 10
+
+    // MARK: - Previous Value Tracking
+    private var previousPropertyValues: [FilterAdjustmentProperty: Float] = [:]
+
     private let actionButtonStackView = UIStackView()
     private let undoButton = UIButton(type: .system)
     private let redoButton = UIButton(type: .system)
@@ -98,14 +106,26 @@ final class FilterEditViewController: BaseViewController {
         configureActionButton(redoButton, image: UIImage.Icon.redo)
         configureActionButton(compareButton, image: UIImage.Icon.compare)
 
+        undoButton.addTarget(self, action: #selector(undoButtonTapped), for: .touchUpInside)
+        redoButton.addTarget(self, action: #selector(redoButtonTapped), for: .touchUpInside)
+
+        // Compare 버튼 long press gesture 추가
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(compareButtonLongPressed(_:)))
+        longPressGesture.minimumPressDuration = 0.1
+        compareButton.addGestureRecognizer(longPressGesture)
+
         actionButtonStackView.axis = .horizontal
         actionButtonStackView.alignment = .center
         actionButtonStackView.spacing = Layout.actionButtonSpacing
+
+        // 초기 히스토리 추가 (기본 필터 값)
+        addToHistory(filterEngine.filterValuesSubject.value)
 
         adjustmentSlider.valueFormatter = { value in
             String(format: "%.1f", value)
         }
         adjustmentSlider.addTarget(self, action: #selector(adjustmentSliderValueChanged(_:)), for: .valueChanged)
+        adjustmentSlider.addTarget(self, action: #selector(adjustmentSliderEditingDidEnd(_:)), for: [.touchUpInside, .touchUpOutside])
 
         propertyScrollView.showsHorizontalScrollIndicator = false
         propertyScrollView.showsVerticalScrollIndicator = false
@@ -229,7 +249,7 @@ final class FilterEditViewController: BaseViewController {
         button.setImage(image, for: .normal)
         button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         button.imageView?.contentMode = .scaleAspectFit
-        button.tintColor = .Feelter.gray75
+        button.tintColor = .Feelter.gray75  // 초기 색상 (비활성화)
         button.backgroundColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5)
         button.layer.cornerRadius = 10
         button.layer.cornerCurve = .continuous
@@ -265,6 +285,10 @@ final class FilterEditViewController: BaseViewController {
         adjustmentSlider.zeroSnapEnabled = property.supportsZeroSnap
         let sliderValue = sliderValues[property] ?? property.defaultSliderValue
         adjustmentSlider.setValue(sliderValue, animated: animated)
+
+        // 이전 값 마커 업데이트
+        adjustmentSlider.previousValuePosition = previousPropertyValues[property]
+
         adjustmentSlider.refresh()
     }
 
@@ -304,6 +328,146 @@ final class FilterEditViewController: BaseViewController {
             filterEngine.updateTemperature(value: Float(internalValue))
         case .blackPoint:
             filterEngine.updateBlackPoint(value: Float(internalValue))
+        }
+
+        // Compare 버튼 상태 실시간 업데이트
+        updateCompareButton()
+    }
+
+    @objc private func adjustmentSliderEditingDidEnd(_ sender: FilterAdjustmentSlider) {
+        // 슬라이더 조작이 끝났을 때 히스토리에 추가
+        addToHistory(filterEngine.filterValuesSubject.value)
+    }
+
+    // MARK: - History Management
+
+    private func addToHistory(_ filterValues: FilterValues) {
+        // 현재 인덱스 이후의 히스토리 제거
+        if currentHistoryIndex < historyStack.count - 1 {
+            historyStack.removeSubrange((currentHistoryIndex + 1)...)
+        }
+
+        // 새 히스토리 추가
+        historyStack.append(filterValues)
+
+        // 최대 개수 유지
+        if historyStack.count > maxHistoryCount {
+            historyStack.removeFirst()
+        } else {
+            currentHistoryIndex += 1
+        }
+
+        // 이전 값 업데이트 (바로 직전 히스토리에서)
+        updatePreviousPropertyValues()
+
+        // 버튼 상태 업데이트
+        updateHistoryButtons()
+        updateCompareButton()
+    }
+
+    private func updatePreviousPropertyValues() {
+        guard currentHistoryIndex >= 0,
+              currentHistoryIndex < historyStack.count else {
+            previousPropertyValues.removeAll()
+            return
+        }
+
+        let referenceValues: FilterValues
+        if currentHistoryIndex > 0 {
+            referenceValues = historyStack[currentHistoryIndex - 1]
+        } else {
+            referenceValues = historyStack[currentHistoryIndex]
+        }
+
+        FilterAdjustmentProperty.ordered.forEach { property in
+            let internalValue = property.internalValue(from: referenceValues)
+            let sliderValue = Float(property.sliderValue(forInternalValue: internalValue))
+            previousPropertyValues[property] = sliderValue
+        }
+
+        adjustmentSlider.previousValuePosition = previousPropertyValues[selectedProperty]
+    }
+
+    private func updateHistoryButtons() {
+        let canUndo = currentHistoryIndex > 0
+        let canRedo = currentHistoryIndex < historyStack.count - 1
+
+        undoButton.isEnabled = canUndo
+        redoButton.isEnabled = canRedo
+
+        undoButton.tintColor = canUndo ? .Feelter.gray60 : .Feelter.gray75
+        redoButton.tintColor = canRedo ? .Feelter.gray60 : .Feelter.gray75
+    }
+
+    private func updateCompareButton() {
+        let currentFilterValues = filterEngine.filterValuesSubject.value
+        let hasChanges = currentFilterValues != FilterValues.default
+
+        compareButton.tintColor = hasChanges ? .Feelter.gray60 : .Feelter.gray75
+    }
+
+    private func restoreHistoryAtIndex(_ index: Int) {
+        guard index >= 0, index < historyStack.count else { return }
+
+        currentHistoryIndex = index
+        let filterValues = historyStack[index]
+
+        // 슬라이더 값 업데이트
+        FilterAdjustmentProperty.ordered.forEach { property in
+            let internalValue = property.internalValue(from: filterValues)
+            let sliderValue = Float(property.sliderValue(forInternalValue: internalValue))
+            sliderValues[property] = sliderValue
+        }
+
+        // FilterEngine에 적용
+        filterEngine.filterValuesSubject.send(filterValues)
+
+        // 현재 선택된 프로퍼티의 슬라이더 업데이트
+        let currentValue = sliderValues[selectedProperty] ?? selectedProperty.defaultSliderValue
+        adjustmentSlider.setValue(currentValue, animated: true)
+
+        // 이전 값 업데이트
+        updatePreviousPropertyValues()
+
+        // 슬라이더 마커 업데이트
+        adjustmentSlider.updatePreviousValueMarker()
+
+        // 버튼 상태 업데이트
+        updateHistoryButtons()
+        updateCompareButton()
+    }
+
+    @objc private func undoButtonTapped() {
+        guard currentHistoryIndex > 0 else { return }
+        restoreHistoryAtIndex(currentHistoryIndex - 1)
+
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
+    @objc private func redoButtonTapped() {
+        guard currentHistoryIndex < historyStack.count - 1 else { return }
+        restoreHistoryAtIndex(currentHistoryIndex + 1)
+
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
+    @objc private func compareButtonLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            // 원본 이미지로 전환
+            photoImageView.image = selectedImage
+            // Haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        case .ended, .cancelled:
+            // 필터 이미지로 복귀
+            photoImageView.image = filterEngine.previewImage
+        default:
+            break
         }
     }
 }
@@ -381,6 +545,7 @@ private final class FilterAdjustmentSlider: UISlider {
         static let thumbSize: CGFloat = 4
         static let bubbleSpacing: CGFloat = 8
         static let trackCapExtension: CGFloat = 6
+        static let markerSize: CGFloat = 6
     }
 
     var valueFormatter: ((Float) -> String) = { value in
@@ -397,6 +562,12 @@ private final class FilterAdjustmentSlider: UISlider {
     private let valueBubbleView = SliderValueBubbleView()
     private var previousValue: Float = 0
     private var feedbackGenerator: UISelectionFeedbackGenerator?
+
+    // MARK: - Previous Value Marker
+    private let previousValueMarker = UIView()
+    var previousValuePosition: Float? {
+        didSet { updatePreviousValueMarker() }
+    }
 
     override var minimumValue: Float {
         didSet { setNeedsLayout() }
@@ -419,6 +590,7 @@ private final class FilterAdjustmentSlider: UISlider {
         super.layoutSubviews()
         updateTrackLayout()
         updateBubblePosition()
+        updatePreviousValueMarker()
     }
 
     override func trackRect(forBounds bounds: CGRect) -> CGRect {
@@ -473,8 +645,14 @@ private final class FilterAdjustmentSlider: UISlider {
         gradientView.layer.cornerRadius = Layout.trackHeight / 2
         gradientView.clipsToBounds = true
 
+        // 이전 값 마커 설정
+        previousValueMarker.backgroundColor = .Feelter.deepTurquoise
+        previousValueMarker.layer.cornerRadius = Layout.markerSize / 2
+        previousValueMarker.isHidden = true
+
         insertSubview(trackBackgroundView, at: 0)
         insertSubview(gradientView, aboveSubview: trackBackgroundView)
+        insertSubview(previousValueMarker, aboveSubview: gradientView)
         addSubview(valueBubbleView)
 
         valueBubbleView.isHidden = false
@@ -513,9 +691,20 @@ private final class FilterAdjustmentSlider: UISlider {
             }
         }
 
+        // 이전 값 마커를 지나갈 때 진동
+        if let previousPosition = previousValuePosition {
+            let crossedMarker = (previousValue < previousPosition && value >= previousPosition) ||
+                               (previousValue > previousPosition && value <= previousPosition)
+            if crossedMarker {
+                feedbackGenerator?.selectionChanged()
+                feedbackGenerator?.prepare()
+            }
+        }
+
         previousValue = value
         updateTrackLayout()
         updateBubblePosition()
+        updatePreviousValueMarker()
     }
 
     private func updateTrackLayout() {
@@ -583,6 +772,49 @@ private final class FilterAdjustmentSlider: UISlider {
             UIColor.Feelter.blackTurquoise?.setFill()
             path.fill()
         }
+    }
+
+    // MARK: - Previous Value Marker
+
+    func updatePreviousValueMarker() {
+        guard let previousPosition = previousValuePosition else {
+            previousValueMarker.isHidden = true
+            return
+        }
+
+        previousValueMarker.isHidden = false
+
+        let trackRect = self.trackRect(forBounds: bounds)
+        let thumbRect = self.thumbRect(forBounds: bounds, trackRect: trackRect, value: previousPosition)
+
+        let markerX = thumbRect.midX - Layout.markerSize / 2
+        let markerY = trackRect.midY - Layout.markerSize / 2
+
+        previousValueMarker.frame = CGRect(
+            x: markerX,
+            y: markerY,
+            width: Layout.markerSize,
+            height: Layout.markerSize
+        )
+
+        // 마커가 그라데이션 영역 내부에 있는지 확인하여 색상 결정
+        let markerNormalized = normalizedValue(for: previousPosition)
+        let currentNormalized = normalizedValue()
+
+        if markerNormalized <= currentNormalized {
+            // 그라데이션 영역 내부 (채워진 영역)
+            previousValueMarker.backgroundColor = .Feelter.gray45
+        } else {
+            // 그라데이션 영역 외부
+            previousValueMarker.backgroundColor = .Feelter.deepTurquoise
+        }
+    }
+
+    private func normalizedValue(for sliderValue: Float) -> CGFloat {
+        let range = maximumValue - minimumValue
+        guard range > 0 else { return 0 }
+        let normalized = (sliderValue - minimumValue) / range
+        return CGFloat(min(max(normalized, 0), 1))
     }
 }
 
