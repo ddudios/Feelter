@@ -64,6 +64,7 @@ final class ChatRoomViewController: BaseViewController {
     private var needsInitialScrollOnAppear = false
     private var shouldScrollToBottomAfterNextReload = false
     private var isTextViewBeingEdited = false  // TextView 편집 중 플래그
+    private var previousMessageCount = 0  // 이전 메시지 개수 (새 메시지 감지용)
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -292,7 +293,7 @@ final class ChatRoomViewController: BaseViewController {
         // Placeholder를 TextView 위에 배치
         messageTextView.addSubview(placeholderLabel)
         placeholderLabel.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(16)
+            make.leading.equalToSuperview().offset(8)
             make.trailing.equalToSuperview().offset(-12)
             make.centerY.equalToSuperview()
         }
@@ -364,6 +365,14 @@ final class ChatRoomViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] chatMessages in
                 guard let self = self else { return }
+
+                // 새 메시지가 추가되었고, 스크롤뷰가 최하단 근처에 있으면 자동 스크롤
+                if chatMessages.count > self.previousMessageCount && self.isNearBottom() {
+                    self.shouldScrollToBottomAfterNextReload = true
+                }
+
+                self.previousMessageCount = chatMessages.count
+
                 // Domain Entity -> View Item 변환
                 self.messages = self.convertToChatMessageViewItems(chatMessages)
             }
@@ -491,7 +500,8 @@ final class ChatRoomViewController: BaseViewController {
                 date: chatMessage.createdAt,
                 isOutgoing: isOutgoing,
                 status: chatMessage.status,
-                showsTime: true  // rebuildItems()에서 다시 계산됨
+                showsTime: true,  // rebuildItems()에서 다시 계산됨
+                showsProfile: true  // rebuildItems()에서 다시 계산됨
             )
         }
     }
@@ -550,10 +560,11 @@ final class ChatRoomViewController: BaseViewController {
 
             var updatedMessage = message
 
-            // 이전 메시지가 failed였는지 체크
+            // 이전 메시지 체크
             let previousMessage = index > 0 ? sortedMessages[index - 1] : nil
             let isPreviousFailed = previousMessage?.status == .failed
 
+            // showsTime 계산
             if index < sortedMessages.count - 1 {
                 let nextMessage = sortedMessages[index + 1]
                 let isSameMinute = calendar.isDate(
@@ -570,6 +581,21 @@ final class ChatRoomViewController: BaseViewController {
                 }
             } else {
                 updatedMessage.showsTime = true
+            }
+
+            // showsProfile 계산 (상대방 메시지만 해당)
+            if !message.isOutgoing {
+                // 상대방 메시지
+                if let prev = previousMessage, !prev.isOutgoing {
+                    // 이전 메시지도 상대방 메시지 → 프로필 숨김
+                    updatedMessage.showsProfile = false
+                } else {
+                    // 이전 메시지가 없거나 내 메시지 → 프로필 표시
+                    updatedMessage.showsProfile = true
+                }
+            } else {
+                // 내 메시지는 항상 프로필 숨김
+                updatedMessage.showsProfile = false
             }
 
             result.append(.message(updatedMessage))
@@ -597,6 +623,24 @@ final class ChatRoomViewController: BaseViewController {
         scrollToBottom(animated: false)
         didScrollToBottomOnAppear = true
         needsInitialScrollOnAppear = false
+    }
+
+    /// 스크롤뷰가 최하단 근처에 있는지 확인
+    ///
+    /// 새 메시지 수신 시 자동 스크롤 여부를 판단하기 위해 사용됩니다.
+    /// 사용자가 이전 메시지를 보고 있을 때는 자동 스크롤하지 않습니다.
+    ///
+    /// - Returns: 최하단 100pt 이내면 true
+    private func isNearBottom() -> Bool {
+        let scrollView = messageTableView
+        let contentHeight = scrollView.contentSize.height
+        let scrollViewHeight = scrollView.bounds.height
+        let contentOffsetY = scrollView.contentOffset.y
+        let bottomInset = scrollView.contentInset.bottom
+
+        // 하단 100pt 이내면 "최하단 근처"로 간주
+        let threshold: CGFloat = 100
+        return contentOffsetY + scrollViewHeight + bottomInset >= contentHeight - threshold
     }
 
     /// 푸시 알림으로 진입 시 스크롤을 최하단으로 이동 (애니메이션 없음)
@@ -922,6 +966,7 @@ extension ChatRoomViewController: UITableViewDataSource {
                     date: message.date,
                     isOutgoing: message.isOutgoing,
                     showsTime: message.showsTime,
+                    showsProfile: message.showsProfile,
                     opponentProfileImagePath: chatRoom.opponent.profileImage
                 )
 

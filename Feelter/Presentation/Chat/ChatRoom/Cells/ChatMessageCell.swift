@@ -54,6 +54,7 @@ struct ChatMessageViewItem {
     let isOutgoing: Bool
     var status: MessageSendStatus
     var showsTime: Bool
+    var showsProfile: Bool  // 프로필 이미지 표시 여부
 
     /// 파일 첨부가 있는지 여부 (이미지 제외 파일)
     var hasFiles: Bool {
@@ -191,12 +192,22 @@ final class ChatMessageCell: UITableViewCell {
             }
         }
 
+        // 프로필 이미지 표시 로직
         if item.isOutgoing {
+            profileImageView.isHidden = true
             profileImageView.image = nil
-        } else if let path = opponentProfileImagePath, !path.isEmpty {
-            profileImageView.setFeelterImage(with: path)
         } else {
-            profileImageView.image = UIImage(named: "appIcon")
+            // 상대방 메시지: showsProfile에 따라 표시/숨김
+            profileImageView.isHidden = !item.showsProfile
+            if item.showsProfile {
+                if let path = opponentProfileImagePath, !path.isEmpty {
+                    profileImageView.setFeelterImage(with: path)
+                } else {
+                    profileImageView.image = UIImage(named: "appIcon")
+                }
+            } else {
+                profileImageView.image = nil
+            }
         }
     }
 
@@ -498,9 +509,6 @@ final class ChatMessageCell: UITableViewCell {
         }
         bubbleMaxWidthConstraint?.deactivate()
         bubbleMaxWidthConstraint = nil
-
-        // 프로필 이미지는 스택뷰에 추가하지 않고 visibility만 조절
-        profileImageView.isHidden = isOutgoing
 
         // 텍스트 버블 정렬 (보내는 메시지는 오른쪽, 받는 메시지는 왼쪽)
         bubbleStackView.alignment = isOutgoing ? .trailing : .leading

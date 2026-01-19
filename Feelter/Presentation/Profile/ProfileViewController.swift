@@ -485,6 +485,9 @@ final class ProfileViewController: BaseViewController {
     }
 
     private func showAlert(message: String) {
+        // 뷰가 윈도우에 올라와 있는지 확인 (detached view controller 방지)
+        guard view.window != nil, isViewLoaded else { return }
+
         let alert = UIAlertController(
             title: "안내",
             message: message,

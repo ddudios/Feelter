@@ -120,7 +120,7 @@ final class ProfileViewModel: ViewModelProtocol {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessageSubject.send("프로필 정보를 불러오는데 실패했습니다: \(error.localizedDescription)")
+                    errorMessageSubject.send("프로필 정보를 불러오는데 실패했습니다.")
                 }
             }
         }
@@ -137,16 +137,33 @@ final class ProfileViewModel: ViewModelProtocol {
     private func fetchAllUserFilters(userId: String) async throws -> [FilterSummary] {
         var filters: [FilterSummary] = []
         var nextCursor: String?
+        var iterationCount = 0
+        let maxIterations = 20  // 최대 20번만 호출 (50개씩 = 최대 1000개 필터)
 
         repeat {
+            // 무한 루프 방지
+            iterationCount += 1
+            if iterationCount > maxIterations {
+                break
+            }
+
             let result = try await filterUsecase.fetchUserFilters(
                 userId: userId,
                 next: nextCursor,
                 limit: "50"
             )
+
             filters.append(contentsOf: result.filters)
-            nextCursor = result.nextCursor
-        } while nextCursor != nil
+
+            // nextCursor가 nil, 빈 문자열, 또는 "0"이면 종료
+            if let cursor = result.nextCursor,
+               !cursor.isEmpty,
+               cursor != "0" {
+                nextCursor = cursor
+            } else {
+                break
+            }
+        } while true
 
         return filters
     }

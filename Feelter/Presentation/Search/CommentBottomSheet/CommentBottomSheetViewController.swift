@@ -17,6 +17,8 @@ final class CommentBottomSheetViewController: UIViewController {
         static let handleTopInset: CGFloat = 8
         static let horizontalInset: CGFloat = 16
         static let verticalInset: CGFloat = 12
+        static let profileImageSize: CGFloat = 32
+        static let profileImageSpacing: CGFloat = 8
         static let inputContainerHeight: CGFloat = 56
         static let inputTextViewMinHeight: CGFloat = 36
         static let inputTextViewMaxHeight: CGFloat = 100
@@ -27,6 +29,7 @@ final class CommentBottomSheetViewController: UIViewController {
 
     private let postId: String
     private let postUsecase: PostUsecaseProtocol
+    private let profileUsecase: ProfileUsecaseProtocol
     private var comments: [Comment] = []
     private var cancellables = Set<AnyCancellable>()
 
@@ -35,7 +38,9 @@ final class CommentBottomSheetViewController: UIViewController {
     private let tableView = UITableView()
     private let contentView = UIView()
     private let inputContainerView = UIView()
+    private let profileImageView = UIImageView()
     private let inputTextView = UITextView()
+    private let placeholderLabel = UILabel()
     private let sendButton = UIButton(type: .system)
 
     private var inputContainerBottomConstraint: Constraint?
@@ -44,9 +49,14 @@ final class CommentBottomSheetViewController: UIViewController {
         return KeychainManager.shared.read(account: "userId")
     }
 
-    init(postId: String, postUsecase: PostUsecaseProtocol = DIContainer.shared.resolve(PostUsecaseProtocol.self)) {
+    init(
+        postId: String,
+        postUsecase: PostUsecaseProtocol = DIContainer.shared.resolve(PostUsecaseProtocol.self),
+        profileUsecase: ProfileUsecaseProtocol = DIContainer.shared.resolve(ProfileUsecaseProtocol.self)
+    ) {
         self.postId = postId
         self.postUsecase = postUsecase
+        self.profileUsecase = profileUsecase
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -62,6 +72,7 @@ final class CommentBottomSheetViewController: UIViewController {
         setupKeyboardNotifications()
         setupGestures()
         loadComments()
+        loadMyProfileImage()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -80,8 +91,10 @@ final class CommentBottomSheetViewController: UIViewController {
         contentView.addSubview(tableView)
         contentView.addSubview(inputContainerView)
 
+        inputContainerView.addSubview(profileImageView)
         inputContainerView.addSubview(inputTextView)
         inputContainerView.addSubview(sendButton)
+        inputTextView.addSubview(placeholderLabel)
     }
 
     private func configureLayout() {
@@ -108,11 +121,23 @@ final class CommentBottomSheetViewController: UIViewController {
             make.height.greaterThanOrEqualTo(Layout.inputContainerHeight)
         }
 
+        profileImageView.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(Layout.horizontalInset)
+            make.centerY.equalTo(inputTextView)
+            make.size.equalTo(Layout.profileImageSize)
+        }
+
         inputTextView.snp.makeConstraints { make in
             make.top.bottom.equalToSuperview().inset(Layout.verticalInset)
-            make.leading.equalToSuperview().inset(Layout.horizontalInset)
+            make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.profileImageSpacing)
             make.trailing.equalTo(sendButton.snp.leading).offset(-8)
             make.height.greaterThanOrEqualTo(Layout.inputTextViewMinHeight)
+        }
+
+        placeholderLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(8)
+            make.trailing.equalToSuperview().offset(-8)
+            make.centerY.equalToSuperview()
         }
 
         sendButton.snp.makeConstraints { make in
@@ -155,6 +180,14 @@ final class CommentBottomSheetViewController: UIViewController {
 
         inputContainerView.backgroundColor = .Feelter.gray100
 
+        profileImageView.image = UIImage(named: "appIcon")
+        profileImageView.contentMode = .scaleAspectFill
+        profileImageView.clipsToBounds = true
+        profileImageView.layer.cornerRadius = Layout.profileImageSize / 2
+        profileImageView.layer.borderWidth = 1
+        profileImageView.layer.borderColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5).cgColor
+        profileImageView.backgroundColor = .Feelter.gray100
+
         inputTextView.font = TextStyle.Pretendard.body2
         inputTextView.textColor = .Feelter.gray0
         inputTextView.backgroundColor = .Feelter.blackTurquoise
@@ -167,10 +200,34 @@ final class CommentBottomSheetViewController: UIViewController {
         inputTextView.delegate = self
         inputTextView.tintColor = .Feelter.gray100
 
+        placeholderLabel.text = "댓글 입력"
+        placeholderLabel.font = TextStyle.Pretendard.body2
+        placeholderLabel.textColor = .Feelter.gray100
+        placeholderLabel.isUserInteractionEnabled = false
+
         sendButton.setImage(UIImage.Icon.message, for: .normal)
         sendButton.tintColor = .Feelter.brightTurquoise
         sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
         sendButton.isEnabled = false
+    }
+
+    private func loadMyProfileImage() {
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let profile = try await profileUsecase.fetchMyProfile()
+                await MainActor.run {
+                    if let path = profile.profileImageURL, !path.isEmpty {
+                        self.profileImageView.setFeelterImage(with: path)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.profileImageView.image = UIImage(named: "appIcon")
+                }
+            }
+        }
     }
 
     private func loadComments() {
@@ -208,6 +265,7 @@ final class CommentBottomSheetViewController: UIViewController {
                     inputTextView.text = ""
                     inputTextView.isEditable = true
                     sendButton.isEnabled = false
+                    placeholderLabel.isHidden = false
                     loadComments()
                     onCommentAdded?()
                 }
@@ -442,5 +500,6 @@ extension CommentBottomSheetViewController: UITextViewDelegate {
     func textViewDidChange(_ textView: UITextView) {
         let content = textView.text.trimmingCharacters(in: .whitespacesAndNewlines)
         sendButton.isEnabled = !content.isEmpty
+        placeholderLabel.isHidden = !textView.text.isEmpty
     }
 }

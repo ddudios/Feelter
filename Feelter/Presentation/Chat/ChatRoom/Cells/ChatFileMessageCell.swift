@@ -136,6 +136,7 @@ final class ChatFileMessageCell: UITableViewCell {
         date: Date,
         isOutgoing: Bool,
         showsTime: Bool,
+        showsProfile: Bool,
         opponentProfileImagePath: String?
     ) {
         currentIsOutgoing = isOutgoing
@@ -149,16 +150,21 @@ final class ChatFileMessageCell: UITableViewCell {
         // 레이아웃 방향
         updateLayoutDirection(isOutgoing: isOutgoing)
 
-        // 프로필 이미지 (수신만)
+        // 프로필 이미지 표시 로직
         if isOutgoing {
-            profileImageView.image = nil
             profileImageView.isHidden = true
+            profileImageView.image = nil
         } else {
-            profileImageView.isHidden = false
-            if let path = opponentProfileImagePath, !path.isEmpty {
-                profileImageView.setFeelterImage(with: path)
+            // 상대방 메시지: showsProfile에 따라 표시/숨김
+            profileImageView.isHidden = !showsProfile
+            if showsProfile {
+                if let path = opponentProfileImagePath, !path.isEmpty {
+                    profileImageView.setFeelterImage(with: path)
+                } else {
+                    profileImageView.image = UIImage(named: "appIcon")
+                }
             } else {
-                profileImageView.image = UIImage(named: "appIcon")
+                profileImageView.image = nil
             }
         }
     }
