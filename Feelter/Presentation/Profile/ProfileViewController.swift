@@ -538,6 +538,14 @@ extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDel
         cell.configure(tag: hashTags[indexPath.item])
         return cell
     }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard collectionView === filtersCollectionView else { return }
+
+        let filter = filters[indexPath.item]
+        let filterDetailVC = FilterDetailViewController(filterId: filter.id)
+        navigationController?.pushViewController(filterDetailVC, animated: true)
+    }
 }
 
 // MARK: - UICollectionView Cells

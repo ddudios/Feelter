@@ -528,7 +528,12 @@ final class FilterDetailViewController: BaseViewController {
             case .presets:
                 guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FilterPresetsCell.identifier, for: indexPath) as? FilterPresetsCell else { return UICollectionViewCell() }
                 if let filterDetail = self?.currentFilterDetail {
-                    let isLocked = !filterDetail.isDownloaded
+                    // 본인 필터인지 확인
+                    let currentUserId = KeychainManager.shared.read(account: "userId")
+                    let isOwnFilter = currentUserId == filterDetail.creator.id
+
+                    // 본인 필터면 lock 해제, 아니면 구매 여부로 판단
+                    let isLocked = isOwnFilter ? false : !filterDetail.isDownloaded
                     cell.configure(values: filterDetail.filterValues, isLocked: isLocked)
                 } else {
                     cell.configure(values: nil, isLocked: true)
@@ -604,10 +609,23 @@ final class FilterDetailViewController: BaseViewController {
     private func reconfigurePurchaseSection() {
         var snapshot = dataSource.snapshot()
         let item = Item.purchase(filterId)
-        if snapshot.indexOfItem(item) == nil {
-            snapshot.appendItems([item], toSection: .purchase)
+
+        // 본인 필터인지 확인
+        let currentUserId = KeychainManager.shared.read(account: "userId")
+        let isOwnFilter = currentUserId == currentFilterDetail?.creator.id
+
+        if isOwnFilter {
+            // 본인 필터면 purchase 아이템 제거
+            if snapshot.indexOfItem(item) != nil {
+                snapshot.deleteItems([item])
+            }
         } else {
-            snapshot.reloadItems([item])
+            // 다른 사람 필터면 추가 또는 업데이트
+            if snapshot.indexOfItem(item) == nil {
+                snapshot.appendItems([item], toSection: .purchase)
+            } else {
+                snapshot.reloadItems([item])
+            }
         }
         dataSource.apply(snapshot, animatingDifferences: false)
     }
