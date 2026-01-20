@@ -63,7 +63,7 @@ final class ProfileEditViewController: BaseViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "프로필 수정"
+        title = "EDIT"
         setupNavigationBar()
         loadProfile()
     }
@@ -149,7 +149,7 @@ final class ProfileEditViewController: BaseViewController {
             target: self,
             action: #selector(saveButtonTapped)
         )
-        saveButton.tintColor = .Feelter.blackTurquoise
+        saveButton.tintColor = .Feelter.gray75
         navigationItem.rightBarButtonItem = saveButton
     }
 
