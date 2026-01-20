@@ -118,6 +118,14 @@ final class ProfileViewController: BaseViewController {
         viewDidLoadSubject.send(())
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 프로필 수정 후 돌아왔을 때 업데이트된 내용 반영
+        if isViewLoaded {
+            viewDidLoadSubject.send(())
+        }
+    }
+
     override func configureHierarchy() {
         super.configureHierarchy()
         view.addSubview(scrollView)
@@ -389,8 +397,14 @@ final class ProfileViewController: BaseViewController {
 
         backgroundImageView.image = UIImage(named: "appIcon")
         backgroundImageView.backgroundColor = .clear
-        if user.hasProfileImage, let path = user.profileImageURL {
-            backgroundImageView.setFeelterImage(with: path)
+        if let path = user.profileImageURL, !path.isEmpty {
+            let screenWidth = UIScreen.main.bounds.width
+            backgroundImageView.setFeelterImage(
+                with: path,
+                targetSize: CGSize(width: screenWidth, height: Layout.backgroundHeight)
+            )
+        } else {
+            backgroundImageView.image = UIImage(named: "appIcon")
         }
 
         hashTags = user.hashTags

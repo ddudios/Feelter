@@ -123,6 +123,9 @@ final class JoinViewController: BaseViewController {
         keyboardType: .default
     )
 
+    private let requiredSectionLabel = SectionTitleLabel(title: "필수 항목")
+    private let optionalSectionLabel = SectionTitleLabel(title: "선택 사항")
+
     private let joinButton = FeelterButton(title: "회원가입")
 
     private lazy var contentStackView: UIStackView = {
@@ -148,7 +151,7 @@ final class JoinViewController: BaseViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "회원가입"
+        title = ""
         setupBindings()
     }
 
@@ -160,6 +163,9 @@ final class JoinViewController: BaseViewController {
         contentView.addSubview(contentStackView)
 
         contentStackView.addArrangedSubview(titleLabel)
+
+        // 필수 항목 섹션
+        contentStackView.addArrangedSubview(requiredSectionLabel)
 
         // 이메일 섹션
         let emailContainer = createEmailContainer()
@@ -176,8 +182,11 @@ final class JoinViewController: BaseViewController {
         contentStackView.addArrangedSubview(nicknameTextField)
         contentStackView.addArrangedSubview(nicknameValidationLabel)
 
-        // 나머지 필드
+        // 이름 필드
         contentStackView.addArrangedSubview(nameTextField)
+
+        // 선택 사항 섹션
+        contentStackView.addArrangedSubview(optionalSectionLabel)
         contentStackView.addArrangedSubview(introductionTextField)
         contentStackView.addArrangedSubview(phoneTextField)
         contentStackView.addArrangedSubview(hashTagsTextField)
@@ -186,10 +195,19 @@ final class JoinViewController: BaseViewController {
 
         // 커스텀 간격
         contentStackView.setCustomSpacing(24, after: titleLabel)
+        contentStackView.setCustomSpacing(8, after: requiredSectionLabel)
         contentStackView.setCustomSpacing(4, after: emailContainer)
+        contentStackView.setCustomSpacing(8, after: emailValidationLabel)
         contentStackView.setCustomSpacing(4, after: passwordTextField)
+        contentStackView.setCustomSpacing(8, after: passwordValidationLabel)
         contentStackView.setCustomSpacing(4, after: passwordConfirmTextField)
+        contentStackView.setCustomSpacing(8, after: passwordMatchLabel)
         contentStackView.setCustomSpacing(4, after: nicknameTextField)
+        contentStackView.setCustomSpacing(8, after: nicknameValidationLabel)
+        contentStackView.setCustomSpacing(24, after: nameTextField)
+        contentStackView.setCustomSpacing(8, after: optionalSectionLabel)
+        contentStackView.setCustomSpacing(8, after: introductionTextField)
+        contentStackView.setCustomSpacing(8, after: phoneTextField)
         contentStackView.setCustomSpacing(24, after: hashTagsTextField)
     }
 

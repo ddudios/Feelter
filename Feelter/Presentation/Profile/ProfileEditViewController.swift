@@ -17,6 +17,7 @@ final class ProfileEditViewController: BaseViewController {
     private var currentUser: User?
     private var selectedImage: UIImage?
     private var uploadedImagePath: String?
+    private var isImageRemoved: Bool = false
 
     // MARK: - UI Components
     private let scrollView = UIScrollView()
@@ -143,11 +144,12 @@ final class ProfileEditViewController: BaseViewController {
     // MARK: - Setup
     private func setupNavigationBar() {
         let saveButton = UIBarButtonItem(
-            title: "저장",
-            style: .done,
+            image: UIImage.Icon.save,
+            style: .plain,
             target: self,
             action: #selector(saveButtonTapped)
         )
+        saveButton.tintColor = .Feelter.blackTurquoise
         navigationItem.rightBarButtonItem = saveButton
     }
 
@@ -169,6 +171,31 @@ final class ProfileEditViewController: BaseViewController {
 
     // MARK: - Actions
     @objc private func profileImageButtonTapped() {
+        let actionSheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        let selectPhotoAction = UIAlertAction(title: "사진 선택", style: .default) { [weak self] _ in
+            self?.presentPhotoPicker()
+        }
+
+        let removePhotoAction = UIAlertAction(title: "사진 제거", style: .destructive) { [weak self] _ in
+            self?.removeProfileImage()
+        }
+
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        actionSheet.addAction(selectPhotoAction)
+
+        // 현재 프로필 이미지가 있을 때만 "사진 제거" 옵션 표시
+        if currentUser?.hasProfileImage == true || selectedImage != nil {
+            actionSheet.addAction(removePhotoAction)
+        }
+
+        actionSheet.addAction(cancelAction)
+
+        present(actionSheet, animated: true)
+    }
+
+    private func presentPhotoPicker() {
         var configuration = PHPickerConfiguration()
         configuration.filter = .images
         configuration.selectionLimit = 1
@@ -176,6 +203,17 @@ final class ProfileEditViewController: BaseViewController {
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = self
         present(picker, animated: true)
+    }
+
+    private func removeProfileImage() {
+        isImageRemoved = true
+        selectedImage = nil
+        uploadedImagePath = nil
+
+        // 기본 아이콘으로 변경
+        profileImageButton.setImage(UIImage(named: "appIcon"), for: .normal)
+        profileImageButton.tintColor = .clear
+        profileImageButton.imageView?.contentMode = .scaleAspectFill
     }
 
     @objc private func saveButtonTapped() {
@@ -205,14 +243,11 @@ final class ProfileEditViewController: BaseViewController {
         hashTagsTextField.text = user.hashTags.joined(separator: ", ")
 
         // Load profile image
-        if let profileImageURL = user.profileImageURL,
-           !profileImageURL.isEmpty,
-           let url = URL(string: profileImageURL, relativeTo: Config.baseURL) {
-            profileImageButton.kf.setImage(with: url, for: .normal, placeholder: UIImage(systemName: "person.circle.fill"))
-        } else {
-            profileImageButton.setImage(UIImage(systemName: "person.circle.fill"), for: .normal)
-            profileImageButton.tintColor = .Feelter.gray75
-        }
+        profileImageButton.setFeelterImage(
+            with: user.profileImageURL,
+            targetSize: CGSize(width: 120, height: 120),
+            defaultImage: UIImage(named: "appIcon")
+        )
     }
 
     // MARK: - Data Saving
@@ -226,8 +261,11 @@ final class ProfileEditViewController: BaseViewController {
             // 1. 이미지가 선택되었으면 먼저 업로드
             var imagePath: String? = uploadedImagePath ?? currentUser?.profileImageURL
 
-            if let selectedImage = selectedImage,
-               let imageData = selectedImage.jpegData(compressionQuality: 0.8) {
+            if isImageRemoved {
+                // 프로필 사진 제거
+                imagePath = ""
+            } else if let selectedImage = selectedImage,
+                      let imageData = selectedImage.jpegData(compressionQuality: 0.8) {
                 showLoading(message: "이미지 업로드 중...")
                 imagePath = try await userRepository.uploadProfileImage(imageData)
                 hideLoading()
@@ -252,6 +290,7 @@ final class ProfileEditViewController: BaseViewController {
             currentUser = updatedUser
             uploadedImagePath = nil
             selectedImage = nil
+            isImageRemoved = false
 
             showAlert(message: "프로필이 저장되었습니다.") { [weak self] in
                 self?.navigationController?.popViewController(animated: true)
@@ -308,7 +347,9 @@ extension ProfileEditViewController: PHPickerViewControllerDelegate {
             if let image = object as? UIImage {
                 DispatchQueue.main.async {
                     self?.selectedImage = image
+                    self?.isImageRemoved = false
                     self?.profileImageButton.setImage(image, for: .normal)
+                    self?.profileImageButton.tintColor = .clear
                     self?.profileImageButton.imageView?.contentMode = .scaleAspectFill
                 }
             }
