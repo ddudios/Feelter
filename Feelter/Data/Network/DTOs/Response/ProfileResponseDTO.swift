@@ -11,7 +11,7 @@ struct ProfileResponseDTO: Decodable {
     let userId: String
     let email: String?
     let nick: String
-    let name: String
+    let name: String?
     let introduction: String?
     let profileImage: String?
     let phoneNum: String?

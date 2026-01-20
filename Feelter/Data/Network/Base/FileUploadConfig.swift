@@ -41,12 +41,12 @@ struct FileUploadConfig {
 
     /// 필터 파일 업로드 설정
     /// - 확장자: jpg, png, jpeg
-    /// - 최대 크기: 2MB
+    /// - 최대 크기: 5MB
     /// - 최대 개수: 2개
     static let filter = FileUploadConfig(
         parameterName: "files",
         allowedExtensions: ["jpg", "png", "jpeg"],
-        maxFileSize: 2 * 1024 * 1024,  // 2MB
+        maxFileSize: 5 * 1024 * 1024,  // 5MB
         maxFileCount: 2
     )
 
