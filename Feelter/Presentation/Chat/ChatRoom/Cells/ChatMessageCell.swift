@@ -65,6 +65,7 @@ struct ChatMessageViewItem {
 enum ChatImageSource {
     case local(UIImage)
     case remote(String)
+    case video(thumbnailImage: UIImage?, videoURL: String, isLocal: Bool)
 }
 
 final class ChatMessageCell: UITableViewCell {

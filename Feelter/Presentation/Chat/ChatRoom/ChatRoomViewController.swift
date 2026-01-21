@@ -11,6 +11,7 @@ import PhotosUI
 import Combine
 import UniformTypeIdentifiers
 import QuickLook
+import AVKit
 
 final class ChatRoomViewController: BaseViewController {
 
@@ -60,6 +61,7 @@ final class ChatRoomViewController: BaseViewController {
         }
     }
     private var pendingImages: [ChatImageSource] = []
+    private var pendingVideos: [(url: URL, thumbnail: UIImage?)] = []
     private var didScrollToBottomOnAppear = false
     private var needsInitialScrollOnAppear = false
     private var shouldScrollToBottomAfterNextReload = false
@@ -454,6 +456,9 @@ final class ChatRoomViewController: BaseViewController {
                 // 이미지 확장자 판별
                 let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic"]
 
+                // 비디오 확장자 판별
+                let videoExtensions = ["mp4", "mov", "m4a", "mp3"]
+
                 // PDF 판별: URL 확장자가 pdf이거나, content가 .pdf로 끝나는 경우
                 let isPDF = urlExt == "pdf" || isPDFByContent
 
@@ -465,6 +470,9 @@ final class ChatRoomViewController: BaseViewController {
                         fileURL: fileUrl,
                         mimeType: "application/pdf"
                     ))
+                } else if videoExtensions.contains(urlExt) {
+                    // 비디오 파일은 썸네일과 함께 표시
+                    images.append(.video(thumbnailImage: nil, videoURL: fileUrl, isLocal: false))
                 } else if imageExtensions.contains(urlExt) {
                     images.append(.remote(fileUrl))
                 } else {
@@ -897,7 +905,12 @@ final class ChatRoomViewController: BaseViewController {
         textViewHeightConstraint?.update(offset: Layout.textViewMinHeight)
         messageTextView.isScrollEnabled = false
 
-        // ViewModel에게 전송 이벤트 전달
+        // 비디오가 있으면 먼저 전송
+        if !pendingVideos.isEmpty {
+            uploadAndSendVideos()
+        }
+
+        // ViewModel에게 전송 이벤트 전달 (텍스트 + 이미지)
         sendButtonTappedSubject.send()
 
         // UI 초기화 (애니메이션 없이 즉시 처리)
@@ -906,6 +919,7 @@ final class ChatRoomViewController: BaseViewController {
             messageTextSubject.send("")
             placeholderLabel.isHidden = false
             pendingImages.removeAll()
+            pendingVideos.removeAll()
             selectedImagesSubject.send([])
             updateSelectedImagesPreview()
             updateSendButtonState()
@@ -990,7 +1004,13 @@ extension ChatRoomViewController: UITableViewDataSource {
                 self?.retryMessage(id: message.id)
             }
             cell.onImageTapped = { [weak self] images, tappedIndex in
-                self?.showImageViewer(images: images, selectedIndex: tappedIndex)
+                guard let self = self else { return }
+                // 탭한 아이템이 비디오인지 확인
+                if case .video(_, let videoURL, let isLocal) = images[tappedIndex] {
+                    self.playVideo(videoURL: videoURL, isLocal: isLocal)
+                } else {
+                    self.showImageViewer(images: images, selectedIndex: tappedIndex)
+                }
             }
             return cell
         }
@@ -1122,8 +1142,8 @@ private extension ChatRoomViewController {
 
         let images = selectedImagesSubject.value
 
-        // 2. 이미지가 없으면 숨김
-        if images.isEmpty {
+        // 2. 이미지와 비디오가 모두 없으면 숨김
+        if images.isEmpty && pendingVideos.isEmpty {
             selectedImagesScrollView.isHidden = true
             selectedImagesHeightConstraint?.update(offset: 0)
             UIView.animate(withDuration: 0.25) {
@@ -1132,13 +1152,22 @@ private extension ChatRoomViewController {
             return
         }
 
-        // 3. 이미지가 있으면 썸네일 생성
+        // 3. 이미지 썸네일 생성
         for (index, image) in images.enumerated() {
-            let thumbnailContainer = createThumbnailView(image: image, index: index)
+            let thumbnailContainer = createThumbnailView(image: image, index: index, isVideo: false)
             selectedImagesStackView.addArrangedSubview(thumbnailContainer)
         }
 
-        // 4. 스크롤뷰 표시 및 높이 조정
+        // 4. 비디오 썸네일 생성
+        for (index, (_, thumbnail)) in pendingVideos.enumerated() {
+            let globalIndex = images.count + index
+            if let thumb = thumbnail {
+                let thumbnailContainer = createThumbnailView(image: thumb, index: globalIndex, isVideo: true)
+                selectedImagesStackView.addArrangedSubview(thumbnailContainer)
+            }
+        }
+
+        // 5. 스크롤뷰 표시 및 높이 조정
         selectedImagesScrollView.isHidden = false
         selectedImagesHeightConstraint?.update(offset: 88) // 80(썸네일) + 8(여백)
         UIView.animate(withDuration: 0.25) {
@@ -1152,8 +1181,9 @@ private extension ChatRoomViewController {
     /// - 컨테이너 (80x80)
     ///   - UIImageView (꽉 채움, rounded corners)
     ///   - X 버튼 (우상단, 24x24)
+    ///   - 재생 아이콘 (비디오인 경우)
     ///
-    func createThumbnailView(image: UIImage, index: Int) -> UIView {
+    func createThumbnailView(image: UIImage, index: Int, isVideo: Bool) -> UIView {
         let containerView = UIView()
         containerView.backgroundColor = .clear
 
@@ -1169,6 +1199,18 @@ private extension ChatRoomViewController {
         imageView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
             make.width.height.equalTo(80)
+        }
+
+        // 비디오인 경우 재생 아이콘 추가
+        if isVideo {
+            let playIconView = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+            playIconView.tintColor = .white
+            playIconView.contentMode = .scaleAspectFit
+            containerView.addSubview(playIconView)
+            playIconView.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+                make.width.height.equalTo(32)
+            }
         }
 
         // X 버튼
@@ -1190,18 +1232,32 @@ private extension ChatRoomViewController {
         return containerView
     }
 
-    /// X 버튼 탭 시 해당 이미지 제거
+    /// X 버튼 탭 시 해당 이미지/비디오 제거
     @objc func removeImageButtonTapped(_ sender: UIButton) {
         let index = sender.tag
         var images = selectedImagesSubject.value
 
-        guard index < images.count else { return }
+        // pendingImages의 총 개수
+        let totalCount = images.count + pendingVideos.count
 
-        images.remove(at: index)
-        selectedImagesSubject.send(images)
+        guard index < totalCount else { return }
 
-        // pendingImages도 동기화
-        pendingImages.remove(at: index)
+        // 이미지 개수보다 작으면 이미지 제거
+        if index < images.count {
+            images.remove(at: index)
+            selectedImagesSubject.send(images)
+            pendingImages.remove(at: index)
+        } else {
+            // 비디오 제거
+            let videoIndex = index - images.count
+            if videoIndex < pendingVideos.count {
+                pendingVideos.remove(at: videoIndex)
+                // pendingImages에서도 제거
+                if index < pendingImages.count {
+                    pendingImages.remove(at: index)
+                }
+            }
+        }
 
         updateSelectedImagesPreview()
         updateSendButtonState()
@@ -1216,29 +1272,64 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
         guard !results.isEmpty else { return }
 
         let dispatchGroup = DispatchGroup()
-        var loadedImages: [UIImage?] = Array(repeating: nil, count: results.count)
+        var loadedItems: [(image: UIImage?, videoURL: URL?)] = Array(repeating: (nil, nil), count: results.count)
 
         for (index, result) in results.enumerated() {
             let provider = result.itemProvider
+
+            // 비디오 확인
+            if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) ||
+               provider.hasItemConformingToTypeIdentifier(UTType.video.identifier) {
+                dispatchGroup.enter()
+                loadVideo(from: provider) { videoURL in
+                    defer { dispatchGroup.leave() }
+                    if let url = videoURL {
+                        loadedItems[index] = (nil, url)
+                    }
+                }
+                continue
+            }
+
+            // 이미지 확인
             guard provider.canLoadObject(ofClass: UIImage.self) else { continue }
 
             dispatchGroup.enter()
             provider.loadObject(ofClass: UIImage.self) { object, _ in
+                defer { dispatchGroup.leave() }
                 if let image = object as? UIImage {
-                    loadedImages[index] = image
+                    loadedItems[index] = (image, nil)
                 }
-                dispatchGroup.leave()
             }
         }
 
         dispatchGroup.notify(queue: .main) { [weak self] in
             guard let self else { return }
-            let images = loadedImages.compactMap { $0 }
 
-            // pendingImages 업데이트 (UI용)
-            self.pendingImages = images.map { .local($0) }
+            // 이미지와 비디오를 분리
+            let images = loadedItems.compactMap { $0.image }
+            let videoURLs = loadedItems.compactMap { $0.videoURL }
 
-            // ViewModel에 UIImage 배열 전달
+            // 기존 pendingVideos 초기화 후 새로운 비디오 추가
+            var newPendingVideos: [(url: URL, thumbnail: UIImage?)] = []
+
+            // 비디오 썸네일 생성
+            for videoURL in videoURLs {
+                let thumbnail = self.makeVideoThumbnail(from: videoURL)
+                newPendingVideos.append((url: videoURL, thumbnail: thumbnail))
+            }
+
+            self.pendingVideos = newPendingVideos
+
+            // pendingImages 업데이트 (이미지 + 비디오 썸네일)
+            var allImages = images.map { ChatImageSource.local($0) }
+            for (_, thumbnail) in newPendingVideos {
+                if let thumb = thumbnail {
+                    allImages.append(.local(thumb))
+                }
+            }
+            self.pendingImages = allImages
+
+            // ViewModel에 UIImage 배열 전달 (이미지만 - 기존 동작 유지)
             self.selectedImagesSubject.send(images)
 
             // 이미지 미리보기 UI 업데이트
@@ -1246,6 +1337,99 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
 
             self.updateSendButtonState()
         }
+    }
+
+    private func loadVideo(from provider: NSItemProvider, completion: @escaping (URL?) -> Void) {
+        let typeIdentifier = provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
+            ? UTType.movie.identifier
+            : UTType.video.identifier
+
+        provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { fileURL, _ in
+            guard let fileURL else {
+                completion(nil)
+                return
+            }
+
+            // 비디오를 임시 디렉토리에 복사 (원본 URL은 접근 권한이 제한됨)
+            let tempDirectory = FileManager.default.temporaryDirectory
+            let fileName = fileURL.lastPathComponent
+            let tempURL = tempDirectory.appendingPathComponent(fileName)
+
+            do {
+                // 기존 파일 삭제
+                if FileManager.default.fileExists(atPath: tempURL.path) {
+                    try FileManager.default.removeItem(at: tempURL)
+                }
+
+                // 복사
+                try FileManager.default.copyItem(at: fileURL, to: tempURL)
+                completion(tempURL)
+            } catch {
+                print("❌ [ChatRoom] 비디오 파일 복사 실패: \(error)")
+                completion(nil)
+            }
+        }
+    }
+
+    private func makeVideoThumbnail(from fileURL: URL) -> UIImage? {
+        let asset = AVAsset(url: fileURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        let time = CMTime(seconds: 0, preferredTimescale: 600)
+        if let imageRef = try? generator.copyCGImage(at: time, actualTime: nil) {
+            return UIImage(cgImage: imageRef)
+        }
+        return nil
+    }
+
+    private func uploadAndSendVideos() {
+        guard !pendingVideos.isEmpty else { return }
+
+        for (videoURL, _) in pendingVideos {
+            do {
+                let videoData = try Data(contentsOf: videoURL)
+                let fileName = videoURL.lastPathComponent
+                let fileExtension = videoURL.pathExtension.lowercased()
+
+                // MIME Type 결정
+                let mimeType: String
+                switch fileExtension {
+                case "mp4":
+                    mimeType = "video/mp4"
+                case "mov":
+                    mimeType = "video/quicktime"
+                case "m4a":
+                    mimeType = "audio/mp4"
+                case "mp3":
+                    mimeType = "audio/mpeg"
+                default:
+                    mimeType = "video/mp4"
+                }
+
+                let sizeInMB = Double(videoData.count) / (1024 * 1024)
+                print("✅ [ChatRoom] 비디오 전송: \(fileExtension), 크기: \(String(format: "%.2f", sizeInMB))MB")
+
+                // ViewModel을 통해 파일 전송
+                viewModel.sendFile(
+                    data: videoData,
+                    fileName: fileName,
+                    mimeType: mimeType
+                ) { [weak self] success, errorMessage in
+                    DispatchQueue.main.async {
+                        if success {
+                            self?.scrollToBottom(animated: true)
+                        } else if let error = errorMessage {
+                            self?.showErrorAlert(message: error)
+                        }
+                    }
+                }
+            } catch {
+                showErrorAlert(message: "비디오 파일을 읽는데 실패했습니다.")
+            }
+        }
+
+        // 전송 후 초기화
+        pendingVideos.removeAll()
     }
 }
 
@@ -1426,6 +1610,52 @@ extension ChatRoomViewController {
         if let coordinator = chatCoordinator {
             coordinator.showImageViewer(images: images, selectedIndex: selectedIndex)
         } else {
+        }
+    }
+
+    /// 비디오 재생
+    ///
+    /// AVPlayerViewController를 사용하여 비디오를 재생합니다.
+    /// - 로컬 비디오: 임시 디렉토리의 파일 재생
+    /// - 원격 비디오: 서버 URL로 스트리밍 재생
+    ///
+    /// - Parameters:
+    ///   - videoURL: 비디오 URL (로컬 경로 또는 서버 경로)
+    ///   - isLocal: 로컬 파일 여부
+    private func playVideo(videoURL: String, isLocal: Bool) {
+        let playerURL: URL?
+
+        if isLocal {
+            // 로컬 파일
+            playerURL = URL(fileURLWithPath: videoURL)
+        } else {
+            // 서버 URL 생성
+            let baseURLString = Config.baseURL.absoluteString
+            let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
+
+            var path = videoURL
+            if path.hasPrefix("/") && !path.hasPrefix("/v1/") {
+                path = "/v1" + path
+            } else if !path.hasPrefix("/") {
+                path = "/v1/" + path
+            }
+
+            playerURL = URL(string: cleanedBase + path)
+        }
+
+        guard let url = playerURL else {
+            showErrorAlert(message: "비디오 URL이 유효하지 않습니다.")
+            return
+        }
+
+        // AVPlayer 생성
+        let player = AVPlayer(url: url)
+        let playerViewController = AVPlayerViewController()
+        playerViewController.player = player
+
+        // 재생 시작
+        present(playerViewController, animated: true) {
+            player.play()
         }
     }
 }

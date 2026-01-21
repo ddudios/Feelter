@@ -281,11 +281,12 @@ extension CoreDataManager {
         message.senderNick = senderNick
         message.senderProfileImage = senderProfileImage
 
-        // files 배열 안전하게 저장 (nil 값 필터링)
+        // files 배열 안전하게 저장 (nil 값 및 빈 문자열 필터링)
         // Transformable 속성에 nil이 포함된 배열을 저장하면 크래시 발생
         if let files = files {
-            let filteredFiles = files.filter { !$0.isEmpty }
-            message.files = filteredFiles.isEmpty ? nil : (filteredFiles as NSObject)
+            // compactMap으로 nil 제거, filter로 빈 문자열 제거
+            let filteredFiles = files.compactMap { $0 }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            message.files = filteredFiles.isEmpty ? nil : (filteredFiles as NSArray)
         } else {
             message.files = nil
         }

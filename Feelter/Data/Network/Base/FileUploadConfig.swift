@@ -62,13 +62,13 @@ struct FileUploadConfig {
     )
 
     /// 채팅 파일 업로드 설정
-    /// - 확장자: jpg, png, jpeg, gif, pdf
-    /// - 최대 크기: 5MB
+    /// - 확장자: jpg, png, jpeg, gif, pdf, mp3, mp4, m4a, mov
+    /// - 최대 크기: 50MB
     /// - 최대 개수: 5개
     static let chat = FileUploadConfig(
         parameterName: "files",
-        allowedExtensions: ["jpg", "png", "jpeg", "gif", "pdf"],
-        maxFileSize: 5 * 1024 * 1024,  // 5MB
+        allowedExtensions: ["jpg", "png", "jpeg", "gif", "pdf", "mp3", "mp4", "m4a", "mov"],
+        maxFileSize: 50 * 1024 * 1024,  // 50MB
         maxFileCount: 5
     )
 
@@ -158,6 +158,12 @@ extension FileUploadConfig {
             return "video/x-matroska"
         case "wmv":
             return "video/x-ms-wmv"
+
+        // 오디오
+        case "mp3":
+            return "audio/mpeg"
+        case "m4a":
+            return "audio/mp4"
 
         // 문서
         case "pdf":

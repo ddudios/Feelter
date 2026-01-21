@@ -18,10 +18,10 @@ final class APISession {
     private init() {
         // 1. 통신 설정
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 30 // 요청 30초 대기
+        configuration.timeoutIntervalForRequest = 120 // 요청 120초 대기 (파일 업로드 고려)
         configuration.timeoutIntervalForResource = 300 // 리소스 다운로드 대기 (큰 파일 처리 일단 5분)
         configuration.requestCachePolicy = .returnCacheDataElseLoad
-        
+
         // 2. Session 생성 (Interceptor, EventMonitor 주입)
         self.session = Session(
             configuration: configuration,

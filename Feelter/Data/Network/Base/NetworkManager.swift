@@ -178,6 +178,7 @@ final class NetworkManager: NetworkManagerProtocol {
         }
 
         let normalizedExtensions = fileExtensions.map { normalizeFileExtension($0) }
+
         for fileExtension in normalizedExtensions {
             guard config.allowedExtensions.contains(fileExtension) else {
                 throw FileUploadError.unsupportedExtension(

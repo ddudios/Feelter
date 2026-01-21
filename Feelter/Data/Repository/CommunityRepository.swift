@@ -101,15 +101,61 @@ final class CommunityRepository: CommunityRepositoryProtocol {
     }
 
     func uploadFiles(_ files: [UploadFile]) async throws -> [String] {
-        let dataList = files.map { $0.data }
-        let fileExtensions = files.map { $0.normalizedFileExtension }
+        print("📤 [CommunityRepository] 파일 업로드 시작 - 파일 개수: \(files.count)")
 
-        return try await networkManager.uploadFiles(
-            dataList,
-            fileExtensions: fileExtensions,
-            config: .post,
-            endpoint: PostRouter.uploadFiles(imageData: dataList)
-        )
+        let dataList = files.map { $0.data }
+
+        for (index, file) in files.enumerated() {
+            let sizeInMB = Double(file.data.count) / (1024 * 1024)
+            print("   📄 [\(index)] 확장자: \(file.normalizedFileExtension), 크기: \(String(format: "%.2f", sizeInMB))MB")
+        }
+
+        do {
+            // ✅ 이미지만 먼저 업로드 (서버가 비디오를 거부하는 것 같음)
+            let imageFiles = files.filter { !$0.isVideo }
+            let videoFiles = files.filter { $0.isVideo }
+
+            var uploadedPaths: [String] = []
+
+            // 이미지 업로드
+            if !imageFiles.isEmpty {
+                let imagePaths = try await networkManager.uploadFiles(
+                    imageFiles.map { $0.data },
+                    config: .post,
+                    endpoint: PostRouter.uploadFiles(imageData: imageFiles.map { $0.data })
+                )
+                uploadedPaths.append(contentsOf: imagePaths)
+                print("✅ [CommunityRepository] 이미지 업로드 성공: \(imagePaths)")
+            }
+
+            // 비디오는 별도 처리 시도
+            if !videoFiles.isEmpty {
+                print("⚠️ [CommunityRepository] 비디오 파일 감지 - 서버 지원 확인 필요")
+                // 비디오도 동일한 방식으로 시도
+                do {
+                    let videoPaths = try await networkManager.uploadFiles(
+                        videoFiles.map { $0.data },
+                        config: .post,
+                        endpoint: PostRouter.uploadFiles(imageData: videoFiles.map { $0.data })
+                    )
+                    uploadedPaths.append(contentsOf: videoPaths)
+                    print("✅ [CommunityRepository] 비디오 업로드 성공: \(videoPaths)")
+                } catch {
+                    print("❌ [CommunityRepository] 비디오 업로드 실패 - 이미지만 사용: \(error)")
+                    // 비디오 업로드 실패 시 이미지만 사용
+                }
+            }
+
+            guard !uploadedPaths.isEmpty else {
+                throw FileUploadError.noFiles
+            }
+
+            print("✅ [CommunityRepository] 전체 업로드 완료: \(uploadedPaths)")
+            return uploadedPaths
+        } catch {
+            print("❌ [CommunityRepository] 파일 업로드 실패 - 에러: \(error)")
+            throw error
+        }
     }
 
     func createComment(postId: String, content: String) async throws -> Comment {

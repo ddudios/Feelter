@@ -701,8 +701,21 @@ final class CreatePostViewController: BaseViewController {
     }
 
     private func submitPost(fields: ValidatedPostFields, coordinate: CLLocationCoordinate2D) {
+        print("💾 [CreatePostVC] submitPost 시작")
+        print("   카테고리: \(fields.category)")
+        print("   제목: \(fields.title)")
+        print("   내용 길이: \(fields.content.count)자")
+        print("   위치: (\(coordinate.latitude), \(coordinate.longitude))")
+
         let newFiles = attachmentItems.compactMap { $0.uploadFile }
         let existingFilePaths = attachmentItems.compactMap { $0.remotePath }
+
+        print("   새 첨부 파일: \(newFiles.count)개")
+        for (index, file) in newFiles.enumerated() {
+            let sizeInMB = Double(file.data.count) / (1024 * 1024)
+            print("      [\(index)] 확장자: \(file.fileExtension), 크기: \(String(format: "%.2f", sizeInMB))MB")
+        }
+        print("   기존 파일 경로: \(existingFilePaths.count)개")
 
         let input = CreatePostViewModel.ValidatedPostInput(
             category: fields.category,
@@ -714,6 +727,7 @@ final class CreatePostViewController: BaseViewController {
             existingFilePaths: existingFilePaths
         )
 
+        print("   📤 ViewModel에 저장 요청 전송")
         saveButtonTappedSubject.send(input)
     }
 
@@ -972,15 +986,20 @@ extension CreatePostViewController: PHPickerViewControllerDelegate {
 
         provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { [weak self] fileURL, _ in
             guard let self, let fileURL else {
+                print("❌ [CreatePost] 비디오 파일 URL을 가져올 수 없습니다.")
                 completion(nil)
                 return
             }
 
             let fileExtension = fileURL.pathExtension.isEmpty ? "mov" : fileURL.pathExtension.lowercased()
             guard let data = try? Data(contentsOf: fileURL) else {
+                print("❌ [CreatePost] 비디오 파일을 Data로 변환할 수 없습니다.")
                 completion(nil)
                 return
             }
+
+            let sizeInMB = Double(data.count) / (1024 * 1024)
+            print("✅ [CreatePost] 비디오 로드 성공: \(fileExtension), 크기: \(String(format: "%.2f", sizeInMB))MB")
 
             let previewImage = self.makeVideoThumbnail(from: fileURL)
             let item = AttachmentItem(

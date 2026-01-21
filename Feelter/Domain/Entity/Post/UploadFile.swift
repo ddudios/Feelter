@@ -18,4 +18,9 @@ struct UploadFile {
         }
         return trimmed
     }
+
+    var isVideo: Bool {
+        let videoExtensions = ["mp4", "mov", "avi", "mkv", "wmv", "m4v"]
+        return videoExtensions.contains(normalizedFileExtension)
+    }
 }

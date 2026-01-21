@@ -7,6 +7,7 @@
 
 import UIKit
 import SnapKit
+import AVFoundation
 
 final class ChatImageGridView: UIView {
 
@@ -205,6 +206,33 @@ final class ChatImageGridView: UIView {
                         }
                     }
                 }
+            case .video(let thumbnailImage, let videoURL, let isLocal):
+                if let thumbnail = thumbnailImage {
+                    imageView.image = thumbnail
+                    addPlayIcon(to: containerView)
+                } else {
+                    // 썸네일이 없으면 비동기로 생성
+                    imageView.image = UIImage(systemName: "video.fill")
+                    imageView.contentMode = .scaleAspectFit
+                    imageView.tintColor = .Feelter.gray60
+
+                    // 비동기로 썸네일 생성
+                    loadVideoThumbnail(videoURL: videoURL, isLocal: isLocal, configureId: configureId) { [weak self, weak containerView] thumbnail in
+                        guard let self = self, let containerView = containerView else { return }
+                        guard configureId == self.currentConfigureId else { return }
+
+                        DispatchQueue.main.async {
+                            if let thumb = thumbnail {
+                                imageView.image = thumb
+                                imageView.contentMode = .scaleAspectFill
+                                self.addPlayIcon(to: containerView)
+                            }
+                        }
+                    }
+
+                    // 재생 아이콘은 일단 추가
+                    addPlayIcon(to: containerView)
+                }
             }
 
             // 탭 제스처 추가
@@ -317,5 +345,64 @@ final class ChatImageGridView: UIView {
 
         let index = containerView.tag
         onImageTapped?(index)
+    }
+
+    private func addPlayIcon(to containerView: UIView) {
+        // 기존 재생 아이콘 제거 (중복 방지)
+        containerView.subviews.forEach { view in
+            if let iconView = view as? UIImageView, iconView.image == UIImage(systemName: "play.circle.fill") {
+                view.removeFromSuperview()
+            }
+        }
+
+        let playIconView = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+        playIconView.tintColor = .white
+        playIconView.contentMode = .scaleAspectFit
+        containerView.addSubview(playIconView)
+        playIconView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(44)
+        }
+    }
+
+    private func loadVideoThumbnail(videoURL: String, isLocal: Bool, configureId: UUID, completion: @escaping (UIImage?) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let url: URL?
+
+            if isLocal {
+                url = URL(fileURLWithPath: videoURL)
+            } else {
+                // 원격 URL 생성
+                let baseURLString = Config.baseURL.absoluteString
+                let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
+
+                var path = videoURL
+                if path.hasPrefix("/") && !path.hasPrefix("/v1/") {
+                    path = "/v1" + path
+                } else if !path.hasPrefix("/") {
+                    path = "/v1/" + path
+                }
+
+                url = URL(string: cleanedBase + path)
+            }
+
+            guard let videoUrl = url else {
+                completion(nil)
+                return
+            }
+
+            // AVAsset으로 썸네일 생성
+            let asset = AVAsset(url: videoUrl)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            let time = CMTime(seconds: 0, preferredTimescale: 600)
+
+            if let imageRef = try? generator.copyCGImage(at: time, actualTime: nil) {
+                let thumbnail = UIImage(cgImage: imageRef)
+                completion(thumbnail)
+            } else {
+                completion(nil)
+            }
+        }
     }
 }

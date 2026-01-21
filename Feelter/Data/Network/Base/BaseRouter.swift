@@ -56,7 +56,17 @@ extension BaseRouter {
 
     // URLRequest 생성
     func asURLRequest() throws -> URLRequest {
-        let url = baseURL.appendingPathComponent(path)
+        // path가 이미 /v1로 시작하는 경우 직접 URL 생성
+        let url: URL
+        if path.hasPrefix("/") {
+            // leading slash가 있으면 baseURL과 path를 직접 조합
+            guard let finalURL = URL(string: baseURL.absoluteString + path) else {
+                throw URLError(.badURL)
+            }
+            url = finalURL
+        } else {
+            url = baseURL.appendingPathComponent(path)
+        }
         var request = URLRequest(url: url)
         request.method = method
         request.cachePolicy = cachePolicy

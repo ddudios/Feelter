@@ -70,6 +70,18 @@ enum ChatRouter: BaseRouter {
             return nil
         }
     }
+
+    var headers: HTTPHeaders {
+        switch self {
+        case .uploadFiles:
+            // multipart 업로드는 Content-Type을 Alamofire가 자동으로 설정
+            var customHeaders = defaultHeaders
+            customHeaders.remove(name: "Content-Type")
+            return customHeaders
+        default:
+            return defaultHeaders
+        }
+    }
 }
 
 extension ChatRouter {

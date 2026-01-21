@@ -13,6 +13,7 @@ final class SearchPostCell: UITableViewCell {
     var onLikeTapped: ((String, Bool) -> Void)?
     var onMoreTapped: ((String, UIView) -> Void)?
     var onCommentTapped: ((String) -> Void)?
+    var onImageTapped: (([String], Int) -> Void)?
 
     private enum Layout {
         static let horizontalInset: CGFloat = 16
@@ -334,6 +335,10 @@ extension SearchPostCell: UICollectionViewDataSource, UICollectionViewDelegate, 
         let path = imagePaths[indexPath.item]
         cell.configure(with: path)
         return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        onImageTapped?(imagePaths, indexPath.item)
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

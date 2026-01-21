@@ -297,6 +297,18 @@ final class ImagePageViewController: UIViewController {
                     }
                 }
             }
+
+        case .video(let thumbnailImage, _, _):
+            // ImageViewer는 이미지 전용이므로 비디오 썸네일만 표시
+            if let thumbnail = thumbnailImage {
+                imageView.image = thumbnail
+                updateImageViewConstraints(for: thumbnail.size)
+            } else {
+                // 썸네일이 없으면 비디오 아이콘 표시
+                imageView.image = UIImage(systemName: "video.fill")
+                imageView.contentMode = .scaleAspectFit
+                imageView.tintColor = .Feelter.gray60
+            }
         }
     }
 

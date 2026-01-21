@@ -481,12 +481,10 @@ final class ChatRoomViewModel {
 
 
                 // 3. 업로드된 파일 URL로 메시지 전송 (sendMessageUsecase 사용)
-                // content는 필수값이므로 파일명을 포함한 기본 텍스트 전송
-                let fileContent = "\(fileName)"
-
+                // 비디오/오디오 파일은 파일명 없이 전송 (content는 빈 문자열)
                 _ = try await sendMessageUsecase.execute(
                     roomId: roomId,
-                    content: fileContent,
+                    content: " ",  // 빈 공백 (서버에서 필수값일 수 있음)
                     files: fileUrls
                 )
 

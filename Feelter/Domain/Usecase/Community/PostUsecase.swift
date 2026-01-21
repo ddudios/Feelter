@@ -86,11 +86,24 @@ struct PostUsecase: PostUsecaseProtocol {
     }
 
     func createPost(input: CreatePostInput) async throws -> PostDetail {
+        print("🔵 [PostUsecase] createPost 시작")
+        print("   카테고리: \(input.category)")
+        print("   제목: \(input.title)")
+        print("   파일 개수: \(input.files.count)")
+
         let fileURLs: [String]?
         if input.files.isEmpty {
+            print("   📄 첨부 파일 없음")
             fileURLs = nil
         } else {
-            fileURLs = try await repository.uploadFiles(input.files)
+            print("   📤 파일 업로드 시작...")
+            do {
+                fileURLs = try await repository.uploadFiles(input.files)
+                print("   ✅ 파일 업로드 완료: \(fileURLs ?? [])")
+            } catch {
+                print("   ❌ 파일 업로드 실패: \(error)")
+                throw error
+            }
         }
 
         let requestDTO = CreatePostRequestDTO(
@@ -102,7 +115,15 @@ struct PostUsecase: PostUsecaseProtocol {
             files: fileURLs
         )
 
-        return try await repository.createPost(requestDTO: requestDTO)
+        print("   📡 게시글 생성 요청 전송...")
+        do {
+            let result = try await repository.createPost(requestDTO: requestDTO)
+            print("   ✅ 게시글 생성 완료: \(result.id)")
+            return result
+        } catch {
+            print("   ❌ 게시글 생성 실패: \(error)")
+            throw error
+        }
     }
 
     func updatePost(input: UpdatePostInput) async throws -> PostDetail {

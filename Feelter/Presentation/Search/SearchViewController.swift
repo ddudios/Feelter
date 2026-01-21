@@ -9,6 +9,7 @@ import UIKit
 import SnapKit
 import Combine
 import CoreLocation
+import AVKit
 
 final class SearchViewController: BaseViewController {
 
@@ -444,6 +445,49 @@ final class SearchViewController: BaseViewController {
 
         present(commentVC, animated: true)
     }
+
+    private func handleImageTapped(imagePaths: [String], tappedIndex: Int) {
+        guard tappedIndex < imagePaths.count else { return }
+        let tappedPath = imagePaths[tappedIndex]
+
+        // 파일 확장자로 비디오 여부 확인
+        let fileExtension = (tappedPath as NSString).pathExtension.lowercased()
+        let videoExtensions = ["mp4", "mov", "avi", "mkv", "wmv", "m4v"]
+
+        if videoExtensions.contains(fileExtension) {
+            // 비디오 재생
+            playVideo(urlString: tappedPath)
+        } else {
+            // 이미지 뷰어 표시
+            showImageViewer(imagePaths: imagePaths, selectedIndex: tappedIndex)
+        }
+    }
+
+    private func playVideo(urlString: String) {
+        guard let url = URL(string: Config.baseURL.absoluteString + urlString) else {
+            showErrorAlert(message: "비디오를 재생할 수 없습니다.")
+            return
+        }
+
+        let player = AVPlayer(url: url)
+        let playerViewController = AVPlayerViewController()
+        playerViewController.player = player
+
+        present(playerViewController, animated: true) {
+            player.play()
+        }
+    }
+
+    private func showImageViewer(imagePaths: [String], selectedIndex: Int) {
+        // String 경로를 ChatImageSource.remote로 변환
+        let imagesSources = imagePaths.map { ChatImageSource.remote($0) }
+
+        // 기존 ImageViewerViewController 사용 (채팅방과 동일)
+        let imageViewer = ImageViewerViewController(images: imagesSources, initialIndex: selectedIndex)
+        imageViewer.modalPresentationStyle = UIModalPresentationStyle.overFullScreen
+        imageViewer.modalTransitionStyle = UIModalTransitionStyle.crossDissolve
+        present(imageViewer, animated: true)
+    }
 }
 
 extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
@@ -477,6 +521,9 @@ extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
         }
         cell.onCommentTapped = { [weak self] postId in
             self?.showCommentBottomSheet(for: postId)
+        }
+        cell.onImageTapped = { [weak self] imagePaths, tappedIndex in
+            self?.handleImageTapped(imagePaths: imagePaths, tappedIndex: tappedIndex)
         }
         return cell
     }

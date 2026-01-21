@@ -110,4 +110,17 @@ enum PostRouter: BaseRouter {
             return nil
         }
     }
+
+    var headers: HTTPHeaders {
+        switch self {
+        case .uploadFiles:
+            // multipart 업로드는 Content-Type을 Alamofire가 자동으로 설정
+            // Authorization 헤더는 유지 (APISession에서 자동 추가됨)
+            var customHeaders = defaultHeaders
+            customHeaders.remove(name: "Content-Type")
+            return customHeaders
+        default:
+            return defaultHeaders
+        }
+    }
 }
