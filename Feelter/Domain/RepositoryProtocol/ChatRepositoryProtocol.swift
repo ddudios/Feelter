@@ -79,21 +79,22 @@ protocol ChatRepositoryProtocol {
 
     // MARK: - 파일 업로드
     /// 채팅방 파일 업로드
-    /// 1. 이미지/파일을 multipart/form-data로 업로드
+    /// 1. 이미지/파일/비디오를 multipart/form-data로 업로드
     /// 2. 서버가 파일 URL 배열 반환
     /// 3. 이 URL을 sendMessage()의 files 파라미터로 사용
     ///
     /// 제약사항:
-    /// - 확장자: jpg, png, jpeg, gif, pdf
-    /// - 용량: 5MB
+    /// - 확장자: jpg, png, jpeg, gif, pdf, mp3, mp4, m4a, mov
+    /// - 용량: 50MB
     /// - 개수: 5개
     ///
     /// - Parameters:
     ///   - roomId: 채팅방 ID
-    ///   - imageData: 업로드할 이미지/파일 데이터 배열
+    ///   - dataList: 업로드할 파일 데이터 배열
+    ///   - fileExtensions: 각 파일의 확장자 배열 (dataList와 같은 순서/개수)
     /// - Returns: 업로드된 파일 URL 배열
     /// - Throws: 네트워크 에러, 서버 에러, 파일 제약 에러
-    func uploadFiles(roomId: String, imageData: [Data]) async throws -> [String]
+    func uploadFiles(roomId: String, dataList: [Data], fileExtensions: [String]) async throws -> [String]
 
     // MARK: - Socket 연결 관리
     /// 채팅방에 Socket 연결

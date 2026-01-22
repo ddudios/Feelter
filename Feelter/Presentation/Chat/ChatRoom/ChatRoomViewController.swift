@@ -456,8 +456,9 @@ final class ChatRoomViewController: BaseViewController {
                 // 이미지 확장자 판별
                 let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic"]
 
-                // 비디오 확장자 판별
+                // 비디오/오디오 확장자 판별
                 let videoExtensions = ["mp4", "mov", "m4a", "mp3"]
+                let isVideoByContent = videoExtensions.contains(contentExt)
 
                 // PDF 판별: URL 확장자가 pdf이거나, content가 .pdf로 끝나는 경우
                 let isPDF = urlExt == "pdf" || isPDFByContent
@@ -470,7 +471,7 @@ final class ChatRoomViewController: BaseViewController {
                         fileURL: fileUrl,
                         mimeType: "application/pdf"
                     ))
-                } else if videoExtensions.contains(urlExt) {
+                } else if videoExtensions.contains(urlExt) || isVideoByContent {
                     // 비디오 파일은 썸네일과 함께 표시
                     images.append(.video(thumbnailImage: nil, videoURL: fileUrl, isLocal: false))
                 } else if imageExtensions.contains(urlExt) {
@@ -490,11 +491,17 @@ final class ChatRoomViewController: BaseViewController {
             // 파일 첨부 메시지인 경우 content는 표시하지 않음 (파일명만 표시)
             // 일반 텍스트 메시지인 경우에만 content 표시
             let displayText: String?
-            if !files.isEmpty {
+            let hasAttachments = !files.isEmpty || !images.isEmpty
+            let hasContent = !(chatMessage.content ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+            let attachmentExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "pdf", "mp4", "mov", "m4a", "mp3"]
+            let isAttachmentFileName = hasAttachments && attachmentExtensions.contains(contentExt)
+
+            if !files.isEmpty || isAttachmentFileName {
                 // 파일 메시지: content는 파일명이므로 별도 텍스트로 표시하지 않음
                 displayText = nil
-            } else if let content = chatMessage.content,
-               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            } else if let content = chatMessage.content, hasContent {
                 displayText = content
             } else {
                 displayText = nil

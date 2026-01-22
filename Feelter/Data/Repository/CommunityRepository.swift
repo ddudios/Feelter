@@ -121,6 +121,7 @@ final class CommunityRepository: CommunityRepositoryProtocol {
             if !imageFiles.isEmpty {
                 let imagePaths = try await networkManager.uploadFiles(
                     imageFiles.map { $0.data },
+                    fileExtensions: imageFiles.map { $0.normalizedFileExtension },
                     config: .post,
                     endpoint: PostRouter.uploadFiles(imageData: imageFiles.map { $0.data })
                 )
@@ -135,6 +136,7 @@ final class CommunityRepository: CommunityRepositoryProtocol {
                 do {
                     let videoPaths = try await networkManager.uploadFiles(
                         videoFiles.map { $0.data },
+                        fileExtensions: videoFiles.map { $0.normalizedFileExtension },
                         config: .post,
                         endpoint: PostRouter.uploadFiles(imageData: videoFiles.map { $0.data })
                     )

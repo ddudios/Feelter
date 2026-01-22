@@ -274,7 +274,12 @@ final class ChatRoomViewModel {
                     let imageDataArray = images.compactMap { $0.jpegData(compressionQuality: 0.8) }
 
                     // Repository의 uploadFiles 메서드 호출
-                    fileUrls = try await repository.uploadFiles(roomId: roomId, imageData: imageDataArray)
+                    let fileExtensions = Array(repeating: "jpg", count: imageDataArray.count)
+                    fileUrls = try await repository.uploadFiles(
+                        roomId: roomId,
+                        dataList: imageDataArray,
+                        fileExtensions: fileExtensions
+                    )
                 }
 
                 // 2. 대기열 확인
@@ -470,7 +475,18 @@ final class ChatRoomViewModel {
 
                 // 2. Repository를 통해 파일 업로드 (인증 헤더 자동 포함)
                 // NetworkManager의 AuthenticationInterceptor가 accessToken을 헤더에 추가
-                let fileUrls = try await repository.uploadFiles(roomId: roomId, imageData: [data])
+                guard let fileExtension = normalizedFileExtension(fileName: fileName, mimeType: mimeType) else {
+                    await MainActor.run {
+                        completion(false, "지원하지 않는 파일 형식입니다.")
+                    }
+                    return
+                }
+
+                let fileUrls = try await repository.uploadFiles(
+                    roomId: roomId,
+                    dataList: [data],
+                    fileExtensions: [fileExtension]
+                )
 
                 guard !fileUrls.isEmpty else {
                     await MainActor.run {
@@ -481,10 +497,10 @@ final class ChatRoomViewModel {
 
 
                 // 3. 업로드된 파일 URL로 메시지 전송 (sendMessageUsecase 사용)
-                // 비디오/오디오 파일은 파일명 없이 전송 (content는 빈 문자열)
+                // 파일 메시지의 content는 원본 파일명으로 전달
                 _ = try await sendMessageUsecase.execute(
                     roomId: roomId,
-                    content: " ",  // 빈 공백 (서버에서 필수값일 수 있음)
+                    content: fileName,
                     files: fileUrls
                 )
 
@@ -517,6 +533,35 @@ final class ChatRoomViewModel {
                     completion(false, errorMessage)
                 }
             }
+        }
+    }
+
+    private func normalizedFileExtension(fileName: String, mimeType: String) -> String? {
+        let trimmed = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ext = (trimmed as NSString).pathExtension.lowercased()
+        if !ext.isEmpty {
+            return ext
+        }
+
+        switch mimeType.lowercased() {
+        case "application/pdf":
+            return "pdf"
+        case "image/jpeg":
+            return "jpg"
+        case "image/png":
+            return "png"
+        case "image/gif":
+            return "gif"
+        case "video/mp4":
+            return "mp4"
+        case "video/quicktime":
+            return "mov"
+        case "audio/mpeg":
+            return "mp3"
+        case "audio/mp4":
+            return "m4a"
+        default:
+            return nil
         }
     }
 

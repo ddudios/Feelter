@@ -313,22 +313,24 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// 3. 이 URL을 sendMessage()의 files 파라미터로 사용
     ///
     /// 제약사항:
-    /// - 확장자: jpg, png, jpeg, gif, pdf
-    /// - 용량: 5MB
+    /// - 확장자: jpg, png, jpeg, gif, pdf, mp3, mp4, m4a, mov
+    /// - 용량: 50MB
     /// - 개수: 5개
     ///
     /// - Parameters:
     ///   - roomId: 채팅방 ID
-    ///   - imageData: 업로드할 이미지/파일 데이터 배열
+    ///   - dataList: 업로드할 파일 데이터 배열
+    ///   - fileExtensions: 각 파일의 확장자 배열
     /// - Returns: 업로드된 파일 URL 배열
-    func uploadFiles(roomId: String, imageData: [Data]) async throws -> [String] {
+    func uploadFiles(roomId: String, dataList: [Data], fileExtensions: [String]) async throws -> [String] {
         // 1. ChatRouter에 uploadFiles 엔드포인트 사용
-        let endpoint = ChatRouter.uploadFiles(roomId: roomId, imageData: imageData)
+        let endpoint = ChatRouter.uploadFiles(roomId: roomId, imageData: dataList)
 
-        // 2. NetworkManager의 config 기반 업로드 메서드 호출
-        // FileUploadConfig.chat: jpg, png, jpeg, gif, pdf (5MB, 5개)
+        // 2. NetworkManager의 확장자 지정 업로드 메서드 호출
+        // FileUploadConfig.chat: jpg, png, jpeg, gif, pdf, mp3, mp4, m4a, mov (50MB, 5개)
         return try await networkManager.uploadFiles(
-            imageData,
+            dataList,
+            fileExtensions: fileExtensions,
             config: .chat,
             endpoint: endpoint
         )
