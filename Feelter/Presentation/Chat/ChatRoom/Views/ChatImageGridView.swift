@@ -365,6 +365,25 @@ final class ChatImageGridView: UIView {
         }
     }
 
+    private func makeVideoAsset(for url: URL) -> AVAsset {
+        if url.isFileURL {
+            return AVAsset(url: url)
+        }
+
+        var headers: [String: String] = [
+            "SeSACKey": Config.apiKey
+        ]
+        if let accessToken = KeychainManager.shared.read(account: "accessToken"),
+           !accessToken.isEmpty {
+            headers["Authorization"] = accessToken
+        }
+
+        return AVURLAsset(
+            url: url,
+            options: ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        )
+    }
+
     private func loadVideoThumbnail(videoURL: String, isLocal: Bool, configureId: UUID, completion: @escaping (UIImage?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let url: URL?
@@ -404,7 +423,7 @@ final class ChatImageGridView: UIView {
             }
 
             // AVAsset으로 썸네일 생성
-            let asset = AVAsset(url: videoUrl)
+            let asset = self.makeVideoAsset(for: videoUrl)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             let time = CMTime(seconds: 0, preferredTimescale: 600)

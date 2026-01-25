@@ -369,18 +369,15 @@ private final class SearchPostImageCell: UICollectionViewCell {
         imageView.clipsToBounds = true
         imageView.backgroundColor = .Feelter.gray90
 
-        // 재생 아이콘 추가
-        let config = UIImage.SymbolConfiguration(pointSize: 40, weight: .medium)
-        playIconView.image = UIImage(systemName: "play.fill", withConfiguration: config)
+        // 재생 아이콘 추가 (채팅 버블과 동일 스타일)
+        playIconView.image = UIImage(systemName: "play.circle.fill")
         playIconView.tintColor = .white
-        playIconView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-        playIconView.layer.cornerRadius = 30
-        playIconView.clipsToBounds = true
+        playIconView.contentMode = .scaleAspectFit
         playIconView.isHidden = true
         contentView.addSubview(playIconView)
         playIconView.snp.makeConstraints { make in
             make.center.equalToSuperview()
-            make.width.height.equalTo(60)
+            make.width.height.equalTo(44)
         }
     }
 
@@ -430,21 +427,42 @@ private final class SearchPostImageCell: UICollectionViewCell {
     private func loadVideoThumbnail(path: String, configureId: UUID, completion: @escaping (UIImage?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let videoURL = self.normalizedRemoteURL(from: path) else {
-                completion(nil)
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
                 return
             }
 
-            let asset = AVAsset(url: videoURL)
+            let asset = self.makeVideoAsset(for: videoURL)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             let time = CMTime(seconds: 0, preferredTimescale: 600)
 
-            if let imageRef = try? generator.copyCGImage(at: time, actualTime: nil) {
-                completion(UIImage(cgImage: imageRef))
-            } else {
-                completion(nil)
+            let imageRef = try? generator.copyCGImage(at: time, actualTime: nil)
+            let thumbnail = imageRef.map { UIImage(cgImage: $0) }
+            DispatchQueue.main.async {
+                completion(thumbnail)
             }
         }
+    }
+
+    private func makeVideoAsset(for url: URL) -> AVAsset {
+        if url.isFileURL {
+            return AVAsset(url: url)
+        }
+
+        var headers: [String: String] = [
+            "SeSACKey": Config.apiKey
+        ]
+        if let accessToken = KeychainManager.shared.read(account: "accessToken"),
+           !accessToken.isEmpty {
+            headers["Authorization"] = accessToken
+        }
+
+        return AVURLAsset(
+            url: url,
+            options: ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        )
     }
 
     private func normalizedRemoteURL(from path: String) -> URL? {
