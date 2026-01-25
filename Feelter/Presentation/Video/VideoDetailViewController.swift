@@ -32,6 +32,13 @@ final class VideoDetailViewController: BaseViewController {
         return view
     }()
 
+    private lazy var controlsBackgroundView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+        view.alpha = 1
+        return view
+    }()
+
     private lazy var loadingIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
         indicator.color = .white
@@ -41,9 +48,10 @@ final class VideoDetailViewController: BaseViewController {
 
     private lazy var playPauseButton: UIButton = {
         let button = UIButton(type: .system)
-        let config = UIImage.SymbolConfiguration(pointSize: 50, weight: .medium)
+        let config = UIImage.SymbolConfiguration(pointSize: 44, weight: .regular, scale: .large)
         button.setImage(UIImage(systemName: "play.fill", withConfiguration: config), for: .normal)
         button.tintColor = .white
+        button.contentMode = .scaleAspectFit
         button.addTarget(self, action: #selector(playPauseTapped), for: .touchUpInside)
         return button
     }()
@@ -75,6 +83,24 @@ final class VideoDetailViewController: BaseViewController {
         return label
     }()
 
+    private lazy var likeButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "heart"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(likeButtonTapped), for: .touchUpInside)
+        return button
+    }()
+
+    private lazy var subtitleLanguageButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "captions.bubble"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(subtitleLanguageButtonTapped), for: .touchUpInside)
+        return button
+    }()
+
+    private var isLiked = false
+
     private lazy var videoInfoView: UIView = {
         let view = UIView()
         view.backgroundColor = .Feelter.gray100
@@ -104,6 +130,24 @@ final class VideoDetailViewController: BaseViewController {
         return label
     }()
 
+    private lazy var subtitleTableView: UITableView = {
+        let table = UITableView()
+        table.backgroundColor = .clear
+        table.separatorStyle = .none
+        table.register(SubtitleCell.self, forCellReuseIdentifier: SubtitleCell.identifier)
+        table.delegate = self
+        table.dataSource = self
+        return table
+    }()
+
+    private var subtitleItems: [SubtitleItem] = []
+    private var currentHighlightedIndex: Int?
+    private var isUserScrolling = false
+    private let subtitleLanguageSubject = PassthroughSubject<String, Never>()
+
+    private var controlsHideTimer: Timer?
+    private var areControlsVisible = true
+
     // MARK: - Initialization
 
     init(viewModel: VideoDetailViewModel) {
@@ -120,6 +164,7 @@ final class VideoDetailViewController: BaseViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupPlayerNotifications()
+        setupGestures()
         bind()
         setupVideoInfo()
         viewDidLoadSubject.send(())
@@ -136,6 +181,7 @@ final class VideoDetailViewController: BaseViewController {
     }
 
     deinit {
+        controlsHideTimer?.invalidate()
         cleanupPlayer()
     }
 
@@ -145,14 +191,18 @@ final class VideoDetailViewController: BaseViewController {
         view.addSubview(videoInfoView)
 
         playerContainerView.addSubview(loadingIndicator)
+        playerContainerView.addSubview(controlsBackgroundView)
         playerContainerView.addSubview(playPauseButton)
         playerContainerView.addSubview(progressSlider)
         playerContainerView.addSubview(currentTimeLabel)
         playerContainerView.addSubview(durationLabel)
+        playerContainerView.addSubview(likeButton)
+        playerContainerView.addSubview(subtitleLanguageButton)
 
         videoInfoView.addSubview(titleLabel)
         videoInfoView.addSubview(descriptionLabel)
         videoInfoView.addSubview(statsLabel)
+        videoInfoView.addSubview(subtitleTableView)
     }
 
     override func configureLayout() {
@@ -168,9 +218,13 @@ final class VideoDetailViewController: BaseViewController {
             make.center.equalToSuperview()
         }
 
+        controlsBackgroundView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
         playPauseButton.snp.makeConstraints { make in
             make.center.equalToSuperview()
-            make.width.height.equalTo(50)
+            make.width.height.equalTo(44)
         }
 
         progressSlider.snp.makeConstraints { make in
@@ -186,6 +240,18 @@ final class VideoDetailViewController: BaseViewController {
         durationLabel.snp.makeConstraints { make in
             make.trailing.equalTo(progressSlider)
             make.top.equalTo(progressSlider.snp.bottom).offset(8)
+        }
+
+        subtitleLanguageButton.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.width.height.equalTo(32)
+        }
+
+        likeButton.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(16)
+            make.trailing.equalTo(subtitleLanguageButton.snp.leading).offset(-12)
+            make.width.height.equalTo(32)
         }
 
         videoInfoView.snp.makeConstraints { make in
@@ -207,6 +273,11 @@ final class VideoDetailViewController: BaseViewController {
             make.top.equalTo(descriptionLabel.snp.bottom).offset(12)
             make.leading.trailing.equalToSuperview().inset(16)
         }
+
+        subtitleTableView.snp.makeConstraints { make in
+            make.top.equalTo(statsLabel.snp.bottom).offset(16)
+            make.leading.trailing.bottom.equalToSuperview()
+        }
     }
 
     override func configureView() {
@@ -216,11 +287,19 @@ final class VideoDetailViewController: BaseViewController {
 
     // MARK: - Setup
 
+    private func setupGestures() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(playerContainerTapped))
+        playerContainerView.addGestureRecognizer(tapGesture)
+    }
+
     private func setupVideoInfo() {
         let summary = viewModel.getVideoSummary()
         titleLabel.text = summary.title
         descriptionLabel.text = summary.description
         statsLabel.text = "조회 \(formatCount(summary.viewCount))회 · 좋아요 \(formatCount(summary.likeCount))개"
+
+        isLiked = summary.isLiked
+        updateLikeButton()
     }
 
     private func setupPlayer(with stream: VideoStream) {
@@ -252,8 +331,6 @@ final class VideoDetailViewController: BaseViewController {
             showAlert(message: "잘못된 스트리밍 URL입니다.")
             return
         }
-
-        print("🎬 [VideoPlayer] 동영상 URL: \(url.absoluteString)")
 
         let asset = AVURLAsset(url: url)
         let playerItem = AVPlayerItem(asset: asset)
@@ -291,35 +368,24 @@ final class VideoDetailViewController: BaseViewController {
     }
 
     private func observePlayerItemStatus(_ playerItem: AVPlayerItem) {
-        print("🎬 [VideoPlayer] PlayerItem 상태 관찰 시작")
-
         statusObserver = playerItem.observe(\.status, options: [.new, .old]) { [weak self] item, _ in
             DispatchQueue.main.async {
-                print("🎬 [VideoPlayer] PlayerItem 상태 변경: \(item.status.rawValue)")
-
                 switch item.status {
                 case .readyToPlay:
-                    print("✅ [VideoPlayer] 재생 준비 완료")
                     self?.updateDuration()
                     self?.player?.play()
                     self?.isPlaying = true
                     self?.updatePlayPauseButton(isPlaying: true)
-                    print("✅ [VideoPlayer] 재생 시작 명령 전송")
+                    self?.resetControlsHideTimer()
 
                 case .failed:
                     let errorMessage = item.error?.localizedDescription ?? "알 수 없는 오류"
-                    print("❌ [VideoPlayer] 재생 실패: \(errorMessage)")
-                    if let error = item.error {
-                        print("❌ [VideoPlayer] 에러 상세: \(error)")
-                    }
                     self?.showAlert(message: "동영상 재생에 실패했습니다: \(errorMessage)")
 
                 case .unknown:
-                    print("⚠️ [VideoPlayer] 상태: unknown")
                     break
 
                 @unknown default:
-                    print("⚠️ [VideoPlayer] 상태: @unknown default")
                     break
                 }
             }
@@ -353,7 +419,8 @@ final class VideoDetailViewController: BaseViewController {
 
     private func bind() {
         let input = VideoDetailViewModel.Input(
-            viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher()
+            viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
+            subtitleLanguageSelected: subtitleLanguageSubject.eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -362,8 +429,6 @@ final class VideoDetailViewController: BaseViewController {
             .compactMap { $0 }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] stream in
-                print("🎬 [VideoPlayer] VideoStream 받음:")
-                print("   - streamURL: \(stream.streamURL)")
                 self?.setupPlayer(with: stream)
             }
             .store(in: &cancellables)
@@ -376,6 +441,14 @@ final class VideoDetailViewController: BaseViewController {
                 } else {
                     self?.loadingIndicator.stopAnimating()
                 }
+            }
+            .store(in: &cancellables)
+
+        output.subtitleItems
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] items in
+                self?.subtitleItems = items
+                self?.subtitleTableView.reloadData()
             }
             .store(in: &cancellables)
 
@@ -396,9 +469,11 @@ final class VideoDetailViewController: BaseViewController {
         if isPlaying {
             player.pause()
             updatePlayPauseButton(isPlaying: false)
+            controlsHideTimer?.invalidate()  // 일시정지 시 타이머 중지
         } else {
             player.play()
             updatePlayPauseButton(isPlaying: true)
+            resetControlsHideTimer()  // 재생 시 타이머 시작
         }
 
         isPlaying.toggle()
@@ -413,6 +488,7 @@ final class VideoDetailViewController: BaseViewController {
         let seekTime = CMTime(value: CMTimeValue(value), timescale: 1)
 
         currentTimeLabel.text = formatTime(value)
+        resetControlsHideTimer()  // 슬라이더 조작 시 타이머 리셋
     }
 
     @objc private func sliderTouchEnded(_ slider: UISlider) {
@@ -424,6 +500,7 @@ final class VideoDetailViewController: BaseViewController {
         let seekTime = CMTime(value: CMTimeValue(value), timescale: 1)
 
         player.seek(to: seekTime)
+        resetControlsHideTimer()  // seek 완료 시 타이머 리셋
     }
 
     @objc private func playerDidFinishPlaying() {
@@ -438,6 +515,102 @@ final class VideoDetailViewController: BaseViewController {
     }
 
     @objc private func playerItemPlaybackStalled(_ notification: Notification) {
+    }
+
+    @objc private func playerContainerTapped() {
+        if areControlsVisible {
+            hideControls()
+        } else {
+            showControls()
+        }
+    }
+
+    @objc private func likeButtonTapped() {
+        isLiked.toggle()
+        updateLikeButton()
+
+        Task {
+            do {
+                _ = try await viewModel.getVideoUsecase().likeVideo(videoId: viewModel.getVideoSummary().id, status: isLiked)
+            } catch {
+                // 에러 발생 시 원래 상태로 되돌림
+                await MainActor.run {
+                    isLiked.toggle()
+                    updateLikeButton()
+                    showAlert(message: "좋아요 처리에 실패했습니다.")
+                }
+            }
+        }
+    }
+
+    @objc private func subtitleLanguageButtonTapped() {
+        // 자막 언어 선택 액션 시트 표시
+        showSubtitleLanguageActionSheet()
+    }
+
+    private func updateLikeButton() {
+        let imageName = isLiked ? "heart.fill" : "heart"
+        likeButton.setImage(UIImage(systemName: imageName), for: .normal)
+    }
+
+    private func showSubtitleLanguageActionSheet() {
+        let alert = UIAlertController(title: "자막 언어 선택", message: nil, preferredStyle: .actionSheet)
+
+        // 자막 목록 가져오기
+        let subtitles = viewModel.getAvailableSubtitles()
+
+        for subtitle in subtitles {
+            let action = UIAlertAction(title: subtitle.name, style: .default) { [weak self] _ in
+                self?.subtitleLanguageSubject.send(subtitle.language)
+            }
+            alert.addAction(action)
+        }
+
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+
+        present(alert, animated: true)
+    }
+
+    private func showControls() {
+        areControlsVisible = true
+
+        UIView.animate(withDuration: 0.3) {
+            self.controlsBackgroundView.alpha = 1
+            self.playPauseButton.alpha = 1
+            self.progressSlider.alpha = 1
+            self.currentTimeLabel.alpha = 1
+            self.durationLabel.alpha = 1
+            self.likeButton.alpha = 1
+            self.subtitleLanguageButton.alpha = 1
+        }
+
+        resetControlsHideTimer()
+    }
+
+    private func hideControls() {
+        areControlsVisible = false
+        controlsHideTimer?.invalidate()
+
+        UIView.animate(withDuration: 0.3) {
+            self.controlsBackgroundView.alpha = 0
+            self.playPauseButton.alpha = 0
+            self.progressSlider.alpha = 0
+            self.currentTimeLabel.alpha = 0
+            self.durationLabel.alpha = 0
+            self.likeButton.alpha = 0
+            self.subtitleLanguageButton.alpha = 0
+        }
+    }
+
+    private func resetControlsHideTimer() {
+        controlsHideTimer?.invalidate()
+
+        // 재생 중일 때만 타이머 시작
+        if isPlaying {
+            controlsHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+                self?.hideControls()
+            }
+        }
     }
 
     private func addPeriodicTimeObserver() {
@@ -461,6 +634,35 @@ final class VideoDetailViewController: BaseViewController {
             progressSlider.value = Float(currentSeconds / totalSeconds)
             currentTimeLabel.text = formatTime(currentSeconds)
         }
+
+        // 자막 하이라이트 및 자동 스크롤
+        updateSubtitleHighlight(currentTime: currentSeconds)
+    }
+
+    private func updateSubtitleHighlight(currentTime: Double) {
+        guard !subtitleItems.isEmpty else { return }
+
+        // 현재 시간에 해당하는 자막 찾기
+        if let index = subtitleItems.firstIndex(where: { $0.contains(time: currentTime) }) {
+            // 이전 하이라이트와 다른 경우에만 업데이트
+            if currentHighlightedIndex != index {
+                let previousIndex = currentHighlightedIndex
+                currentHighlightedIndex = index
+
+                // 셀 업데이트
+                var indexPathsToReload: [IndexPath] = [IndexPath(row: index, section: 0)]
+                if let previous = previousIndex {
+                    indexPathsToReload.append(IndexPath(row: previous, section: 0))
+                }
+
+                subtitleTableView.reloadRows(at: indexPathsToReload, with: .none)
+
+                // 자동 스크롤 (사용자가 스크롤 중이 아닐 때만)
+                if !isUserScrolling {
+                    subtitleTableView.scrollToRow(at: IndexPath(row: index, section: 0), at: .middle, animated: true)
+                }
+            }
+        }
     }
 
     private func updateDuration() {
@@ -473,7 +675,7 @@ final class VideoDetailViewController: BaseViewController {
     }
 
     private func updatePlayPauseButton(isPlaying: Bool) {
-        let config = UIImage.SymbolConfiguration(pointSize: 50, weight: .medium)
+        let config = UIImage.SymbolConfiguration(pointSize: 44, weight: .regular, scale: .large)
         let imageName = isPlaying ? "pause.fill" : "play.fill"
         playPauseButton.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
     }
@@ -526,3 +728,54 @@ final class VideoDetailViewController: BaseViewController {
         present(alert, animated: true)
     }
 }
+
+// MARK: - UITableViewDataSource
+
+extension VideoDetailViewController: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return subtitleItems.count
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: SubtitleCell.identifier, for: indexPath) as? SubtitleCell else {
+            return UITableViewCell()
+        }
+
+        let item = subtitleItems[indexPath.row]
+        let isHighlighted = currentHighlightedIndex == indexPath.row
+        cell.configure(with: item, isHighlighted: isHighlighted)
+
+        return cell
+    }
+}
+
+// MARK: - UITableViewDelegate
+
+extension VideoDetailViewController: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let item = subtitleItems[indexPath.row]
+        let seekTime = CMTime(seconds: item.startTime, preferredTimescale: 1)
+        player?.seek(to: seekTime)
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        isUserScrolling = true
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate {
+            // 스크롤이 끝났고 감속도 없으면 3초 후 자동 스크롤 재개
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.isUserScrolling = false
+            }
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        // 감속이 끝났으면 3초 후 자동 스크롤 재개
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.isUserScrolling = false
+        }
+    }
+}
+

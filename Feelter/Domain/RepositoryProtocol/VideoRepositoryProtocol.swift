@@ -14,5 +14,6 @@ protocol VideoRepositoryProtocol {
     ) async throws -> (videos: [VideoSummary], nextCursor: String?)
 
     func fetchStream(videoId: String) async throws -> VideoStream
+    func fetchSubtitle(url: String) async throws -> [SubtitleItem]
     func likeVideo(videoId: String, status: Bool) async throws -> Bool
 }

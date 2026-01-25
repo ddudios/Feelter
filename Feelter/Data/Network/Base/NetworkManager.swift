@@ -14,6 +14,9 @@ protocol NetworkManagerProtocol {
     /// 응답 Body가 없는 API 요청용 (DELETE 등)
     func requestWithEmptyResponse<R: URLRequestConvertible>(_ endpoint: R) async throws
 
+    /// String 응답을 받는 API 요청용 (자막 등)
+    func requestString<R: URLRequestConvertible>(_ endpoint: R) async throws -> String
+
     // 설정 기반 파일 업로드
     func uploadFiles(_ dataList: [Data], config: FileUploadConfig, endpoint: URLRequestConvertible) async throws -> [String]
     func uploadFiles(
@@ -69,6 +72,23 @@ final class NetworkManager: NetworkManagerProtocol {
         case .success:
             // 성공 - 아무것도 반환하지 않음
             return
+
+        case .failure(let error):
+            throw parseError(error, response: response.response, data: response.data)
+        }
+    }
+
+    // 3-2. String 응답을 받는 API 요청용 (자막 등)
+    func requestString<R: URLRequestConvertible>(_ endpoint: R) async throws -> String {
+        let dataTask = session.request(endpoint)
+            .validate() // 200~299 상태코드 확인
+            .serializingString()
+
+        let response = await dataTask.response
+
+        switch response.result {
+        case .success(let value):
+            return value
 
         case .failure(let error):
             throw parseError(error, response: response.response, data: response.data)

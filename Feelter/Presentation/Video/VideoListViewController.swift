@@ -20,16 +20,15 @@ final class VideoListViewController: BaseViewController {
         static let headerEstimatedHeight: CGFloat = 64
     }
 
-    private enum Section {
-        case main
+    private enum Section: Int, CaseIterable {
+        case featured = 0
+        case main = 1
     }
 
     private let viewModel: VideoViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let loadMoreVideosSubject = PassthroughSubject<Void, Never>()
-    private let likeButtonTappedSubject = PassthroughSubject<(videoId: String, isLiked: Bool), Never>()
     private var cancellables = Set<AnyCancellable>()
-    private var safeAreaTopInset: CGFloat = 0
 
     private lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: createLayout())
@@ -38,9 +37,9 @@ final class VideoListViewController: BaseViewController {
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.register(VideoListCell.self, forCellWithReuseIdentifier: VideoListCell.identifier)
         collectionView.register(
-            VideoListHeaderView.self,
+            SectionHeaderView.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
-            withReuseIdentifier: VideoListHeaderView.identifier
+            withReuseIdentifier: SectionHeaderView.identifier
         )
         return collectionView
     }()
@@ -68,16 +67,6 @@ final class VideoListViewController: BaseViewController {
         collectionView.delegate = self
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let topInset = view.safeAreaInsets.top
-        if safeAreaTopInset != topInset {
-            safeAreaTopInset = topInset
-            collectionView.collectionViewLayout.invalidateLayout()
-            collectionView.reloadData()
-        }
-    }
-
     override func configureHierarchy() {
         super.configureHierarchy()
         view.addSubview(collectionView)
@@ -91,51 +80,71 @@ final class VideoListViewController: BaseViewController {
     }
 
     private func createLayout() -> UICollectionViewLayout {
-        let itemSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .estimated(Layout.cellEstimatedHeight)
-        )
-        let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        item.contentInsets = NSDirectionalEdgeInsets(
-            top: 0,
-            leading: 0,
-            bottom: 0,
-            trailing: 0
-        )
+        let layout = UICollectionViewCompositionalLayout { sectionIndex, environment in
+            guard let section = Section(rawValue: sectionIndex) else {
+                fatalError("Unknown section")
+            }
 
-        let groupSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .estimated(Layout.cellEstimatedHeight)
-        )
-        let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
+            switch section {
+            case .featured:
+                // 첫 번째 동영상: 화면 높이의 60% (safeArea 무시)
+                let screenHeight = UIScreen.main.bounds.height
+                let featuredHeight = screenHeight * 0.6
 
-        let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = Layout.sectionSpacing
-        section.contentInsets = NSDirectionalEdgeInsets(
-            top: 0,
-            leading: 0,
-            bottom: 120,
-            trailing: 0
-        )
+                let itemSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .absolute(featuredHeight)
+                )
+                let item = NSCollectionLayoutItem(layoutSize: itemSize)
 
-        let headerSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .estimated(Layout.headerEstimatedHeight)
-        )
-        let header = NSCollectionLayoutBoundarySupplementaryItem(
-            layoutSize: headerSize,
-            elementKind: UICollectionView.elementKindSectionHeader,
-            alignment: .top
-        )
-        header.contentInsets = NSDirectionalEdgeInsets(
-            top: 0,
-            leading: 0,
-            bottom: Layout.sectionSpacing,
-            trailing: 0
-        )
-        section.boundarySupplementaryItems = [header]
+                let groupSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .absolute(featuredHeight)
+                )
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
 
-        return UICollectionViewCompositionalLayout(section: section)
+                let section = NSCollectionLayoutSection(group: group)
+                return section
+
+            case .main:
+                // 나머지 동영상들: 기존 레이아웃 유지
+                let itemSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .estimated(Layout.cellEstimatedHeight)
+                )
+                let item = NSCollectionLayoutItem(layoutSize: itemSize)
+
+                let groupSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .estimated(Layout.cellEstimatedHeight)
+                )
+                let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
+
+                let section = NSCollectionLayoutSection(group: group)
+                section.interGroupSpacing = Layout.sectionSpacing
+                section.contentInsets = NSDirectionalEdgeInsets(
+                    top: 0,
+                    leading: 0,
+                    bottom: 120,
+                    trailing: 0
+                )
+
+                let headerSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0),
+                    heightDimension: .absolute(44)
+                )
+                let header = NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: headerSize,
+                    elementKind: UICollectionView.elementKindSectionHeader,
+                    alignment: .top
+                )
+                section.boundarySupplementaryItems = [header]
+
+                return section
+            }
+        }
+
+        return layout
     }
 
     private func setupDataSource() {
@@ -148,28 +157,29 @@ final class VideoListViewController: BaseViewController {
             ) as? VideoListCell else {
                 return UICollectionViewCell()
             }
-            cell.configure(with: video)
-            cell.onLikeTapped = { [weak self] videoId, isLiked in
-                self?.likeButtonTappedSubject.send((videoId: videoId, isLiked: isLiked))
-            }
+
+            let isFeatured = indexPath.section == Section.featured.rawValue
+            cell.configure(with: video, isFeatured: isFeatured)
             return cell
         }
 
+        // Supplementary View Provider (헤더)
         dataSource.supplementaryViewProvider = { collectionView, kind, indexPath in
             guard kind == UICollectionView.elementKindSectionHeader else {
                 return nil
             }
-            guard let header = collectionView.dequeueReusableSupplementaryView(
+
+            let header = collectionView.dequeueReusableSupplementaryView(
                 ofKind: kind,
-                withReuseIdentifier: VideoListHeaderView.identifier,
+                withReuseIdentifier: SectionHeaderView.identifier,
                 for: indexPath
-            ) as? VideoListHeaderView else {
-                return nil
+            ) as? SectionHeaderView
+
+            // Section 1 (main)에만 헤더 표시
+            if indexPath.section == Section.main.rawValue {
+                header?.configure(with: "오늘의 보정팁")
             }
-            header.configure(
-                title: "Feelter",
-                safeAreaTopInset: self.safeAreaTopInset
-            )
+
             return header
         }
     }
@@ -178,7 +188,7 @@ final class VideoListViewController: BaseViewController {
         let input = VideoViewModel.Input(
             viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher(),
             loadMoreVideos: loadMoreVideosSubject.eraseToAnyPublisher(),
-            likeButtonTapped: likeButtonTappedSubject.eraseToAnyPublisher()
+            likeButtonTapped: Empty().eraseToAnyPublisher()
         )
 
         let output = viewModel.transform(input: input)
@@ -208,8 +218,17 @@ final class VideoListViewController: BaseViewController {
 
     private func applySnapshot(videos: [VideoSummary]) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, VideoSummary>()
-        snapshot.appendSections([.main])
-        snapshot.appendItems(videos, toSection: .main)
+
+        if let firstVideo = videos.first {
+            snapshot.appendSections([.featured])
+            snapshot.appendItems([firstVideo], toSection: .featured)
+        }
+
+        if videos.count > 1 {
+            snapshot.appendSections([.main])
+            snapshot.appendItems(Array(videos.dropFirst()), toSection: .main)
+        }
+
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 

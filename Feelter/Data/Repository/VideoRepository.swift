@@ -36,6 +36,14 @@ final class VideoRepository: VideoRepositoryProtocol {
         return response.toDomain()
     }
 
+    func fetchSubtitle(url: String) async throws -> [SubtitleItem] {
+        let webvttContent = try await networkManager.requestString(
+            VideoRouter.subtitle(url: url)
+        )
+
+        return WebVTTParser.parse(webvttContent)
+    }
+
     func likeVideo(videoId: String, status: Bool) async throws -> Bool {
         let response = try await networkManager.request(
             VideoRouter.likeVideo(videoId: videoId, body: LikeRequestDTO(likeStatus: status)),

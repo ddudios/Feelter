@@ -14,6 +14,7 @@ protocol VideoUsecaseProtocol {
     ) async throws -> (videos: [VideoSummary], nextCursor: String?)
 
     func fetchStream(videoId: String) async throws -> VideoStream
+    func fetchSubtitle(url: String) async throws -> [SubtitleItem]
     func likeVideo(videoId: String, status: Bool) async throws -> Bool
 }
 
@@ -34,6 +35,10 @@ struct VideoUsecase: VideoUsecaseProtocol {
 
     func fetchStream(videoId: String) async throws -> VideoStream {
         try await repository.fetchStream(videoId: videoId)
+    }
+
+    func fetchSubtitle(url: String) async throws -> [SubtitleItem] {
+        try await repository.fetchSubtitle(url: url)
     }
 
     func likeVideo(videoId: String, status: Bool) async throws -> Bool {

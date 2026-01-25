@@ -12,11 +12,12 @@ enum VideoRouter: BaseRouter {
 
     case videoList(next: String?, limit: Int?)
     case stream(videoId: String)
+    case subtitle(url: String)
     case likeVideo(videoId: String, body: LikeRequestDTO)
 
     var method: HTTPMethod {
         switch self {
-        case .videoList, .stream:
+        case .videoList, .stream, .subtitle:
             return .get
         case .likeVideo:
             return .post
@@ -29,6 +30,9 @@ enum VideoRouter: BaseRouter {
             return "/v1/videos"
         case .stream(let videoId):
             return "/v1/videos/\(videoId)/stream"
+        case .subtitle(let url):
+            // url은 "/videos/stream/..." 형태이므로 "/v1"을 앞에 붙임
+            return "/v1" + url
         case .likeVideo(let videoId, _):
             return "/v1/videos/\(videoId)/like"
         }
@@ -42,7 +46,7 @@ enum VideoRouter: BaseRouter {
                 let limit: Int?
             }
             return VideoListQuery(next: next, limit: limit)
-        case .stream, .likeVideo:
+        case .stream, .subtitle, .likeVideo:
             return nil
         }
     }
@@ -51,7 +55,7 @@ enum VideoRouter: BaseRouter {
         switch self {
         case .likeVideo(_, let body):
             return body
-        case .videoList, .stream:
+        case .videoList, .stream, .subtitle:
             return nil
         }
     }
