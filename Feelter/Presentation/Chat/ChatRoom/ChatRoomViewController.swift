@@ -12,6 +12,7 @@ import Combine
 import UniformTypeIdentifiers
 import QuickLook
 import AVKit
+import AVFoundation
 
 final class ChatRoomViewController: BaseViewController {
 
@@ -885,11 +886,12 @@ final class ChatRoomViewController: BaseViewController {
         present(actionSheet, animated: true)
     }
 
-    /// 앨범에서 이미지/비디오 선택 (PHPicker)
+    /// 앨범에서 이미지/동영상 선택 (PHPicker)
+    /// 지원: 이미지, 동영상 (mp4, mov, m4a - 최대 50MB)
     private func openImagePicker() {
         var configuration = PHPickerConfiguration()
         configuration.selectionLimit = 5
-        configuration.filter = .any(of: [.images, .videos])
+        configuration.filter = .any(of: [.images, .videos])  // ✅ 이미지 + 동영상
 
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = self
@@ -897,9 +899,9 @@ final class ChatRoomViewController: BaseViewController {
     }
 
     /// 파일 선택 (UIDocumentPicker)
-    /// 지원 확장자: pdf, jpg, png, jpeg, gif
+    /// 지원 확장자: 모든 파일
     private func openFilePicker() {
-        let supportedTypes: [UTType] = [.pdf, .image, .jpeg, .png, .gif]
+        let supportedTypes: [UTType] = [.item]
 
         let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes)
         documentPicker.delegate = self
@@ -912,7 +914,7 @@ final class ChatRoomViewController: BaseViewController {
         textViewHeightConstraint?.update(offset: Layout.textViewMinHeight)
         messageTextView.isScrollEnabled = false
 
-        // 비디오가 있으면 먼저 전송
+        // 동영상이 있으면 먼저 전송
         if !pendingVideos.isEmpty {
             uploadAndSendVideos()
         }
@@ -1284,7 +1286,7 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
         for (index, result) in results.enumerated() {
             let provider = result.itemProvider
 
-            // 비디오 확인
+            // 동영상 확인
             if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) ||
                provider.hasItemConformingToTypeIdentifier(UTType.video.identifier) {
                 dispatchGroup.enter()
@@ -1312,22 +1314,19 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
         dispatchGroup.notify(queue: .main) { [weak self] in
             guard let self else { return }
 
-            // 이미지와 비디오를 분리
+            // 이미지와 동영상 분리
             let images = loadedItems.compactMap { $0.image }
             let videoURLs = loadedItems.compactMap { $0.videoURL }
 
-            // 기존 pendingVideos 초기화 후 새로운 비디오 추가
+            // 동영상 처리
             var newPendingVideos: [(url: URL, thumbnail: UIImage?)] = []
-
-            // 비디오 썸네일 생성
             for videoURL in videoURLs {
                 let thumbnail = self.makeVideoThumbnail(from: videoURL)
                 newPendingVideos.append((url: videoURL, thumbnail: thumbnail))
             }
-
             self.pendingVideos = newPendingVideos
 
-            // pendingImages 업데이트 (이미지 + 비디오 썸네일)
+            // pendingImages 업데이트 (이미지 + 동영상 썸네일)
             var allImages = images.map { ChatImageSource.local($0) }
             for (_, thumbnail) in newPendingVideos {
                 if let thumb = thumbnail {
@@ -1336,7 +1335,7 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
             }
             self.pendingImages = allImages
 
-            // ViewModel에 UIImage 배열 전달 (이미지만 - 기존 동작 유지)
+            // ViewModel에 UIImage 배열 전달 (이미지만)
             self.selectedImagesSubject.send(images)
 
             // 이미지 미리보기 UI 업데이트
@@ -1372,7 +1371,6 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
                 try FileManager.default.copyItem(at: fileURL, to: tempURL)
                 completion(tempURL)
             } catch {
-                print("❌ [ChatRoom] 비디오 파일 복사 실패: \(error)")
                 completion(nil)
             }
         }
@@ -1412,9 +1410,6 @@ extension ChatRoomViewController: PHPickerViewControllerDelegate {
                 default:
                     mimeType = "video/mp4"
                 }
-
-                let sizeInMB = Double(videoData.count) / (1024 * 1024)
-                print("✅ [ChatRoom] 비디오 전송: \(fileExtension), 크기: \(String(format: "%.2f", sizeInMB))MB")
 
                 // ViewModel을 통해 파일 전송
                 viewModel.sendFile(
@@ -1530,11 +1525,11 @@ extension ChatRoomViewController: UIDocumentPickerDelegate {
         do {
             let fileData = try Data(contentsOf: url)
 
-            // 파일 크기 검증 (5MB 제한)
-            let maxSize = 5 * 1024 * 1024  // 5MB
+            // 파일 크기 검증 (50MB 제한)
+            let maxSize = 50 * 1024 * 1024  // 50MB
             guard fileData.count <= maxSize else {
                 let sizeInMB = Double(fileData.count) / (1024 * 1024)
-                showErrorAlert(message: "파일 크기는 5MB를 초과할 수 없습니다.\n현재 크기: \(String(format: "%.2f", sizeInMB))MB")
+                showErrorAlert(message: "파일 크기는 50MB를 초과할 수 없습니다.\n현재 크기: \(String(format: "%.2f", sizeInMB))MB")
                 return
             }
 
@@ -1630,33 +1625,15 @@ extension ChatRoomViewController {
     ///   - videoURL: 비디오 URL (로컬 경로 또는 서버 경로)
     ///   - isLocal: 로컬 파일 여부
     private func playVideo(videoURL: String, isLocal: Bool) {
-        let playerURL: URL?
-
-        if isLocal {
-            // 로컬 파일
-            playerURL = URL(fileURLWithPath: videoURL)
-        } else {
-            // 서버 URL 생성
-            let baseURLString = Config.baseURL.absoluteString
-            let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
-
-            var path = videoURL
-            if path.hasPrefix("/") && !path.hasPrefix("/v1/") {
-                path = "/v1" + path
-            } else if !path.hasPrefix("/") {
-                path = "/v1/" + path
-            }
-
-            playerURL = URL(string: cleanedBase + path)
-        }
+        let playerURL = isLocal ? URL(fileURLWithPath: videoURL) : normalizedRemoteURL(from: videoURL)
 
         guard let url = playerURL else {
             showErrorAlert(message: "비디오 URL이 유효하지 않습니다.")
             return
         }
 
-        // AVPlayer 생성
-        let player = AVPlayer(url: url)
+        let playerItem = makePlayerItem(for: url)
+        let player = AVPlayer(playerItem: playerItem)
         let playerViewController = AVPlayerViewController()
         playerViewController.player = player
 
@@ -1664,6 +1641,26 @@ extension ChatRoomViewController {
         present(playerViewController, animated: true) {
             player.play()
         }
+    }
+
+    private func makePlayerItem(for url: URL) -> AVPlayerItem {
+        if url.isFileURL {
+            return AVPlayerItem(url: url)
+        }
+
+        var headers: [String: String] = [
+            "SeSACKey": Config.apiKey
+        ]
+        if let accessToken = KeychainManager.shared.read(account: "accessToken"),
+           !accessToken.isEmpty {
+            headers["Authorization"] = accessToken
+        }
+
+        let asset = AVURLAsset(
+            url: url,
+            options: ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        )
+        return AVPlayerItem(asset: asset)
     }
 }
 
@@ -1681,10 +1678,9 @@ extension ChatRoomViewController: QLPreviewControllerDataSource {
     func openFileWithQuickLook(file: ChatFileAttachment) {
 
         // 원격 URL 생성 (서버 base URL + file path)
-        let baseURL = Config.baseURL
-        let fullURLString = "\(Config.baseURL)/v1\(file.fileURL)"
+        let fullURL = normalizedRemoteURL(from: file.fileURL)
 
-        guard let remoteURL = URL(string: fullURLString) else {
+        guard let remoteURL = fullURL else {
             showErrorAlert(message: "유효하지 않은 파일 URL입니다.")
             return
         }
@@ -1808,5 +1804,32 @@ extension ChatRoomViewController: QLPreviewControllerDataSource {
 
     func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
         return (currentPreviewItem ?? URL(fileURLWithPath: "")) as QLPreviewItem
+    }
+
+    private func normalizedRemoteURL(from path: String) -> URL? {
+        if let url = URL(string: path), url.scheme != nil {
+            if url.path.hasPrefix("/data/") {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                components?.path = "/v1" + url.path
+                return components?.url
+            }
+            return url
+        }
+
+        let baseURLString = Config.baseURL.absoluteString
+        let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
+
+        var urlPath = path
+        if urlPath.hasPrefix("/data/") {
+            urlPath = "/v1" + urlPath
+        } else if urlPath.hasPrefix("/v1/") {
+            // 그대로 사용
+        } else if urlPath.hasPrefix("/") {
+            urlPath = "/v1" + urlPath
+        } else {
+            urlPath = "/v1/" + urlPath
+        }
+
+        return URL(string: cleanedBase + urlPath)
     }
 }

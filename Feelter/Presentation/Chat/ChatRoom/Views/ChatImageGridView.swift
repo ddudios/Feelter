@@ -371,15 +371,27 @@ final class ChatImageGridView: UIView {
 
             if isLocal {
                 url = URL(fileURLWithPath: videoURL)
+            } else if let absoluteURL = URL(string: videoURL), absoluteURL.scheme != nil {
+                if absoluteURL.path.hasPrefix("/data/") {
+                    var components = URLComponents(url: absoluteURL, resolvingAgainstBaseURL: false)
+                    components?.path = "/v1" + absoluteURL.path
+                    url = components?.url
+                } else {
+                    url = absoluteURL
+                }
             } else {
                 // 원격 URL 생성
                 let baseURLString = Config.baseURL.absoluteString
                 let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
 
                 var path = videoURL
-                if path.hasPrefix("/") && !path.hasPrefix("/v1/") {
+                if path.hasPrefix("/data/") {
                     path = "/v1" + path
-                } else if !path.hasPrefix("/") {
+                } else if path.hasPrefix("/v1/") {
+                    // 그대로 사용
+                } else if path.hasPrefix("/") {
+                    path = "/v1" + path
+                } else {
                     path = "/v1/" + path
                 }
 

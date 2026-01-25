@@ -39,6 +39,14 @@ struct ChatFileAttachment {
             return "image/png"
         case "gif":
             return "image/gif"
+        case "mp4":
+            return "video/mp4"
+        case "mov":
+            return "video/quicktime"
+        case "mp3":
+            return "audio/mpeg"
+        case "m4a":
+            return "audio/mp4"
         default:
             return "application/octet-stream"
         }

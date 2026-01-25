@@ -179,12 +179,15 @@ final class NetworkManager: NetworkManagerProtocol {
 
         let normalizedExtensions = fileExtensions.map { normalizeFileExtension($0) }
 
-        for fileExtension in normalizedExtensions {
-            guard config.allowedExtensions.contains(fileExtension) else {
-                throw FileUploadError.unsupportedExtension(
-                    extension: fileExtension,
-                    allowed: config.allowedExtensions
-                )
+        let allowsAnyExtension = config.allowedExtensions.contains("*")
+        if !allowsAnyExtension {
+            for fileExtension in normalizedExtensions {
+                guard config.allowedExtensions.contains(fileExtension) else {
+                    throw FileUploadError.unsupportedExtension(
+                        extension: fileExtension,
+                        allowed: config.allowedExtensions
+                    )
+                }
             }
         }
 
@@ -197,14 +200,6 @@ final class NetworkManager: NetworkManagerProtocol {
                         let timestamp = Date().timeIntervalSince1970
                         let fileName = "\(config.parameterName)_\(index)_\(timestamp).\(fileExtension)"
 
-                        print("📤 [Upload] 파일[\(index)]:")
-                        print("   - 파일명: \(fileName)")
-                        print("   - 확장자: \(fileExtension)")
-                        print("   - MIME Type: \(mimeType)")
-                        print("   - Parameter Name: \(config.parameterName)")
-                        print("   - 크기: \(data.count) bytes (\(data.count / 1024)KB)")
-                        print("   - 데이터 시작: \(data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))")
-
                         multipartFormData.append(
                             data,
                             withName: config.parameterName,
@@ -212,42 +207,17 @@ final class NetworkManager: NetworkManagerProtocol {
                             mimeType: mimeType
                         )
                     }
-
-                    print("📦 [Upload] Multipart 정보:")
-                    print("   - Boundary: \(multipartFormData.boundary)")
-                    print("   - Content Length: \(multipartFormData.contentLength) bytes")
-                    print("   - Content Type: multipart/form-data; boundary=\(multipartFormData.boundary)")
                 },
                 with: endpoint
             )
 
-            // 🔍 요청 정보 상세 로깅
-            uploadRequest.cURLDescription { description in
-                print("🌐 [Upload] cURL 커맨드:")
-                print(description)
-            }
-
             uploadRequest
             .validate()
             .responseDecodable(of: FileUploadResponseDTO.self) { response in
-                // 응답 상세 로깅
-                print("📥 [Upload Response]")
-                print("   - Status Code: \(response.response?.statusCode ?? -1)")
-                print("   - URL: \(response.request?.url?.absoluteString ?? "nil")")
-                print("   - Headers: \(response.response?.allHeaderFields ?? [:])")
-
-                if let data = response.data {
-                    print("   - Response Data: \(String(data: data, encoding: .utf8) ?? "nil")")
-                }
-
                 switch response.result {
                 case .success(let value):
-                    print("✅ [Upload] 서버 응답: \(value.files)")
                     continuation.resume(returning: value.files)
                 case .failure(let error):
-                    print("❌ [Upload] 실패 상세:")
-                    print("   - Error: \(error)")
-                    print("   - Underlying Error: \(error.underlyingError?.localizedDescription ?? "nil")")
                     let networkError = self.parseError(error, response: response.response, data: response.data)
                     continuation.resume(throwing: networkError)
                 }

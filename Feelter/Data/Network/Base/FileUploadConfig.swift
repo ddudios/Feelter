@@ -62,12 +62,30 @@ struct FileUploadConfig {
     )
 
     /// 채팅 파일 업로드 설정
-    /// - 확장자: jpg, png, jpeg, gif, pdf, mp3, mp4, m4a, mov
+    /// - 확장자: 서버 제한이 있어도 클라이언트는 제한하지 않음
     /// - 최대 크기: 50MB
     /// - 최대 개수: 5개
     static let chat = FileUploadConfig(
         parameterName: "files",
-        allowedExtensions: ["jpg", "png", "jpeg", "gif", "pdf", "mp3", "mp4", "m4a", "mov"],
+        allowedExtensions: ["*"],
+        maxFileSize: 50 * 1024 * 1024,  // 50MB
+        maxFileCount: 5
+    )
+
+    /// 채팅 파일 업로드 설정 (대체 파라미터)
+    /// - 일부 서버에서 files[] 형태만 허용하는 경우 대응
+    static let chatArray = FileUploadConfig(
+        parameterName: "files[]",
+        allowedExtensions: ["*"],
+        maxFileSize: 50 * 1024 * 1024,  // 50MB
+        maxFileCount: 5
+    )
+
+    /// 채팅 파일 업로드 설정 (단일 파일 파라미터)
+    /// - 일부 서버에서 file 단일 파라미터만 허용하는 경우 대응
+    static let chatSingle = FileUploadConfig(
+        parameterName: "file",
+        allowedExtensions: ["*"],
         maxFileSize: 50 * 1024 * 1024,  // 50MB
         maxFileCount: 5
     )

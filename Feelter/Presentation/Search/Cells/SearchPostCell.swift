@@ -7,6 +7,7 @@
 
 import UIKit
 import SnapKit
+import AVFoundation
 
 final class SearchPostCell: UITableViewCell {
 
@@ -84,7 +85,10 @@ final class SearchPostCell: UITableViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         if let layout = imageCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-            let size = CGSize(width: imageCollectionView.bounds.width, height: imageCollectionView.bounds.height)
+            let width = imageCollectionView.bounds.width
+            let height = imageCollectionView.bounds.height
+            guard width > 0, height > 0 else { return }
+            let size = CGSize(width: width, height: height)
             if layout.itemSize != size {
                 layout.itemSize = size
                 layout.invalidateLayout()
@@ -352,6 +356,8 @@ extension SearchPostCell: UICollectionViewDataSource, UICollectionViewDelegate, 
 private final class SearchPostImageCell: UICollectionViewCell {
 
     private let imageView = UIImageView()
+    private var currentConfigureId = UUID()
+    private let playIconView = UIImageView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -362,6 +368,20 @@ private final class SearchPostImageCell: UICollectionViewCell {
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.backgroundColor = .Feelter.gray90
+
+        // 재생 아이콘 추가
+        let config = UIImage.SymbolConfiguration(pointSize: 40, weight: .medium)
+        playIconView.image = UIImage(systemName: "play.fill", withConfiguration: config)
+        playIconView.tintColor = .white
+        playIconView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        playIconView.layer.cornerRadius = 30
+        playIconView.clipsToBounds = true
+        playIconView.isHidden = true
+        contentView.addSubview(playIconView)
+        playIconView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(60)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -370,10 +390,87 @@ private final class SearchPostImageCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        currentConfigureId = UUID()
         imageView.image = nil
+        playIconView.isHidden = true
     }
 
     func configure(with path: String) {
-        imageView.setFeelterImage(with: path)
+        currentConfigureId = UUID()
+        let configureId = currentConfigureId
+        // 파일 확장자로 동영상 여부 확인
+        let fileExtension = (path as NSString).pathExtension.lowercased()
+        let videoExtensions = ["mp4", "mov", "avi", "mkv", "wmv", "m4v"]
+
+        if videoExtensions.contains(fileExtension) {
+            // 동영상: 첫 프레임 썸네일 표시
+            imageView.isHidden = false
+            imageView.image = UIImage(systemName: "video.fill")
+            imageView.contentMode = .scaleAspectFit
+            imageView.tintColor = .Feelter.gray60
+            playIconView.isHidden = false
+
+            loadVideoThumbnail(path: path, configureId: configureId) { [weak self] thumbnail in
+                guard let self = self else { return }
+                guard configureId == self.currentConfigureId else { return }
+                if let thumbnail = thumbnail {
+                    self.imageView.image = thumbnail
+                    self.imageView.contentMode = .scaleAspectFill
+                }
+            }
+        } else {
+            // 이미지
+            imageView.isHidden = false
+            playIconView.isHidden = true
+            imageView.contentMode = .scaleAspectFill
+            imageView.setFeelterImage(with: path)
+        }
+    }
+
+    private func loadVideoThumbnail(path: String, configureId: UUID, completion: @escaping (UIImage?) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let videoURL = self.normalizedRemoteURL(from: path) else {
+                completion(nil)
+                return
+            }
+
+            let asset = AVAsset(url: videoURL)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            let time = CMTime(seconds: 0, preferredTimescale: 600)
+
+            if let imageRef = try? generator.copyCGImage(at: time, actualTime: nil) {
+                completion(UIImage(cgImage: imageRef))
+            } else {
+                completion(nil)
+            }
+        }
+    }
+
+    private func normalizedRemoteURL(from path: String) -> URL? {
+        if let url = URL(string: path), url.scheme != nil {
+            if url.path.hasPrefix("/data/") {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                components?.path = "/v1" + url.path
+                return components?.url
+            }
+            return url
+        }
+
+        let baseURLString = Config.baseURL.absoluteString
+        let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
+
+        var urlPath = path
+        if urlPath.hasPrefix("/data/") {
+            urlPath = "/v1" + urlPath
+        } else if urlPath.hasPrefix("/v1/") {
+            // 그대로 사용
+        } else if urlPath.hasPrefix("/") {
+            urlPath = "/v1" + urlPath
+        } else {
+            urlPath = "/v1/" + urlPath
+        }
+
+        return URL(string: cleanedBase + urlPath)
     }
 }

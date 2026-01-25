@@ -561,7 +561,7 @@ final class ChatRoomViewModel {
         case "audio/mp4":
             return "m4a"
         default:
-            return nil
+            return "bin"
         }
     }
 

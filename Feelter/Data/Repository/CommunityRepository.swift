@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import UIKit
+import AVFoundation
 
 final class CommunityRepository: CommunityRepositoryProtocol {
 
@@ -101,63 +103,122 @@ final class CommunityRepository: CommunityRepositoryProtocol {
     }
 
     func uploadFiles(_ files: [UploadFile]) async throws -> [String] {
-        print("📤 [CommunityRepository] 파일 업로드 시작 - 파일 개수: \(files.count)")
-
-        let dataList = files.map { $0.data }
-
-        for (index, file) in files.enumerated() {
-            let sizeInMB = Double(file.data.count) / (1024 * 1024)
-            print("   📄 [\(index)] 확장자: \(file.normalizedFileExtension), 크기: \(String(format: "%.2f", sizeInMB))MB")
-        }
-
         do {
-            // ✅ 이미지만 먼저 업로드 (서버가 비디오를 거부하는 것 같음)
-            let imageFiles = files.filter { !$0.isVideo }
-            let videoFiles = files.filter { $0.isVideo }
+            var allData: [Data] = []
+            var allExtensions: [String] = []
 
-            var uploadedPaths: [String] = []
-
-            // 이미지 업로드
-            if !imageFiles.isEmpty {
-                let imagePaths = try await networkManager.uploadFiles(
-                    imageFiles.map { $0.data },
-                    fileExtensions: imageFiles.map { $0.normalizedFileExtension },
-                    config: .post,
-                    endpoint: PostRouter.uploadFiles(imageData: imageFiles.map { $0.data })
-                )
-                uploadedPaths.append(contentsOf: imagePaths)
-                print("✅ [CommunityRepository] 이미지 업로드 성공: \(imagePaths)")
-            }
-
-            // 비디오는 별도 처리 시도
-            if !videoFiles.isEmpty {
-                print("⚠️ [CommunityRepository] 비디오 파일 감지 - 서버 지원 확인 필요")
-                // 비디오도 동일한 방식으로 시도
-                do {
-                    let videoPaths = try await networkManager.uploadFiles(
-                        videoFiles.map { $0.data },
-                        fileExtensions: videoFiles.map { $0.normalizedFileExtension },
-                        config: .post,
-                        endpoint: PostRouter.uploadFiles(imageData: videoFiles.map { $0.data })
-                    )
-                    uploadedPaths.append(contentsOf: videoPaths)
-                    print("✅ [CommunityRepository] 비디오 업로드 성공: \(videoPaths)")
-                } catch {
-                    print("❌ [CommunityRepository] 비디오 업로드 실패 - 이미지만 사용: \(error)")
-                    // 비디오 업로드 실패 시 이미지만 사용
+            for file in files {
+                if file.isVideo && file.normalizedFileExtension != "mp4" {
+                    // 동영상이고 mp4가 아닌 경우: mp4로 변환 후 업로드
+                    do {
+                        let mp4Data = try await convertVideoToMP4(from: file.data)
+                        allData.append(mp4Data)
+                        allExtensions.append("mp4")  // mov → mp4
+                    } catch {
+                        continue
+                    }
+                } else {
+                    // 이미 mp4이거나 이미지인 경우: 그대로 추가
+                    allData.append(file.data)
+                    allExtensions.append(file.normalizedFileExtension)
                 }
             }
 
-            guard !uploadedPaths.isEmpty else {
+            guard !allData.isEmpty else {
                 throw FileUploadError.noFiles
             }
 
-            print("✅ [CommunityRepository] 전체 업로드 완료: \(uploadedPaths)")
+            // 모든 파일을 한 번에 업로드
+            let uploadedPaths = try await networkManager.uploadFiles(
+                allData,
+                fileExtensions: allExtensions,
+                config: .post,
+                endpoint: PostRouter.uploadFiles(imageData: allData)
+            )
+
             return uploadedPaths
         } catch {
-            print("❌ [CommunityRepository] 파일 업로드 실패 - 에러: \(error)")
             throw error
         }
+    }
+
+    /// 동영상 파일 Data를 mp4로 변환
+    /// - Parameter videoData: 원본 동영상 Data (mov, m4v 등)
+    /// - Returns: mp4로 변환된 Data
+    private func convertVideoToMP4(from videoData: Data) async throws -> Data {
+        // 1. Data를 임시 파일로 저장 (AVAsset은 URL이 필요함)
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let inputURL = tempDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+        let outputURL = tempDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+
+        try videoData.write(to: inputURL)
+
+        defer {
+            // 작업 완료 후 임시 파일들 삭제
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+
+        // 2. AVAsset으로 동영상 로드
+        let asset = AVAsset(url: inputURL)
+
+        // 3. Export Session 생성 (고품질 프리셋)
+        guard let exportSession = AVAssetExportSession(
+            asset: asset,
+            presetName: AVAssetExportPresetHighestQuality
+        ) else {
+            throw FileUploadError.noFiles
+        }
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4  // ✅ mp4로 변환
+        exportSession.shouldOptimizeForNetworkUse = true
+
+        // 4. 변환 시작 (async/await)
+        await exportSession.export()
+
+        // 5. 변환 결과 확인
+        guard exportSession.status == .completed else {
+            throw FileUploadError.noFiles
+        }
+
+        // 6. 변환된 mp4 파일을 Data로 읽기
+        let mp4Data = try Data(contentsOf: outputURL)
+
+        return mp4Data
+    }
+
+    /// 동영상 파일 Data로부터 첫 프레임 썸네일 생성
+    /// - Parameter videoData: 동영상 파일 Data
+    /// - Returns: 썸네일 JPEG Data
+    private func generateVideoThumbnail(from videoData: Data) throws -> Data {
+        // 1. Data를 임시 파일로 저장 (AVAsset은 URL이 필요함)
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let tempFileURL = tempDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+
+        try videoData.write(to: tempFileURL)
+
+        defer {
+            // 2. 작업 완료 후 임시 파일 삭제
+            try? FileManager.default.removeItem(at: tempFileURL)
+        }
+
+        // 3. AVAsset으로 동영상 로드
+        let asset = AVAsset(url: tempFileURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+
+        // 4. 첫 프레임 추출 (0초)
+        let time = CMTime(seconds: 0, preferredTimescale: 600)
+        let imageRef = try generator.copyCGImage(at: time, actualTime: nil)
+        let thumbnailImage = UIImage(cgImage: imageRef)
+
+        // 5. JPEG Data로 변환 (0.8 품질)
+        guard let jpegData = thumbnailImage.jpegData(compressionQuality: 0.8) else {
+            throw FileUploadError.noFiles  // 적절한 에러로 변경 가능
+        }
+
+        return jpegData
     }
 
     func createComment(postId: String, content: String) async throws -> Comment {

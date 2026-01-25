@@ -233,7 +233,13 @@ final class VideoDetailViewController: BaseViewController {
             let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
 
             var path = stream.streamURL
-            if path.hasPrefix("/") && !path.hasPrefix("/v1/") {
+
+            // ✅ /data/ 경로는 정적 파일이므로 /v1/ 붙이지 않음
+            if path.hasPrefix("/data/") {
+                // 정적 파일 경로 (이미지, 동영상 등)
+                // 그대로 사용
+            } else if path.hasPrefix("/") && !path.hasPrefix("/v1/") {
+                // API 경로에만 /v1/ 추가
                 path = "/v1" + path
             } else if !path.hasPrefix("/") {
                 path = "/v1/" + path
@@ -246,6 +252,8 @@ final class VideoDetailViewController: BaseViewController {
             showAlert(message: "잘못된 스트리밍 URL입니다.")
             return
         }
+
+        print("🎬 [VideoPlayer] 동영상 URL: \(url.absoluteString)")
 
         let asset = AVURLAsset(url: url)
         let playerItem = AVPlayerItem(asset: asset)
@@ -283,22 +291,35 @@ final class VideoDetailViewController: BaseViewController {
     }
 
     private func observePlayerItemStatus(_ playerItem: AVPlayerItem) {
+        print("🎬 [VideoPlayer] PlayerItem 상태 관찰 시작")
+
         statusObserver = playerItem.observe(\.status, options: [.new, .old]) { [weak self] item, _ in
             DispatchQueue.main.async {
+                print("🎬 [VideoPlayer] PlayerItem 상태 변경: \(item.status.rawValue)")
+
                 switch item.status {
                 case .readyToPlay:
+                    print("✅ [VideoPlayer] 재생 준비 완료")
                     self?.updateDuration()
                     self?.player?.play()
                     self?.isPlaying = true
                     self?.updatePlayPauseButton(isPlaying: true)
+                    print("✅ [VideoPlayer] 재생 시작 명령 전송")
 
                 case .failed:
-                    self?.showAlert(message: "동영상 재생에 실패했습니다: \(item.error?.localizedDescription ?? "알 수 없는 오류")")
+                    let errorMessage = item.error?.localizedDescription ?? "알 수 없는 오류"
+                    print("❌ [VideoPlayer] 재생 실패: \(errorMessage)")
+                    if let error = item.error {
+                        print("❌ [VideoPlayer] 에러 상세: \(error)")
+                    }
+                    self?.showAlert(message: "동영상 재생에 실패했습니다: \(errorMessage)")
 
                 case .unknown:
+                    print("⚠️ [VideoPlayer] 상태: unknown")
                     break
 
                 @unknown default:
+                    print("⚠️ [VideoPlayer] 상태: @unknown default")
                     break
                 }
             }
@@ -341,6 +362,8 @@ final class VideoDetailViewController: BaseViewController {
             .compactMap { $0 }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] stream in
+                print("🎬 [VideoPlayer] VideoStream 받음:")
+                print("   - streamURL: \(stream.streamURL)")
                 self?.setupPlayer(with: stream)
             }
             .store(in: &cancellables)

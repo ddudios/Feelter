@@ -10,6 +10,7 @@ import SnapKit
 import Combine
 import CoreLocation
 import AVKit
+import AVFoundation
 
 final class SearchViewController: BaseViewController {
 
@@ -464,18 +465,68 @@ final class SearchViewController: BaseViewController {
     }
 
     private func playVideo(urlString: String) {
-        guard let url = URL(string: Config.baseURL.absoluteString + urlString) else {
+        let finalURL = normalizedRemoteURL(from: urlString)
+
+        guard let url = finalURL else {
             showErrorAlert(message: "비디오를 재생할 수 없습니다.")
             return
         }
 
-        let player = AVPlayer(url: url)
+        let playerItem = makePlayerItem(for: url)
+        let player = AVPlayer(playerItem: playerItem)
         let playerViewController = AVPlayerViewController()
         playerViewController.player = player
 
         present(playerViewController, animated: true) {
             player.play()
         }
+    }
+
+    private func makePlayerItem(for url: URL) -> AVPlayerItem {
+        if url.isFileURL {
+            return AVPlayerItem(url: url)
+        }
+
+        var headers: [String: String] = [
+            "SeSACKey": Config.apiKey
+        ]
+        if let accessToken = KeychainManager.shared.read(account: "accessToken"),
+           !accessToken.isEmpty {
+            headers["Authorization"] = accessToken
+        }
+
+        let asset = AVURLAsset(
+            url: url,
+            options: ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        )
+        return AVPlayerItem(asset: asset)
+    }
+
+    private func normalizedRemoteURL(from urlString: String) -> URL? {
+        if let url = URL(string: urlString), url.scheme != nil {
+            if url.path.hasPrefix("/data/") {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                components?.path = "/v1" + url.path
+                return components?.url
+            }
+            return url
+        }
+
+        let baseURLString = Config.baseURL.absoluteString
+        let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
+
+        var path = urlString
+        if path.hasPrefix("/data/") {
+            path = "/v1" + path
+        } else if path.hasPrefix("/v1/") {
+            // 그대로 사용
+        } else if path.hasPrefix("/") {
+            path = "/v1" + path
+        } else {
+            path = "/v1/" + path
+        }
+
+        return URL(string: cleanedBase + path)
     }
 
     private func showImageViewer(imagePaths: [String], selectedIndex: Int) {
