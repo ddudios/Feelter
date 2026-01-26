@@ -46,9 +46,16 @@ final class ProfileEditViewController: BaseViewController {
 
     private lazy var nicknameTextField = createTextField(placeholder: "닉네임")
     private lazy var nameTextField = createTextField(placeholder: "이름")
-    private lazy var introductionTextField = createTextField(placeholder: "소개")
+    private let introductionTextView = UITextView()
+    private let introductionPlaceholderLabel = UILabel()
     private lazy var phoneTextField = createTextField(placeholder: "전화번호 (010-1234-5678)")
     private lazy var hashTagsTextField = createTextField(placeholder: "해시태그 (#태그1, #태그2)")
+    private weak var activeInputView: UIView?
+    private var baseScrollBottomInset: CGFloat = 0
+    private lazy var backgroundTapGesture = UITapGestureRecognizer(
+        target: self,
+        action: #selector(backgroundTapped)
+    )
 
     // MARK: - Initialization
     init(userRepository: UserRepositoryProtocol = UserRepository(networkManager: NetworkManager())) {
@@ -65,7 +72,12 @@ final class ProfileEditViewController: BaseViewController {
         super.viewDidLoad()
         title = "EDIT"
         setupNavigationBar()
+        setupKeyboardObservers()
         loadProfile()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func configureHierarchy() {
@@ -75,7 +87,7 @@ final class ProfileEditViewController: BaseViewController {
         scrollView.addSubview(contentView)
 
         [profileImageButton, cameraIconView, nicknameTextField, nameTextField,
-         introductionTextField, phoneTextField, hashTagsTextField].forEach {
+         introductionTextView, phoneTextField, hashTagsTextField].forEach {
             contentView.addSubview($0)
         }
     }
@@ -115,14 +127,14 @@ final class ProfileEditViewController: BaseViewController {
             make.height.equalTo(48)
         }
 
-        introductionTextField.snp.makeConstraints { make in
+        introductionTextView.snp.makeConstraints { make in
             make.top.equalTo(nameTextField.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview().inset(20)
-            make.height.equalTo(48)
+            make.height.equalTo(96)
         }
 
         phoneTextField.snp.makeConstraints { make in
-            make.top.equalTo(introductionTextField.snp.bottom).offset(16)
+            make.top.equalTo(introductionTextView.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview().inset(20)
             make.height.equalTo(48)
         }
@@ -137,6 +149,39 @@ final class ProfileEditViewController: BaseViewController {
 
     override func configureView() {
         super.configureView()
+
+        view.gestureRecognizers?
+            .filter { $0 is UITapGestureRecognizer }
+            .forEach { view.removeGestureRecognizer($0) }
+        backgroundTapGesture.cancelsTouchesInView = false
+        backgroundTapGesture.delegate = self
+        scrollView.addGestureRecognizer(backgroundTapGesture)
+
+        scrollView.keyboardDismissMode = .interactive
+        baseScrollBottomInset = scrollView.contentInset.bottom
+
+        introductionTextView.font = TextStyle.Pretendard.body1
+        introductionTextView.textColor = .Feelter.gray60
+        introductionTextView.backgroundColor = .Feelter.gray90
+        introductionTextView.layer.cornerRadius = 8
+        introductionTextView.layer.borderWidth = 1
+        introductionTextView.layer.borderColor = UIColor.Feelter.gray75?.cgColor
+        introductionTextView.textContainerInset = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        introductionTextView.delegate = self
+
+        introductionPlaceholderLabel.text = "소개"
+        introductionPlaceholderLabel.font = TextStyle.Pretendard.body1
+        introductionPlaceholderLabel.textColor = .Feelter.gray75
+        introductionPlaceholderLabel.isUserInteractionEnabled = false
+        introductionTextView.addSubview(introductionPlaceholderLabel)
+        introductionPlaceholderLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(12)
+            make.top.equalToSuperview().offset(12)
+        }
+
+        [nicknameTextField, nameTextField, phoneTextField, hashTagsTextField].forEach {
+            $0.delegate = self
+        }
 
         profileImageButton.addTarget(self, action: #selector(profileImageButtonTapped), for: .touchUpInside)
     }
@@ -167,6 +212,27 @@ final class ProfileEditViewController: BaseViewController {
         textField.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         textField.rightViewMode = .always
         return textField
+    }
+
+    private func setupKeyboardObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow(_:)),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide(_:)),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+    }
+
+    private func scrollToVisible(_ view: UIView, animated: Bool = true) {
+        let rect = view.convert(view.bounds, to: scrollView)
+        let targetRect = rect.insetBy(dx: 0, dy: -8)
+        scrollView.scrollRectToVisible(targetRect, animated: animated)
     }
 
     // MARK: - Actions
@@ -222,6 +288,28 @@ final class ProfileEditViewController: BaseViewController {
         }
     }
 
+    @objc private func backgroundTapped() {
+        view.endEditing(true)
+    }
+
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        let keyboardFrame = view.convert(frame, from: nil)
+        let overlap = max(0, scrollView.frame.maxY - keyboardFrame.minY)
+        let bottomInset = baseScrollBottomInset + overlap
+        scrollView.contentInset.bottom = bottomInset
+        scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
+
+        if let activeInputView {
+            scrollToVisible(activeInputView)
+        }
+    }
+
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        scrollView.contentInset.bottom = baseScrollBottomInset
+        scrollView.verticalScrollIndicatorInsets.bottom = baseScrollBottomInset
+    }
+
     // MARK: - Data Loading
     private func loadProfile() {
         Task {
@@ -238,7 +326,8 @@ final class ProfileEditViewController: BaseViewController {
     private func updateUI(with user: User) {
         nicknameTextField.text = user.nickname
         nameTextField.text = user.name
-        introductionTextField.text = user.introduction
+        introductionTextView.text = user.introduction
+        introductionPlaceholderLabel.isHidden = !(user.introduction ?? "").isEmpty
         phoneTextField.text = user.phoneNumber
         hashTagsTextField.text = user.hashTags.joined(separator: ", ")
 
@@ -279,7 +368,7 @@ final class ProfileEditViewController: BaseViewController {
             let updatedUser = try await userRepository.updateProfile(
                 nick: nickname,
                 name: nameTextField.text,
-                introduction: introductionTextField.text,
+                introduction: introductionTextView.text,
                 phoneNum: phoneTextField.text,
                 profileImage: imagePath,
                 hashTags: hashTags.isEmpty ? nil : hashTags
@@ -326,6 +415,57 @@ final class ProfileEditViewController: BaseViewController {
     private func hideLoading() {
         // TODO: 로딩 인디케이터 숨기기
         print("Loading hidden")
+    }
+}
+
+// MARK: - UIGestureRecognizerDelegate
+extension ProfileEditViewController {
+    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        return !isTouchInsideInput(from: touch.view)
+    }
+
+    private func isTouchInsideInput(from view: UIView?) -> Bool {
+        guard let view else { return false }
+        var currentView: UIView? = view
+        while let candidate = currentView {
+            if candidate is UIControl || candidate is UITextView {
+                return true
+            }
+            currentView = candidate.superview
+        }
+        return false
+    }
+}
+
+// MARK: - UITextFieldDelegate
+extension ProfileEditViewController: UITextFieldDelegate {
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        activeInputView = textField
+        scrollToVisible(textField)
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        if activeInputView === textField {
+            activeInputView = nil
+        }
+    }
+}
+
+// MARK: - UITextViewDelegate
+extension ProfileEditViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        activeInputView = textView
+        scrollToVisible(textView)
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if activeInputView === textView {
+            activeInputView = nil
+        }
+    }
+
+    func textViewDidChange(_ textView: UITextView) {
+        introductionPlaceholderLabel.isHidden = !textView.text.isEmpty
     }
 }
 

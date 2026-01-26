@@ -108,11 +108,8 @@ final class FilterMakeViewController: BaseViewController {
     private let metadataCell = FilterMetadataCell()
 
     private let descriptionTitleLabel = SectionTitleLabel(title: "필터 소개")
-    private let descriptionTextField = FeelterTextField(
-        placeholder: "이 필터에 대해 간단하게 소개해주세요.",
-        textContentType: nil,
-        keyboardType: .default
-    )
+    private let descriptionTextView = UITextView()
+    private let descriptionPlaceholderLabel = UILabel()
 
     private let priceTitleLabel = SectionTitleLabel(title: "판매 가격")
     private let priceTextField = FeelterTextField(
@@ -122,7 +119,7 @@ final class FilterMakeViewController: BaseViewController {
     )
 
     private var categoryButtons: [SelectableCapsuleButton] = []
-    private weak var activeTextField: UITextField?
+    private weak var activeInputView: UIView?
     private var selectedPhotoImage: UIImage?
     private var currentPhotoMetadata: PhotoMetadata?
 
@@ -135,6 +132,7 @@ final class FilterMakeViewController: BaseViewController {
 
     private var photoUploadButtonHeightConstraint: Constraint?
     private var photoUploadButtonSquareConstraint: NSLayoutConstraint?
+    private var descriptionTextViewHeightConstraint: Constraint?
     private var baseScrollBottomInset: CGFloat = 0
     private lazy var backgroundTapGesture = UITapGestureRecognizer(
         target: self,
@@ -185,7 +183,7 @@ final class FilterMakeViewController: BaseViewController {
             photoUploadButton,
             metadataCell,
             descriptionTitleLabel,
-            descriptionTextField,
+            descriptionTextView,
             priceTitleLabel,
             priceTextField
         ].forEach { contentStackView.addArrangedSubview($0) }
@@ -217,8 +215,8 @@ final class FilterMakeViewController: BaseViewController {
             make.height.equalTo(Layout.textFieldHeight)
         }
 
-        descriptionTextField.snp.makeConstraints { make in
-            make.height.equalTo(Layout.textFieldHeight)
+        descriptionTextView.snp.makeConstraints { make in
+            descriptionTextViewHeightConstraint = make.height.equalTo(Layout.textFieldHeight).constraint
         }
 
         priceTextField.snp.makeConstraints { make in
@@ -260,7 +258,29 @@ final class FilterMakeViewController: BaseViewController {
         scrollView.verticalScrollIndicatorInsets.bottom = baseScrollBottomInset
 
         filterNameTextField.autocapitalizationType = .words
-        descriptionTextField.autocapitalizationType = .sentences
+
+        descriptionTextView.font = TextStyle.Pretendard.caption1
+        descriptionTextView.textColor = .Feelter.gray0
+        descriptionTextView.backgroundColor = .clear
+        descriptionTextView.layer.borderWidth = 1
+        descriptionTextView.layer.cornerRadius = Radius.s
+        descriptionTextView.layer.borderColor = UIColor.Feelter.gray75?.cgColor
+        descriptionTextView.textContainerInset = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        descriptionTextView.autocapitalizationType = .sentences
+        descriptionTextView.tintColor = .Feelter.deepTurquoise
+        descriptionTextView.isScrollEnabled = false
+        descriptionTextView.delegate = self
+
+        descriptionPlaceholderLabel.text = "이 필터에 대해 간단하게 소개해주세요."
+        descriptionPlaceholderLabel.font = TextStyle.Pretendard.caption1
+        descriptionPlaceholderLabel.textColor = .Feelter.gray75
+        descriptionPlaceholderLabel.isUserInteractionEnabled = false
+        descriptionTextView.addSubview(descriptionPlaceholderLabel)
+        descriptionPlaceholderLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(12)
+        }
+
         priceTextField.keyboardType = .numberPad
         priceTextField.rightView = makeCurrencyRightView()
         priceTextField.rightViewMode = .always
@@ -271,7 +291,7 @@ final class FilterMakeViewController: BaseViewController {
         priceTextField.tintColor = .Feelter.deepTurquoise ?? .systemTeal
         priceTextField.textAlignment = .left
         priceTextField.addTarget(self, action: #selector(priceTextFieldDidChange), for: .editingChanged)
-        [filterNameTextField, descriptionTextField, priceTextField].forEach { $0.delegate = self }
+        [filterNameTextField, priceTextField].forEach { $0.delegate = self }
 
         setupCategoryButtons()
         setupStackSpacing()
@@ -322,7 +342,7 @@ final class FilterMakeViewController: BaseViewController {
         contentStackView.setCustomSpacing(Layout.sectionSpacing, after: photoUploadButton)
         contentStackView.setCustomSpacing(Layout.sectionSpacing, after: metadataCell)
         contentStackView.setCustomSpacing(Layout.labelSpacing, after: descriptionTitleLabel)
-        contentStackView.setCustomSpacing(Layout.sectionSpacing, after: descriptionTextField)
+        contentStackView.setCustomSpacing(Layout.sectionSpacing, after: descriptionTextView)
         contentStackView.setCustomSpacing(Layout.labelSpacing, after: priceTitleLabel)
     }
 
@@ -400,7 +420,9 @@ final class FilterMakeViewController: BaseViewController {
 
     private func prefillForm(with data: FilterMakeViewModel.PrefilledFormData) {
         filterNameTextField.text = data.title
-        descriptionTextField.text = data.description
+        descriptionTextView.text = data.description
+        descriptionPlaceholderLabel.isHidden = !data.description.isEmpty
+        updateDescriptionTextViewHeight()
         priceTextField.text = formatPriceText(from: String(data.price))
 
         // 카테고리 선택
@@ -567,6 +589,31 @@ final class FilterMakeViewController: BaseViewController {
         return value.formatted(.number.grouping(.automatic))
     }
 
+    private func updateDescriptionTextViewHeight() {
+        var fixedWidth = descriptionTextView.frame.width
+            - descriptionTextView.textContainerInset.left
+            - descriptionTextView.textContainerInset.right
+        if fixedWidth <= 0 {
+            view.layoutIfNeeded()
+            fixedWidth = descriptionTextView.frame.width
+                - descriptionTextView.textContainerInset.left
+                - descriptionTextView.textContainerInset.right
+        }
+        guard fixedWidth > 0 else { return }
+
+        let sizeThatFits = descriptionTextView.sizeThatFits(
+            CGSize(width: fixedWidth, height: .greatestFiniteMagnitude)
+        )
+        let targetHeight = max(Layout.textFieldHeight, ceil(sizeThatFits.height))
+
+        if abs(targetHeight - (descriptionTextViewHeightConstraint?.layoutConstraints.first?.constant ?? 0)) > 0.5 {
+            descriptionTextViewHeightConstraint?.update(offset: targetHeight)
+            UIView.animate(withDuration: 0.1) {
+                self.view.layoutIfNeeded()
+            }
+        }
+    }
+
     @objc private func keyboardWillShow(_ notification: Notification) {
         guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
         let keyboardFrame = view.convert(frame, from: nil)
@@ -575,8 +622,8 @@ final class FilterMakeViewController: BaseViewController {
         scrollView.contentInset.bottom = bottomInset
         scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
 
-        if let activeTextField {
-            scrollToVisible(activeTextField)
+        if let activeInputView {
+            scrollToVisible(activeInputView)
         }
     }
 
@@ -691,7 +738,7 @@ final class FilterMakeViewController: BaseViewController {
         }
 
         // 3. Description validation
-        guard let description = descriptionTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard let description = descriptionTextView.text?.trimmingCharacters(in: .whitespacesAndNewlines),
               !description.isEmpty else {
             return .failure(.emptyDescription)
         }
@@ -763,9 +810,9 @@ extension FilterMakeViewController {
     }
 
     private func isTouchInsideTextFields(at location: CGPoint) -> Bool {
-        let fields = [filterNameTextField, descriptionTextField, priceTextField]
-        return fields.contains { field in
-            let fieldFrame = field.convert(field.bounds, to: scrollView)
+        let inputs: [UIView] = [filterNameTextField, descriptionTextView, priceTextField]
+        return inputs.contains { input in
+            let fieldFrame = input.convert(input.bounds, to: scrollView)
             return fieldFrame.contains(location)
         }
     }
@@ -774,14 +821,35 @@ extension FilterMakeViewController {
 // MARK: - UITextFieldDelegate
 extension FilterMakeViewController: UITextFieldDelegate {
     func textFieldDidBeginEditing(_ textField: UITextField) {
-        activeTextField = textField
+        activeInputView = textField
         scrollToVisible(textField)
     }
 
     func textFieldDidEndEditing(_ textField: UITextField) {
-        if activeTextField === textField {
-            activeTextField = nil
+        if activeInputView === textField {
+            activeInputView = nil
         }
+    }
+}
+
+// MARK: - UITextViewDelegate
+extension FilterMakeViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        activeInputView = textView
+        descriptionTextView.layer.borderColor = UIColor.Feelter.deepTurquoise?.cgColor
+        scrollToVisible(textView)
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if activeInputView === textView {
+            activeInputView = nil
+        }
+        descriptionTextView.layer.borderColor = UIColor.Feelter.gray75?.cgColor
+    }
+
+    func textViewDidChange(_ textView: UITextView) {
+        descriptionPlaceholderLabel.isHidden = !textView.text.isEmpty
+        updateDescriptionTextViewHeight()
     }
 }
 
@@ -820,6 +888,10 @@ private enum PhotoMetadataExtractor {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter
     }()
+    private static let fallbackLandscapeNightSkyLensInfo = "와이드 카메라"
+    private static let fallbackLandscapeNightSkyFocalLength = 24
+    private static let fallbackLandscapeNightSkyAperture = 2.8
+    private static let fallbackLandscapeNightSkyIso = 1600
 
     static func makeMetadata(
         fileURL: URL?,
@@ -896,6 +968,12 @@ private enum PhotoMetadataExtractor {
                 pixelHeight = fallbackHeight
             }
         }
+
+        // Fallback values for missing EXIF fields (landscape/night sky defaults).
+        if lensInfo.isEmpty { lensInfo = fallbackLandscapeNightSkyLensInfo }
+        if focalLength == 0 { focalLength = fallbackLandscapeNightSkyFocalLength }
+        if aperture == 0 { aperture = fallbackLandscapeNightSkyAperture }
+        if iso == 0 { iso = fallbackLandscapeNightSkyIso }
 
         let resolution = pixelWidth > 0 && pixelHeight > 0
         ? "\(pixelWidth) x \(pixelHeight)"
