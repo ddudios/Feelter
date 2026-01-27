@@ -237,7 +237,6 @@ final class FilterMakeViewController: BaseViewController {
 
     override func configureView() {
         super.configureView()
-        additionalSafeAreaInsets.bottom = Layout.scrollBottomInset
         view.gestureRecognizers?
             .filter { $0 is UITapGestureRecognizer }
             .forEach { view.removeGestureRecognizer($0) }
@@ -253,7 +252,7 @@ final class FilterMakeViewController: BaseViewController {
         navigationItem.rightBarButtonItem?.tintColor = .Feelter.gray75
 
         scrollView.delaysContentTouches = false
-        baseScrollBottomInset = 0
+        baseScrollBottomInset = Layout.scrollBottomInset
         scrollView.contentInset.bottom = baseScrollBottomInset
         scrollView.verticalScrollIndicatorInsets.bottom = baseScrollBottomInset
 
