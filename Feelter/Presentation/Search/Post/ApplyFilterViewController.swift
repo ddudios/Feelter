@@ -21,6 +21,7 @@ final class ApplyFilterViewController: BaseViewController {
     private let saveButtonTappedSubject = PassthroughSubject<Void, Never>()
 
     private var filters: [FilterDetail] = []
+    private var originalImage: UIImage?
     var onFilterApplied: ((UIImage, FilterDetail?) -> Void)?
 
     // MARK: - Layout Constants
@@ -187,6 +188,11 @@ final class ApplyFilterViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] image in
                 self?.previewImageView.image = image
+                // 첫 이미지를 원본으로 저장
+                if self?.originalImage == nil {
+                    self?.originalImage = image
+                    self?.filterCollectionView.reloadData()
+                }
             }
             .store(in: &cancellables)
 
@@ -240,7 +246,7 @@ extension ApplyFilterViewController: UICollectionViewDataSource {
         }
 
         let filter = filters[indexPath.item]
-        cell.configure(with: filter)
+        cell.configure(with: filter, originalImage: originalImage)
         return cell
     }
 }
@@ -366,14 +372,20 @@ private final class FilterPreviewCell: UICollectionViewCell {
         }
     }
 
-    func configure(with filter: FilterDetail) {
+    func configure(with filter: FilterDetail, originalImage: UIImage?) {
         titleLabel.text = filter.title
 
         // 원본 필터인 경우 (previewImages가 비어있는 경우)
         if filter.previewImages.isEmpty {
-            thumbnailImageView.image = UIImage(systemName: "photo.fill")
-            thumbnailImageView.tintColor = .Feelter.gray60
-            thumbnailImageView.contentMode = .center
+            if let original = originalImage {
+                thumbnailImageView.contentMode = .scaleAspectFill
+                // 다운샘플링 적용
+                thumbnailImageView.image = resize(image: original, to: CGSize(width: 80, height: 80))
+            } else {
+                thumbnailImageView.image = UIImage(systemName: "photo.fill")
+                thumbnailImageView.tintColor = .Feelter.gray60
+                thumbnailImageView.contentMode = .center
+            }
         } else if let thumbnailURL = filter.previewImages.first {
             thumbnailImageView.contentMode = .scaleAspectFill
             thumbnailImageView.setFeelterImage(with: thumbnailURL)
@@ -381,6 +393,13 @@ private final class FilterPreviewCell: UICollectionViewCell {
             thumbnailImageView.image = UIImage(systemName: "photo")
             thumbnailImageView.tintColor = .Feelter.gray60
             thumbnailImageView.contentMode = .center
+        }
+    }
+
+    private func resize(image: UIImage, to size: CGSize) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
         }
     }
 }
