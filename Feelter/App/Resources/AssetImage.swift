@@ -18,7 +18,7 @@ extension UIImage {
         static var homeFill: UIImage? { template("Home_Fill") }
         static var feedEmpty: UIImage? { template("Feed_Empty") }
         static var feedFill: UIImage? { template("Feed_Fill") }
-        static var filterEmpty: UIImage? { template("Filter_Empty") }
+        static var filterEmpty: UIImage? { template("Filter_Empty") } 
         static var filterFill: UIImage? { template("Filter_Fill") }
         static var searchEmpty: UIImage? { template("Search_Empty") }
         static var searchFill: UIImage? { template("Search_Fill") }

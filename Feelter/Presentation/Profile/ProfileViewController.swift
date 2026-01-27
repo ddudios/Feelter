@@ -18,14 +18,28 @@ final class ProfileViewController: BaseViewController {
     private enum Layout {
         static let horizontalInset: CGFloat = 16
         static let sectionSpacing: CGFloat = 16
-        static let backgroundHeight: CGFloat = 280
-        static let infoBottomInset: CGFloat = 20
-        static let filterCountSize: CGFloat = 84
-        static let filterItemSize = CGSize(width: 140, height: 96)
-        static let filterItemSpacing: CGFloat = 12
+        static let smallSpacing: CGFloat = 4
+
+        // Profile Section
+        static let profileImageWidthRatio: CGFloat = 2.0 / 3.0
+        static let boxSpacing: CGFloat = 8
+        static let boxCornerRadius: CGFloat = 12
+        static let boxPadding: CGFloat = 12
+
+        // HashTags
         static let tagSpacing: CGFloat = 8
         static let tagRowHeight: CGFloat = 34
-        static let messageButtonSize: CGFloat = 44
+
+        // Filter/Chat Box
+        static let iconSize: CGFloat = 24
+
+        // Category Filter
+        static let filterItemSize = CGSize(width: 50, height: 50)
+        static let filterItemSpacing: CGFloat = 8
+        static let categoryLabelHeight: CGFloat = 25
+        static let categoryBottomInset: CGFloat = 90
+
+        // Menu
         static let menuWidthRatio: CGFloat = 0.33
         static let menuItemHeight: CGFloat = 44
         static let menuItemSpacing: CGFloat = 12
@@ -33,71 +47,55 @@ final class ProfileViewController: BaseViewController {
     }
 
     private var filters: [FilterSummary] = []
+    private var filtersByCategory: [FilterCategory: [FilterSummary]] = [:]
+    private let categories: [FilterCategory] = [.food, .portrait, .landscape, .night, .star]
     private var hashTags: [String] = []
     private var profileUserId: String?
     private var isMenuVisible = false
     private var menuTrailingConstraint: Constraint?
 
-    private let scrollView = UIScrollView()
-    private let contentView = UIView()
-    private let backgroundImageView = UIImageView()
-    private let backgroundDimView = UIView()
+    // UI Components
+    // HashTags Section
+    private let hashTagsCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = Layout.tagSpacing
+        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .clear
+        collectionView.showsHorizontalScrollIndicator = false
+        return collectionView
+    }()
+
+    // Profile Section
+    private let profileSectionView = UIView()
+    private let profileImageView = UIImageView()
+    private let rightBoxesStackView = UIStackView()
+    private let filterBoxView = UIView()
+    private let filterBoxIconView = UILabel()
+    private let filterBoxCountLabel = UILabel()
+    private let chatBoxView = UIView()
+    private let chatBoxIconView = UIImageView()
+    private let chatBoxLabel = UILabel()
+
+    // Info Section
     private let nameLabel = UILabel()
     private let introductionLabel = UILabel()
-    private let filterCountView = UIView()
-    private let filterCountLabel = UILabel()
-    private let filterCountTitleLabel = UILabel()
-    private let filterSectionStackView = UIStackView()
-    private let tagRowStackView = UIStackView()
-    private let messageButton = UIButton(type: .system)
+
+    // Filter Scroll Section
+    private let filterScrollView = UIScrollView()
+    private let filterContainerView = UIView()
+
+    // Category Labels (Bottom Fixed)
+    private let categoryLabelsStackView = UIStackView()
+
+    // Menu
     private let menuOverlayView = UIView()
     private let menuContainerView = UIView()
     private let menuStackView = UIStackView()
     private let editProfileButton = FeelterButton(title: "프로필 수정")
     private let logoutButton = FeelterButton(title: "로그아웃")
 
-    private lazy var infoStackView: UIStackView = {
-        let stackView = UIStackView(arrangedSubviews: [nameLabel, introductionLabel])
-        stackView.axis = .vertical
-        stackView.alignment = .leading
-        stackView.spacing = 6
-        return stackView
-    }()
-
-    private lazy var filtersCollectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.minimumLineSpacing = Layout.filterItemSpacing
-        layout.itemSize = Layout.filterItemSize
-
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .clear
-        collectionView.showsHorizontalScrollIndicator = false
-        collectionView.dataSource = self
-        collectionView.delegate = self
-        collectionView.register(
-            ProfileFilterCell.self,
-            forCellWithReuseIdentifier: ProfileFilterCell.identifier
-        )
-        return collectionView
-    }()
-
-    private lazy var tagCollectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.minimumLineSpacing = Layout.tagSpacing
-        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
-
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .clear
-        collectionView.showsHorizontalScrollIndicator = false
-        collectionView.dataSource = self
-        collectionView.register(
-            ProfileTagCell.self,
-            forCellWithReuseIdentifier: ProfileTagCell.identifier
-        )
-        return collectionView
-    }()
 
     private let viewModel: ProfileViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
@@ -128,93 +126,137 @@ final class ProfileViewController: BaseViewController {
 
     override func configureHierarchy() {
         super.configureHierarchy()
-        view.addSubview(scrollView)
-        scrollView.addSubview(contentView)
 
-        contentView.addSubview(backgroundImageView)
-        backgroundImageView.addSubview(backgroundDimView)
-        backgroundImageView.addSubview(infoStackView)
-        contentView.addSubview(filterSectionStackView)
-        contentView.addSubview(tagRowStackView)
+        // Profile Section
+        view.addSubview(profileSectionView)
+        profileSectionView.addSubview(profileImageView)
+        profileSectionView.addSubview(rightBoxesStackView)
 
-        filterSectionStackView.addArrangedSubview(filterCountView)
-        filterSectionStackView.addArrangedSubview(filtersCollectionView)
-        filterCountView.addSubview(filterCountLabel)
-        filterCountView.addSubview(filterCountTitleLabel)
+        rightBoxesStackView.addArrangedSubview(filterBoxView)
+        rightBoxesStackView.addArrangedSubview(chatBoxView)
 
-        tagRowStackView.addArrangedSubview(tagCollectionView)
-        tagRowStackView.addArrangedSubview(messageButton)
+        filterBoxView.addSubview(filterBoxIconView)
+        filterBoxView.addSubview(filterBoxCountLabel)
 
+        chatBoxView.addSubview(chatBoxIconView)
+        chatBoxView.addSubview(chatBoxLabel)
+
+        // Info Section
+        view.addSubview(nameLabel)
+        view.addSubview(hashTagsCollectionView)
+        view.addSubview(introductionLabel)
+
+        // Filter Scroll Section
+        view.addSubview(filterScrollView)
+        filterScrollView.addSubview(filterContainerView)
+
+        // Category Labels (Bottom Fixed)
+        view.addSubview(categoryLabelsStackView)
+
+        // Menu
         view.addSubview(menuOverlayView)
         menuOverlayView.addSubview(menuContainerView)
         menuContainerView.addSubview(menuStackView)
         menuStackView.addArrangedSubview(editProfileButton)
         menuStackView.addArrangedSubview(logoutButton)
+
+        // Register cells
+        hashTagsCollectionView.dataSource = self
+        hashTagsCollectionView.delegate = self
+        hashTagsCollectionView.register(
+            ProfileTagCell.self,
+            forCellWithReuseIdentifier: ProfileTagCell.identifier
+        )
     }
 
     override func configureLayout() {
         super.configureLayout()
-        scrollView.snp.makeConstraints { make in
-            make.edges.equalTo(view.safeAreaLayoutGuide)
-        }
 
-        contentView.snp.makeConstraints { make in
-            make.edges.equalTo(scrollView.contentLayoutGuide)
-            make.width.equalTo(scrollView.frameLayoutGuide)
-        }
-
-        backgroundImageView.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(Layout.backgroundHeight)
-        }
-
-        backgroundDimView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-
-        infoStackView.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.bottom.equalToSuperview().inset(Layout.infoBottomInset)
-        }
-
-        filterSectionStackView.snp.makeConstraints { make in
-            make.top.equalTo(backgroundImageView.snp.bottom).offset(Layout.sectionSpacing)
+        // Profile Section
+        profileSectionView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(Layout.smallSpacing)
             make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
         }
 
-        filterCountView.snp.makeConstraints { make in
-            make.width.height.equalTo(Layout.filterCountSize)
+        profileImageView.snp.makeConstraints { make in
+            make.leading.top.bottom.equalToSuperview()
+            make.width.equalToSuperview().multipliedBy(Layout.profileImageWidthRatio)
+            make.height.equalTo(profileImageView.snp.width)
         }
 
-        filterCountLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().inset(14)
-            make.centerX.equalToSuperview()
+        rightBoxesStackView.snp.makeConstraints { make in
+            make.leading.equalTo(profileImageView.snp.trailing).offset(8)
+            make.trailing.top.bottom.equalToSuperview()
         }
 
-        filterCountTitleLabel.snp.makeConstraints { make in
-            make.top.equalTo(filterCountLabel.snp.bottom).offset(6)
-            make.centerX.equalToSuperview()
-            make.bottom.lessThanOrEqualToSuperview().inset(12)
+        // Filter Box (2/3 height)
+        filterBoxView.snp.makeConstraints { make in
+            make.height.equalTo(profileImageView.snp.height).multipliedBy(2.0 / 3.0).offset(-Layout.boxSpacing / 2)
         }
 
-        filtersCollectionView.snp.makeConstraints { make in
-            make.height.equalTo(Layout.filterItemSize.height)
+        // Chat Box (1/3 height)
+        chatBoxView.snp.makeConstraints { make in
+            make.height.equalTo(profileImageView.snp.height).multipliedBy(1.0 / 3.0).offset(-Layout.boxSpacing / 2)
         }
 
-        tagRowStackView.snp.makeConstraints { make in
-            make.top.equalTo(filterSectionStackView.snp.bottom).offset(Layout.sectionSpacing)
-            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.bottom.equalToSuperview().inset(Layout.sectionSpacing)
+        // Filter Box
+        filterBoxIconView.snp.makeConstraints { make in
+            make.leading.top.equalToSuperview().inset(Layout.boxPadding)
         }
 
-        tagCollectionView.snp.makeConstraints { make in
+        filterBoxCountLabel.snp.makeConstraints { make in
+            make.trailing.bottom.equalToSuperview().inset(Layout.boxPadding)
+        }
+
+        // Chat Box
+        chatBoxIconView.snp.makeConstraints { make in
+            make.leading.top.equalToSuperview().inset(Layout.boxPadding)
+            make.width.height.equalTo(Layout.iconSize)
+        }
+
+        chatBoxLabel.snp.makeConstraints { make in
+            make.trailing.bottom.equalToSuperview().inset(Layout.boxPadding)
+        }
+
+        // Info Section
+        nameLabel.snp.makeConstraints { make in
+            make.top.equalTo(profileSectionView.snp.bottom).offset(8)
+            make.leading.equalToSuperview().inset(Layout.horizontalInset)
+        }
+
+        // HashTags (이름 옆에)
+        hashTagsCollectionView.snp.makeConstraints { make in
+            make.leading.equalTo(nameLabel.snp.trailing).offset(Layout.smallSpacing)
+            make.centerY.equalTo(nameLabel)
+            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
             make.height.equalTo(Layout.tagRowHeight)
         }
 
-        messageButton.snp.makeConstraints { make in
-            make.width.height.equalTo(Layout.messageButtonSize)
+        introductionLabel.snp.makeConstraints { make in
+            make.top.equalTo(nameLabel.snp.bottom).offset(Layout.smallSpacing)
+            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
         }
 
+        // Category Labels
+        categoryLabelsStackView.snp.makeConstraints { make in
+            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
+            make.bottom.equalTo(view.safeAreaLayoutGuide).inset(Layout.categoryBottomInset)
+            make.height.equalTo(Layout.categoryLabelHeight)
+        }
+
+        // Filter Scroll Section
+        filterScrollView.snp.makeConstraints { make in
+            make.top.equalTo(introductionLabel.snp.bottom).offset(Layout.smallSpacing)
+            make.leading.trailing.equalToSuperview()
+            make.bottom.equalTo(categoryLabelsStackView.snp.top)
+        }
+
+        filterContainerView.snp.makeConstraints { make in
+            make.edges.equalTo(filterScrollView.contentLayoutGuide)
+            make.width.equalTo(filterScrollView.frameLayoutGuide)
+        }
+
+        // Menu
         menuOverlayView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
@@ -239,53 +281,89 @@ final class ProfileViewController: BaseViewController {
 
     override func configureView() {
         super.configureView()
-        scrollView.showsVerticalScrollIndicator = false
-        backgroundImageView.contentMode = .scaleAspectFill
-        backgroundImageView.clipsToBounds = true
-        backgroundImageView.backgroundColor = .Feelter.gray90
-        backgroundImageView.image = UIImage(named: "appIcon")
 
-        backgroundDimView.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        // Navigation Inline Title
+        navigationController?.navigationBar.prefersLargeTitles = false
+        navigationItem.largeTitleDisplayMode = .never
 
-        nameLabel.font = TextStyle.Mulgyeol.body1
+        // Profile Image
+        profileImageView.contentMode = .scaleAspectFill
+        profileImageView.clipsToBounds = true
+        profileImageView.backgroundColor = .Feelter.gray90
+        profileImageView.layer.cornerRadius = Layout.boxCornerRadius
+
+        // Right Boxes StackView
+        rightBoxesStackView.axis = .vertical
+        rightBoxesStackView.spacing = Layout.boxSpacing
+        rightBoxesStackView.distribution = .fill
+
+        // Filter Box
+        filterBoxView.backgroundColor = .Feelter.deepTurquoise
+        filterBoxView.layer.cornerRadius = Layout.boxCornerRadius
+        filterBoxView.clipsToBounds = true
+
+        filterBoxIconView.text = "Filter"
+        filterBoxIconView.font = TextStyle.Pretendard.caption2
+        filterBoxIconView.textColor = .Feelter.gray60
+
+        filterBoxCountLabel.font = TextStyle.Mulgyeol.body1
+        filterBoxCountLabel.textColor = .Feelter.gray0
+        filterBoxCountLabel.textAlignment = .right
+        filterBoxCountLabel.text = "0"
+
+        // Chat Box
+        chatBoxView.backgroundColor = .Feelter.brightTurquoise
+        chatBoxView.layer.cornerRadius = Layout.boxCornerRadius
+        chatBoxView.clipsToBounds = true
+        let chatTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleChatBoxTapped))
+        chatBoxView.addGestureRecognizer(chatTapGesture)
+        chatBoxView.isUserInteractionEnabled = true
+
+        chatBoxIconView.image = UIImage.Icon.message
+        chatBoxIconView.tintColor = .Feelter.gray60
+        chatBoxIconView.contentMode = .scaleAspectFit
+
+        chatBoxLabel.text = "Chat"
+        chatBoxLabel.font = TextStyle.Pretendard.body2
+        chatBoxLabel.textColor = .Feelter.gray0
+        chatBoxLabel.textAlignment = .right
+
+        // Info Section
+        nameLabel.font = TextStyle.Pretendard.body2
         nameLabel.textColor = .Feelter.gray0
+        nameLabel.setContentHuggingPriority(.required, for: .horizontal)
+        nameLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        // HashTags CollectionView
+        hashTagsCollectionView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        hashTagsCollectionView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         introductionLabel.font = TextStyle.Pretendard.caption1
-        introductionLabel.textColor = .Feelter.gray30
+        introductionLabel.textColor = .Feelter.gray60
+        introductionLabel.textAlignment = .left
         introductionLabel.numberOfLines = 0
 
-        filterSectionStackView.axis = .horizontal
-        filterSectionStackView.alignment = .center
-        filterSectionStackView.spacing = Layout.sectionSpacing
+        // Filter Scroll View
+        filterScrollView.showsVerticalScrollIndicator = true
+        filterScrollView.alwaysBounceVertical = true
 
-        filterCountView.backgroundColor = .Feelter.deepTurquoise
-        filterCountView.layer.cornerRadius = 12
-        filterCountView.clipsToBounds = true
+        // Category Labels StackView
+        categoryLabelsStackView.axis = .horizontal
+        categoryLabelsStackView.distribution = .fillEqually
+        categoryLabelsStackView.alignment = .center
+        categoryLabelsStackView.spacing = 0
 
-        filterCountLabel.font = TextStyle.Mulgyeol.body1
-        filterCountLabel.textColor = .Feelter.gray0
-        filterCountLabel.textAlignment = .center
-        filterCountLabel.text = "0"
+        // Create category labels
+        for category in categories {
+            let label = UILabel()
+            label.text = category.rawValue
+            label.font = TextStyle.Pretendard.body4
+            label.textColor = .Feelter.gray0
+            label.textAlignment = .center
+            categoryLabelsStackView.addArrangedSubview(label)
+        }
 
-        filterCountTitleLabel.font = TextStyle.Pretendard.body2
-        filterCountTitleLabel.textColor = .Feelter.gray60
-        filterCountTitleLabel.textAlignment = .center
-        filterCountTitleLabel.text = "Filters"
-
-        tagRowStackView.axis = .horizontal
-        tagRowStackView.alignment = .center
-        tagRowStackView.spacing = Layout.sectionSpacing
-
-        tagCollectionView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        tagCollectionView.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-        messageButton.backgroundColor = .Feelter.gray60?.withAlphaComponent(0.5)
-        messageButton.tintColor = .Feelter.gray0
-        messageButton.layer.cornerRadius = 8
-        messageButton.clipsToBounds = true
-        messageButton.setImage(UIImage.Icon.message, for: .normal)
-        messageButton.addTarget(self, action: #selector(handleMessageButtonTapped), for: .touchUpInside)
-
+        // Menu
         menuOverlayView.backgroundColor = UIColor.black.withAlphaComponent(0.4)
         menuOverlayView.isHidden = true
         menuOverlayView.alpha = 0
@@ -298,8 +376,6 @@ final class ProfileViewController: BaseViewController {
 
         editProfileButton.backgroundColor = .Feelter.brightTurquoise
         logoutButton.backgroundColor = .Feelter.deepTurquoise
-
-        title = "프로필"
 
         let overlayTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleMenuOverlayTapped))
         overlayTapGesture.cancelsTouchesInView = true
@@ -383,8 +459,8 @@ final class ProfileViewController: BaseViewController {
     }
 
     private func applyProfile(_ user: User) {
-        title = user.nickname
         profileUserId = user.id
+        title = user.nickname
         nameLabel.text = user.name ?? user.nickname
 
         if let introduction = user.introduction, !introduction.isEmpty {
@@ -395,30 +471,88 @@ final class ProfileViewController: BaseViewController {
             introductionLabel.isHidden = true
         }
 
-        backgroundImageView.image = UIImage(named: "appIcon")
-        backgroundImageView.backgroundColor = .clear
+        // Profile Image
+        profileImageView.image = UIImage(named: "appIcon")
+        profileImageView.backgroundColor = .Feelter.gray90
         if let path = user.profileImageURL, !path.isEmpty {
             let screenWidth = UIScreen.main.bounds.width
-            backgroundImageView.setFeelterImage(
+            let imageSize = screenWidth * Layout.profileImageWidthRatio - Layout.horizontalInset * 2
+            profileImageView.setFeelterImage(
                 with: path,
-                targetSize: CGSize(width: screenWidth, height: Layout.backgroundHeight)
+                targetSize: CGSize(width: imageSize, height: imageSize)
             )
-        } else {
-            backgroundImageView.image = UIImage(named: "appIcon")
         }
 
+        // HashTags
         hashTags = user.hashTags
-        tagCollectionView.reloadData()
+        hashTagsCollectionView.reloadData()
     }
 
     private func applyFilters(_ filters: [FilterSummary]) {
         self.filters = filters
-        filterCountLabel.text = "\(filters.count)"
-        filtersCollectionView.reloadData()
-        filtersCollectionView.setContentOffset(.zero, animated: false)
+        filterBoxCountLabel.text = "\(filters.count)"
+
+        // 카테고리별로 필터 그룹핑
+        filtersByCategory = Dictionary(grouping: filters, by: { $0.category })
+
+        // 기존 필터 뷰 제거
+        filterContainerView.subviews.forEach { $0.removeFromSuperview() }
+
+        // 카테고리별 스택뷰 생성
+        let categoryStackViews = categories.map { category -> UIStackView in
+            let stackView = UIStackView()
+            stackView.axis = .vertical
+            stackView.spacing = Layout.filterItemSpacing
+            stackView.alignment = .center
+
+            if let categoryFilters = filtersByCategory[category] {
+                for filter in categoryFilters {
+                    let imageView = UIImageView()
+                    imageView.contentMode = .scaleAspectFill
+                    imageView.clipsToBounds = true
+                    imageView.backgroundColor = .Feelter.gray90
+                    imageView.layer.cornerRadius = 8
+                    imageView.setFeelterImage(with: filter.mainImageURL)
+                    imageView.isUserInteractionEnabled = true
+
+                    let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleFilterImageTapped(_:)))
+                    imageView.addGestureRecognizer(tapGesture)
+                    imageView.tag = filters.firstIndex(where: { $0.id == filter.id }) ?? 0
+
+                    stackView.addArrangedSubview(imageView)
+                    imageView.snp.makeConstraints { make in
+                        make.width.height.equalTo(Layout.filterItemSize.width)
+                    }
+                }
+            }
+
+            return stackView
+        }
+
+        // 가로 스택뷰로 카테고리들을 배치
+        let horizontalStackView = UIStackView(arrangedSubviews: categoryStackViews)
+        horizontalStackView.axis = .horizontal
+        horizontalStackView.distribution = .fillEqually
+        horizontalStackView.alignment = .bottom
+        horizontalStackView.spacing = 0
+
+        filterContainerView.addSubview(horizontalStackView)
+        horizontalStackView.snp.makeConstraints { make in
+            make.leading.trailing.bottom.equalToSuperview().inset(Layout.horizontalInset)
+            make.top.greaterThanOrEqualToSuperview().inset(Layout.horizontalInset)
+        }
     }
 
-    @objc private func handleMessageButtonTapped() {
+    @objc private func handleFilterImageTapped(_ sender: UITapGestureRecognizer) {
+        guard let imageView = sender.view as? UIImageView,
+              imageView.tag < filters.count else { return }
+
+        let filter = filters[imageView.tag]
+        let filterDetailVC = FilterDetailViewController(filterId: filter.id)
+        navigationController?.pushViewController(filterDetailVC, animated: true)
+    }
+
+    @objc private func handleChatBoxTapped() {
         if viewModel.isMyProfile {
             onChatListTapped?()
             return
@@ -491,7 +625,6 @@ final class ProfileViewController: BaseViewController {
 
         alert.addAction(UIAlertAction(title: "취소", style: .cancel))
         alert.addAction(UIAlertAction(title: "로그아웃", style: .destructive) { [weak self] _ in
-            // ViewModel에게 "확인 버튼 눌렀어" 신호 전달
             self?.logoutConfirmSubject.send(())
         })
 
@@ -522,9 +655,6 @@ final class ProfileViewController: BaseViewController {
 // MARK: - UICollectionViewDataSource, UICollectionViewDelegate
 extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        if collectionView === filtersCollectionView {
-            return filters.count
-        }
         return hashTags.count
     }
 
@@ -532,17 +662,6 @@ extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDel
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        if collectionView === filtersCollectionView {
-            guard let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: ProfileFilterCell.identifier,
-                for: indexPath
-            ) as? ProfileFilterCell else {
-                return UICollectionViewCell()
-            }
-            cell.configure(with: filters[indexPath.item])
-            return cell
-        }
-
         guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: ProfileTagCell.identifier,
             for: indexPath
@@ -551,14 +670,6 @@ extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDel
         }
         cell.configure(tag: hashTags[indexPath.item])
         return cell
-    }
-
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard collectionView === filtersCollectionView else { return }
-
-        let filter = filters[indexPath.item]
-        let filterDetailVC = FilterDetailViewController(filterId: filter.id)
-        navigationController?.pushViewController(filterDetailVC, animated: true)
     }
 }
 
