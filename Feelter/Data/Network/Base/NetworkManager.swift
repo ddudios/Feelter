@@ -97,12 +97,23 @@ final class NetworkManager: NetworkManagerProtocol {
 
     // 4. 에러 파싱 (Alamofire 에러 -> Custom Error)
     private func parseError(_ error: AFError, response: HTTPURLResponse?, data: Data?) -> NetworkError {
+        // 네트워크 연결 에러 확인 (비행기 모드, 인터넷 끊김 등)
+        if let underlyingError = error.underlyingError as? URLError {
+            switch underlyingError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .timedOut:
+                return .networkConnectionError
+            default:
+                break
+            }
+        }
+
         if case .responseSerializationFailed = error {
             return .decodingError
         }
 
         guard let statusCode = response?.statusCode else {
-            return .unknownError(error.localizedDescription)
+            // response가 nil이면 네트워크 연결 문제일 가능성이 높음
+            return .networkConnectionError
         }
 
         switch statusCode {

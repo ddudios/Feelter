@@ -118,10 +118,21 @@ extension SendMessageUsecase {
         /// - Parameter error: 원본 에러
         /// - Returns: SendMessageError
         static func from(_ error: Error) -> SendMessageError {
-            // NetworkError나 다른 에러 타입 확인
-
+            // SendMessageError는 그대로 반환
             if let sendError = error as? SendMessageError {
                 return sendError
+            }
+
+            // NetworkError 확인
+            if let networkError = error as? NetworkError {
+                switch networkError {
+                case .networkConnectionError:
+                    return .networkError
+                case .serverError:
+                    return .serverError
+                case .clientError, .decodingError, .invalidURL, .unknownError:
+                    return .unknown
+                }
             }
 
             // URLError 확인 (비행기 모드, 인터넷 연결 끊김 등)

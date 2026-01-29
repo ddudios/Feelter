@@ -1012,6 +1012,9 @@ extension ChatRoomViewController: UITableViewDataSource {
             cell.onRetryTapped = { [weak self] in
                 self?.retryMessage(id: message.id)
             }
+            cell.onDeleteTapped = { [weak self] in
+                self?.showDeleteConfirmation(messageId: message.id)
+            }
             cell.onImageTapped = { [weak self] images, tappedIndex in
                 guard let self = self else { return }
                 // 탭한 아이템이 비디오인지 확인
@@ -1459,6 +1462,44 @@ private extension ChatRoomViewController {
 
         // 4. UI는 ViewModel의 output.messages를 통해 자동 업데이트됨
         // 재전송 성공 시 새 메시지는 가장 최근(아래)에 자동 배치됨
+    }
+
+    /// 삭제 확인 Alert 표시
+    ///
+    /// 동작:
+    /// 1. Alert 표시
+    /// 2. "삭제" 선택 시 deleteMessage 호출
+    /// 3. "취소" 선택 시 아무 작업 없음
+    ///
+    /// - Parameter messageId: 삭제할 메시지 ID
+    private func showDeleteConfirmation(messageId: String) {
+        let alert = UIAlertController(
+            title: "메시지 삭제",
+            message: "이 메시지를 삭제하시겠습니까?",
+            preferredStyle: .alert
+        )
+
+        let deleteAction = UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            self?.deleteMessage(id: messageId)
+        }
+
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        alert.addAction(deleteAction)
+        alert.addAction(cancelAction)
+
+        present(alert, animated: true)
+    }
+
+    /// 실패한 메시지 삭제
+    ///
+    /// 동작:
+    /// 1. ViewModel을 통해 CoreData에서 메시지 삭제
+    /// 2. UI는 ViewModel의 output.messages를 통해 자동 업데이트됨
+    ///
+    /// - Parameter id: 삭제할 메시지 ID
+    private func deleteMessage(id: String) {
+        viewModel.deleteMessage(messageId: id)
     }
 }
 

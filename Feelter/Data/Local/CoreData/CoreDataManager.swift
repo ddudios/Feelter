@@ -102,6 +102,10 @@ final class CoreDataManager {
     /// - Entity를 생성/수정/삭제한 후
     /// - 주의: 너무 자주 호출하면 성능 저하
     ///
+    /// Thread-Safety:
+    /// - NSManagedObjectContext는 thread-safe하지 않음
+    /// - performAndWait을 사용해 context의 스레드에서 save() 실행
+    ///
     /// - Parameter context: 저장할 Context (기본값: viewContext)
     /// - Throws: CoreData 저장 에러
     func saveContext(_ context: NSManagedObjectContext? = nil) throws {
@@ -110,12 +114,22 @@ final class CoreDataManager {
         // hasChanges: 변경사항이 있을 때만 저장 (성능 최적화)
         guard contextToSave.hasChanges else { return }
 
-        do {
-            try contextToSave.save()
-        } catch {
-            #if DEBUG
-            #endif
-            throw error
+        var saveError: Error?
+
+        // ✅ Context의 스레드에서 save() 실행 (thread-safety 보장)
+        contextToSave.performAndWait {
+            do {
+                try contextToSave.save()
+            } catch {
+                #if DEBUG
+                print("❌ CoreData 저장 실패: \(error)")
+                #endif
+                saveError = error
+            }
+        }
+
+        if let saveError = saveError {
+            throw saveError
         }
     }
 

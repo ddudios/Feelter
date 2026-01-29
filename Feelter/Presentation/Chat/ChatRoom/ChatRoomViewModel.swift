@@ -619,4 +619,28 @@ final class ChatRoomViewModel {
             }
         }
     }
+
+    /// 실패한 메시지 삭제
+    ///
+    /// 동작:
+    /// 1. CoreData에서 메시지 삭제
+    /// 2. messagesSubject 자동 업데이트 (Repository의 observeMessages)
+    ///
+    /// - Parameter messageId: 삭제할 메시지 ID
+    func deleteMessage(messageId: String) {
+        Task {
+            do {
+                try await repository.deleteMessage(chatId: messageId)
+
+                await MainActor.run {
+                    // Repository의 observeMessages가 자동으로 messagesSubject 업데이트
+                    // 추가 작업 불필요
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ [ChatRoomViewModel] 메시지 삭제 실패: \(error)")
+                }
+            }
+        }
+    }
 }

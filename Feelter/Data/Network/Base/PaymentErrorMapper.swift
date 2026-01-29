@@ -24,6 +24,8 @@ struct PaymentErrorMapper {
             return mapUnknownError(description: description)
         case .invalidURL:
             return "요청 주소가 올바르지 않습니다.\n잠시 후 다시 시도해주세요."
+        case .networkConnectionError:
+            return "네트워크 연결을 확인해 주세요"
         }
     }
 

@@ -63,12 +63,12 @@ final class FilterCreatorInfoCell: BaseCollectionViewCell {
         }
 
         tagWrapView.snp.makeConstraints { make in
-            make.top.equalTo(profileImageView.snp.bottom).offset(16)
+            make.top.equalTo(profileImageView.snp.bottom).offset(8)
             make.leading.trailing.equalToSuperview().inset(16)
         }
 
         descriptionLabel.snp.makeConstraints { make in
-            make.top.equalTo(tagWrapView.snp.bottom).offset(16)
+            make.top.equalTo(tagWrapView.snp.bottom).offset(8)
             make.leading.trailing.equalToSuperview().inset(16)
             make.bottom.equalToSuperview().inset(16)
         }

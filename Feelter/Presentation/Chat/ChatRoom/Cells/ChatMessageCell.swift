@@ -79,6 +79,7 @@ enum ChatImageSource {
 final class ChatMessageCell: UITableViewCell {
 
     var onRetryTapped: (() -> Void)?
+    var onDeleteTapped: (() -> Void)?
     var onImageTapped: (([ChatImageSource], Int) -> Void)?  // (전체 이미지 목록, 탭한 이미지 인덱스)
 
     private enum Layout {
@@ -110,6 +111,7 @@ final class ChatMessageCell: UITableViewCell {
     private let statusLabel = UILabel()
     private let statusIconImageView = UIImageView()
     private let retryButton = UIButton(type: .system)
+    private let deleteButton = UIButton(type: .system)
     private let statusStackView = UIStackView()
     private let horizontalStackView = UIStackView()
     private let spacerView = UIView()
@@ -139,6 +141,7 @@ final class ChatMessageCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         onRetryTapped = nil
+        onDeleteTapped = nil
         onImageTapped = nil
         currentIsOutgoing = false
         hasImageAndText = false
@@ -147,6 +150,7 @@ final class ChatMessageCell: UITableViewCell {
         statusLabel.text = nil
         statusIconImageView.image = nil
         retryButton.isHidden = true
+        deleteButton.isHidden = true
 
         // ✅ 이미지 그리드 완전 초기화 (이전 콜백 무효화)
         imageGridView.reset()
@@ -232,6 +236,7 @@ final class ChatMessageCell: UITableViewCell {
         statusStackView.addArrangedSubview(statusIconImageView)
         statusStackView.addArrangedSubview(statusLabel)
         statusStackView.addArrangedSubview(retryButton)
+        statusStackView.addArrangedSubview(deleteButton)
     }
 
     private func configureLayout() {
@@ -262,7 +267,11 @@ final class ChatMessageCell: UITableViewCell {
         }
 
         retryButton.snp.makeConstraints { make in
-            make.width.height.equalTo(13)
+            make.width.height.equalTo(16)
+        }
+
+        deleteButton.snp.makeConstraints { make in
+            make.width.height.equalTo(24.2)
         }
     }
 
@@ -335,10 +344,13 @@ final class ChatMessageCell: UITableViewCell {
         statusIconImageView.tintColor = .Feelter.gray60
         statusIconImageView.isHidden = true
 
-        retryButton.tintColor = .Feelter.gray60
-        retryButton.setImage(UIImage(systemName: "arrow.clockwise"), for: .normal)
+        retryButton.setImage(UIImage.Icon.restart, for: .normal)
         retryButton.setTitle(nil, for: .normal)
         retryButton.addTarget(self, action: #selector(retryButtonTapped), for: .touchUpInside)
+
+        deleteButton.setImage(UIImage.Icon.delete, for: .normal)
+        deleteButton.setTitle(nil, for: .normal)
+        deleteButton.addTarget(self, action: #selector(deleteButtonTapped), for: .touchUpInside)
 
         statusStackView.axis = .horizontal
         statusStackView.spacing = 4
@@ -469,6 +481,7 @@ final class ChatMessageCell: UITableViewCell {
         statusLabel.isHidden = true
         statusIconImageView.isHidden = true
         retryButton.isHidden = true
+        deleteButton.isHidden = true
 
         switch status {
         case .sending:
@@ -476,7 +489,9 @@ final class ChatMessageCell: UITableViewCell {
             statusIconImageView.isHidden = !shouldShowStatus
         case .failed:
             retryButton.isHidden = !shouldShowStatus
-            retryButton.tintColor = .systemRed
+            retryButton.tintColor = .Feelter.gray75
+            deleteButton.isHidden = !shouldShowStatus
+            deleteButton.tintColor = .Feelter.red
         case .sent:
             break
         }
@@ -593,6 +608,10 @@ final class ChatMessageCell: UITableViewCell {
 
     @objc private func retryButtonTapped() {
         onRetryTapped?()
+    }
+
+    @objc private func deleteButtonTapped() {
+        onDeleteTapped?()
     }
 
     /// hitTest 오버라이드: 터치가 실제 텍스트 콘텐츠 위에 있을 때만 messageTextView를 반환
