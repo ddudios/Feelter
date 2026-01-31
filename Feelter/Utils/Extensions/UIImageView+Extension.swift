@@ -19,6 +19,15 @@ extension UIImageView {
             return
         }
 
+        if path.hasPrefix("asset:") {
+            let assetName = path
+                .replacingOccurrences(of: "asset://", with: "")
+                .replacingOccurrences(of: "asset:", with: "")
+            self.image = UIImage(named: assetName)
+            completion?(self.image != nil)
+            return
+        }
+
         // 1. URL 조립 (Config.baseURL + /v1 + path)
         // (슬래시 처리가 애매하면 여기서 확실하게 처리해도 됨)
         let fullPath = "\(Config.baseURL)/v1\(path)"

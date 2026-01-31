@@ -38,8 +38,8 @@ final class FilterDetailViewController: BaseViewController {
     }
 
     // MARK: - Properties
-    
-    private let filterId: String
+
+    let filterId: String  // internal로 변경 (중복 push 방지를 위해)
     private let viewModel: FilterDetailViewModel
 
     private lazy var paymentViewModel: PaymentViewModel = {

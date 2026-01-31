@@ -99,6 +99,23 @@ final class TabBarCoordinator: Coordinator, CustomTabBarControllerDelegate {
         }
     }
 
+    /// 미완료 결제 복구를 위한 필터 상세 화면으로 이동
+    ///
+    /// - Parameter filterId: 이동할 필터 ID
+    ///
+    /// 동작:
+    /// 1. Home 탭으로 전환
+    /// 2. HomeCoordinator를 통해 필터 상세로 이동
+    public func showFilterDetail(filterId: String) {
+        // Home 탭으로 전환 (index 0)
+        tabBarController.selectedIndex = 0
+
+        // HomeCoordinator 찾기
+        if let homeCoordinator = childCoordinators.first(where: { $0 is HomeCoordinator }) as? HomeCoordinator {
+            homeCoordinator.showFilterDetail(filterId: filterId)
+        }
+    }
+
     @MainActor
     func customTabBarControllerDidSelectFilter(_ controller: CustomTabBarController) {
         presentFilterSelectionActionSheet(from: controller)

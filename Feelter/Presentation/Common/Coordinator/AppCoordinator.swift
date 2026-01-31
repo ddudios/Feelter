@@ -42,6 +42,13 @@ final public class AppCoordinator: Coordinator {
             name: .unauthorizedError,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePendingPaymentDetected),
+            name: .pendingPaymentDetected,
+            object: nil
+        )
     }
 
     private func checkLoginStatus() -> Bool {
@@ -125,6 +132,60 @@ final public class AppCoordinator: Coordinator {
         NotificationCenter.default.removeObserver(self, name: .unauthorizedError, object: nil)
         childCoordinators.removeAll()
         showAuthFlow()
+    }
+
+    @objc private func handlePendingPaymentDetected(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let filterId = userInfo["filterId"] as? String,
+              let orderCode = userInfo["orderCode"] as? String,
+              let totalPrice = userInfo["totalPrice"] as? Int else {
+            return
+        }
+
+        Task { @MainActor in
+            showPendingPaymentAlert(filterId: filterId, orderCode: orderCode, totalPrice: totalPrice)
+        }
+    }
+
+    @MainActor
+    private func showPendingPaymentAlert(filterId: String, orderCode: String, totalPrice: Int) {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let priceString = formatter.string(from: NSNumber(value: totalPrice)) ?? "\(totalPrice)"
+
+        let alert = UIAlertController(
+            title: "미완료 결제",
+            message: "결제가 완료되지 않은 주문이 있습니다.\n주문번호: \(orderCode)\n금액: \(priceString)원\n\n해당 필터로 이동하여 결제를 진행하시겠습니까?",
+            preferredStyle: .alert
+        )
+
+        let retryAction = UIAlertAction(title: "이동", style: .default) { [weak self] _ in
+            // Alert dismiss 후 navigation 수행 (중복 탭 방지)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self?.navigateToFilterDetail(filterId: filterId)
+            }
+        }
+
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel) { _ in
+            // 사용자가 취소하면 저장된 결제 상태 삭제
+            PaymentStateManager.shared.clearPendingPayment()
+        }
+
+        alert.addAction(retryAction)
+        alert.addAction(cancelAction)
+
+        // 최상위 ViewController에서 알림 표시
+        if let topViewController = getTopViewController() {
+            topViewController.present(alert, animated: true)
+        }
+    }
+
+    @MainActor
+    private func navigateToFilterDetail(filterId: String) {
+        // TabBarCoordinator를 찾아서 필터 상세로 이동
+        if let tabBarCoordinator = childCoordinators.first(where: { $0 is TabBarCoordinator }) as? TabBarCoordinator {
+            tabBarCoordinator.showFilterDetail(filterId: filterId)
+        }
     }
 }
 

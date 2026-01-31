@@ -25,10 +25,49 @@ final class VideoListViewController: BaseViewController {
         case main = 1
     }
 
+    private enum FeaturedMock {
+        static let id = "featured-video-mock"
+        static let thumbnailAssetName = "videoThumbnail"
+        static let title = "색감·명암 기본 공식"
+        static let description = """
+        사진 보정이 어렵게 느껴지시나요?
+        이 영상에서는 초보자도 바로 적용할 수 있는 사진 보정의 기본 공식과 색감 정리 방법을 알려드립니다.
+
+        ✔ 노출과 대비 조절 순서
+        ✔ 색온도와 채도 균형 잡는 법
+        ✔ 자연스러운 보정이 되는 기준
+
+        과하지 않게, 오래 봐도 질리지 않는
+        사진 보정 노하우를 공유합니다.
+        """
+        static let viewCount = 128
+        static let likeCount = 21
+        static let duration: Double = 108
+        static var createdAt: Date {
+            Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        }
+    }
+
     private let viewModel: VideoViewModel
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let loadMoreVideosSubject = PassthroughSubject<Void, Never>()
     private var cancellables = Set<AnyCancellable>()
+
+    private lazy var featuredMockVideo: VideoSummary = {
+        VideoSummary(
+            id: FeaturedMock.id,
+            fileName: "featured_mock",
+            title: FeaturedMock.title,
+            description: FeaturedMock.description,
+            duration: FeaturedMock.duration,
+            thumbnailURL: "asset:\(FeaturedMock.thumbnailAssetName)",
+            availableQualities: [],
+            viewCount: FeaturedMock.viewCount,
+            likeCount: FeaturedMock.likeCount,
+            isLiked: false,
+            createdAt: FeaturedMock.createdAt
+        )
+    }()
 
     private lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: createLayout())
@@ -219,17 +258,22 @@ final class VideoListViewController: BaseViewController {
     private func applySnapshot(videos: [VideoSummary]) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, VideoSummary>()
 
-        if let firstVideo = videos.first {
-            snapshot.appendSections([.featured])
-            snapshot.appendItems([firstVideo], toSection: .featured)
-        }
+        snapshot.appendSections([.featured])
+        snapshot.appendItems([featuredMockVideo], toSection: .featured)
 
-        if videos.count > 1 {
+        let reorderedVideos = reorderedMainVideos(from: videos)
+        if !reorderedVideos.isEmpty {
             snapshot.appendSections([.main])
-            snapshot.appendItems(Array(videos.dropFirst()), toSection: .main)
+            snapshot.appendItems(reorderedVideos, toSection: .main)
         }
 
         dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func reorderedMainVideos(from videos: [VideoSummary]) -> [VideoSummary] {
+        guard let firstVideo = videos.first else { return [] }
+        guard videos.count > 1 else { return videos }
+        return Array(videos.dropFirst()) + [firstVideo]
     }
 
     private func showAlert(message: String) {
@@ -247,6 +291,9 @@ final class VideoListViewController: BaseViewController {
 extension VideoListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard let video = dataSource.itemIdentifier(for: indexPath) else { return }
+        if video.id == FeaturedMock.id {
+            return
+        }
         coordinator?.showVideoDetail(videoId: video.id, videoSummary: video)
     }
 

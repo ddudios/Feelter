@@ -93,6 +93,9 @@ final class PaymentViewModel: ViewModelProtocol {
                 if success, let impUid = impUid {
                     self.validatePayment(impUid: impUid)
                 } else {
+                    // PG 결제 취소/실패 시 저장된 결제 상태 삭제
+                    PaymentStateManager.shared.clearPendingPayment()
+
                     let message = PaymentErrorMapper.paymentCancelledMessage(reason: errorMsg)
                     self.showErrorSubject.send(message)
                     self.isPaymentInProgress = false

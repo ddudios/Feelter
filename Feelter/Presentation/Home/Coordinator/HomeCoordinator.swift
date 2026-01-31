@@ -35,6 +35,19 @@ final class HomeCoordinator: Coordinator {
 
     @MainActor
     func showFilterDetail(filterId: String) {
+        // 이미 같은 필터 상세 화면이 스택에 있는지 확인 (중복 push 방지)
+        if let existingVC = navigationController.viewControllers.first(where: { vc in
+            if let filterVC = vc as? FilterDetailViewController, filterVC.filterId == filterId {
+                return true
+            }
+            return false
+        }) {
+            // 이미 있으면 해당 화면으로 pop
+            navigationController.popToViewController(existingVC, animated: true)
+            return
+        }
+
+        // 없으면 새로 push
         let filterDetailViewController = FilterDetailViewController(filterId: filterId)
         navigationController.pushViewController(filterDetailViewController, animated: true)
     }
