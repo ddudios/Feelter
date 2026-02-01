@@ -40,7 +40,25 @@ final class LoginViewController: BaseViewController {
         return label
     }()
     private let emailTextField = FeelterTextField(placeholder: "이메일", textContentType: .emailAddress)
+    private let emailErrorLabel = {
+        let label = UILabel()
+        label.font = TextStyle.Pretendard.caption2
+        label.textColor = .Feelter.red
+        label.numberOfLines = 0
+        label.isHidden = true
+        return label
+    }()
+
     private let passwordTextField = FeelterTextField(placeholder: "비밀번호", isSecure: true, textContentType: .password)
+    private let passwordErrorLabel = {
+        let label = UILabel()
+        label.font = TextStyle.Pretendard.caption2
+        label.textColor = .Feelter.red
+        label.numberOfLines = 0
+        label.isHidden = true
+        return label
+    }()
+
     private let loginButton = FeelterButton(title: "로그인")
     private let signUpButton = {
         let button = UIButton()
@@ -287,7 +305,9 @@ final class LoginViewController: BaseViewController {
 
         contentStackView.addArrangedSubview(titleLabel)
         contentStackView.addArrangedSubview(emailTextField)
+        contentStackView.addArrangedSubview(emailErrorLabel)
         contentStackView.addArrangedSubview(passwordTextField)
+        contentStackView.addArrangedSubview(passwordErrorLabel)
         contentStackView.addArrangedSubview(loginButton)
         contentStackView.addArrangedSubview(signUpButton)
         contentStackView.addArrangedSubview(socialLoginDividerView)
@@ -295,8 +315,10 @@ final class LoginViewController: BaseViewController {
 
         // 각 요소 사이의 커스텀 간격 설정
         contentStackView.setCustomSpacing(50, after: titleLabel)
-        contentStackView.setCustomSpacing(20, after: emailTextField)
-        contentStackView.setCustomSpacing(20, after: passwordTextField)
+        contentStackView.setCustomSpacing(20, after: emailTextField) // 초기값: 에러 없을 때 간격
+        contentStackView.setCustomSpacing(20, after: emailErrorLabel)
+        contentStackView.setCustomSpacing(20, after: passwordTextField) // 초기값: 에러 없을 때 간격
+        contentStackView.setCustomSpacing(20, after: passwordErrorLabel)
         contentStackView.setCustomSpacing(10, after: loginButton)
         contentStackView.setCustomSpacing(40, after: signUpButton)
         contentStackView.setCustomSpacing(20, after: socialLoginDividerView)
@@ -316,9 +338,15 @@ final class LoginViewController: BaseViewController {
             make.width.equalTo(contentStackView)
             make.height.equalTo(44)
         }
+        emailErrorLabel.snp.makeConstraints { make in
+            make.width.equalTo(contentStackView)
+        }
         passwordTextField.snp.makeConstraints { make in
             make.width.equalTo(contentStackView)
             make.height.equalTo(44)
+        }
+        passwordErrorLabel.snp.makeConstraints { make in
+            make.width.equalTo(contentStackView)
         }
         loginButton.snp.makeConstraints { make in
             make.width.equalTo(contentStackView)
@@ -379,6 +407,46 @@ final class LoginViewController: BaseViewController {
         output.loginSuccess
             .sink { [weak self] _, _ in
                 self?.coordinator?.loginDidFinish()
+            }
+            .store(in: &cancellables)
+
+        // 이메일 유효성 검증 바인딩
+        output.emailValidationError
+            .sink { [weak self] errorMessage in
+                guard let self = self else { return }
+
+                if let errorMessage = errorMessage {
+                    self.emailTextField.setBorderState(.error)
+                    self.emailErrorLabel.text = errorMessage
+                    self.emailErrorLabel.isHidden = false
+                    // 에러가 있을 때: 4pt 간격
+                    self.contentStackView.setCustomSpacing(4, after: self.emailTextField)
+                } else {
+                    self.emailTextField.setBorderState(.normal)
+                    self.emailErrorLabel.isHidden = true
+                    // 에러가 없을 때: 20pt 간격으로 복구
+                    self.contentStackView.setCustomSpacing(20, after: self.emailTextField)
+                }
+            }
+            .store(in: &cancellables)
+
+        // 비밀번호 유효성 검증 바인딩
+        output.passwordValidationError
+            .sink { [weak self] errorMessage in
+                guard let self = self else { return }
+
+                if let errorMessage = errorMessage {
+                    self.passwordTextField.setBorderState(.error)
+                    self.passwordErrorLabel.text = errorMessage
+                    self.passwordErrorLabel.isHidden = false
+                    // 에러가 있을 때: 4pt 간격
+                    self.contentStackView.setCustomSpacing(4, after: self.passwordTextField)
+                } else {
+                    self.passwordTextField.setBorderState(.normal)
+                    self.passwordErrorLabel.isHidden = true
+                    // 에러가 없을 때: 20pt 간격으로 복구
+                    self.contentStackView.setCustomSpacing(20, after: self.passwordTextField)
+                }
             }
             .store(in: &cancellables)
     }

@@ -14,6 +14,7 @@ final class FeelterTextField: UITextField {
     enum BorderState {
         case normal
         case highlighted
+        case error
 
         var color: UIColor? {
             switch self {
@@ -21,6 +22,8 @@ final class FeelterTextField: UITextField {
                 return .Feelter.gray75
             case .highlighted:
                 return .Feelter.deepTurquoise
+            case .error:
+                return .Feelter.red
             }
         }
     }
@@ -41,6 +44,7 @@ final class FeelterTextField: UITextField {
         editingDidEndSubject.eraseToAnyPublisher()
     }
 
+    private var currentBorderState: BorderState = .normal
     private let isSecure: Bool
     private let textContentTypeValue: UITextContentType?
     private let keyboardTypeValue: UIKeyboardType
@@ -125,6 +129,7 @@ final class FeelterTextField: UITextField {
 
     // MARK: - Public Methods
     func setBorderState(_ state: BorderState) {
+        currentBorderState = state
         layer.borderColor = state.color?.cgColor
     }
 
@@ -163,7 +168,10 @@ final class FeelterTextField: UITextField {
     }
 
     @objc private func editingDidEnd() {
-        setBorderState(.normal)
+        // 에러 상태가 아닐 때만 normal로 변경
+        if currentBorderState != .error {
+            setBorderState(.normal)
+        }
         editingDidEndSubject.send()
     }
 

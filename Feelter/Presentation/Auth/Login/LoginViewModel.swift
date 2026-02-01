@@ -20,6 +20,8 @@ final class LoginViewModel: ViewModelProtocol {
         let isLoading: AnyPublisher<Bool, Never>
         let errorMessage: AnyPublisher<String?, Never>
         let loginSuccess: AnyPublisher<(User, AuthToken), Never>
+        let emailValidationError: AnyPublisher<String?, Never>
+        let passwordValidationError: AnyPublisher<String?, Never>
     }
 
     private let usecase: LoginUsecaseProtocol
@@ -46,14 +48,46 @@ final class LoginViewModel: ViewModelProtocol {
             .assign(to: \.value, on: passwordState)
             .store(in: &cancellables)
 
-        // 버튼 활성화 상태 (이메일, 비밀번호 둘 다 비어있지 않을 때)
-        let isLoginButtonEnabled = Publishers.CombineLatest(input.email, input.password)
-            .map { email, password in
-                let emailText = email ?? ""
-                let passwordText = password ?? ""
-                return !emailText.isEmpty && !passwordText.isEmpty
+        // 이메일 실시간 유효성 검증
+        let emailValidationError = input.email
+            .map { email -> String? in
+                guard let email = email, !email.isEmpty else {
+                    return nil // 빈 값일 때는 에러 표시 안 함
+                }
+
+                let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+                let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+                let isValid = emailPredicate.evaluate(with: email)
+
+                return isValid ? nil : "올바른 이메일 형식을 입력해주세요"
             }
             .eraseToAnyPublisher()
+
+        // 비밀번호 실시간 유효성 검증
+        let passwordValidationError = input.password
+            .map { password -> String? in
+                guard let password = password, !password.isEmpty else {
+                    return nil // 빈 값일 때는 에러 표시 안 함
+                }
+
+                return password.count >= 8 ? nil : "비밀번호는 8자 이상이어야 합니다"
+            }
+            .eraseToAnyPublisher()
+
+        // 버튼 활성화 상태 (이메일, 비밀번호 둘 다 유효할 때)
+        let isLoginButtonEnabled = Publishers.CombineLatest3(
+            input.email,
+            input.password,
+            Publishers.CombineLatest(emailValidationError, passwordValidationError)
+        )
+        .map { email, password, validationErrors in
+            let emailText = email ?? ""
+            let passwordText = password ?? ""
+            let (emailError, passwordError) = validationErrors
+
+            return !emailText.isEmpty && !passwordText.isEmpty && emailError == nil && passwordError == nil
+        }
+        .eraseToAnyPublisher()
 
         input.loginButtonTap
             .sink { [weak self] in
@@ -104,7 +138,9 @@ final class LoginViewModel: ViewModelProtocol {
             isLoginButtonEnabled: isLoginButtonEnabled,
             isLoading: isLoadingSubject.eraseToAnyPublisher(),
             errorMessage: errorMessageSubject.eraseToAnyPublisher(),
-            loginSuccess: loginSuccessSubject.eraseToAnyPublisher()
+            loginSuccess: loginSuccessSubject.eraseToAnyPublisher(),
+            emailValidationError: emailValidationError,
+            passwordValidationError: passwordValidationError
         )
     }
 }
