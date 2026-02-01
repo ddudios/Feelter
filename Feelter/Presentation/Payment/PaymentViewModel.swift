@@ -58,6 +58,11 @@ final class PaymentViewModel: ViewModelProtocol {
     private let filterId: String
     private let price: Int
 
+    /// 미완료 결제 복구를 위한 기존 주문 정보
+    /// - nil: 새로운 결제 (createOrder 호출)
+    /// - non-nil: 기존 주문 재사용 (createOrder 건너뛰고 바로 PG 결제)
+    private let existingOrder: (orderCode: String, totalPrice: Int)?
+
     private var cancellables = Set<AnyCancellable>()
 
     private let loadingStateSubject = CurrentValueSubject<LoadingState, Never>(.idle)
@@ -69,19 +74,33 @@ final class PaymentViewModel: ViewModelProtocol {
     private var isPaymentInProgress = false
 
     // MARK: - Initializer
-    init(usecase: PaymentUsecaseProtocol, filterId: String, price: Int) {
+    init(
+        usecase: PaymentUsecaseProtocol,
+        filterId: String,
+        price: Int,
+        existingOrder: (orderCode: String, totalPrice: Int)? = nil
+    ) {
         self.usecase = usecase
         self.filterId = filterId
         self.price = price
+        self.existingOrder = existingOrder
     }
 
     // MARK: - Transform
     func transform(input: Input) -> Output {
 
-        // 1. 구매 버튼 탭 -> 주문 생성(Create Order) 요청
+        // 1. 구매 버튼 탭 -> 기존 주문 재사용 or 새 주문 생성
         input.didTapPurchaseButton
             .sink { [weak self] in
-                self?.createOrder()
+                guard let self else { return }
+
+                if let existingOrder = self.existingOrder {
+                    // 기존 주문 재사용 (createOrder 건너뛰기)
+                    self.startPaymentWithExistingOrder(existingOrder)
+                } else {
+                    // 새 주문 생성
+                    self.createOrder()
+                }
             }
             .store(in: &cancellables)
 
@@ -112,6 +131,54 @@ final class PaymentViewModel: ViewModelProtocol {
     }
 
     // MARK: - Private Logic
+
+    /// 기존 주문으로 PG 결제 시작 (createOrder 건너뛰기)
+    ///
+    /// 동작:
+    /// 1. 중복 결제 방지 체크
+    /// 2. 기존 주문 정보로 OrderInfo 생성
+    /// 3. PG 결제 화면 표시 (requestIamportPayment)
+    ///
+    /// 고려사항:
+    /// - 서버에 중복 주문 생성하지 않음 (서버 부하 감소)
+    /// - PG사는 중복 merchant_uid 자동 차단 (보안)
+    /// - Access Token으로 본인 인증 보장 (AuthenticationInterceptor)
+    /// - orderId는 더미값 사용 (PG 결제에는 orderCode만 필요)
+    ///
+    /// - Parameter existingOrder: 미완료 결제의 주문 정보 (orderCode, totalPrice)
+    private func startPaymentWithExistingOrder(_ existingOrder: (orderCode: String, totalPrice: Int)) {
+        // 중복 결제 방지
+        guard !isPaymentInProgress else {
+            return
+        }
+
+        isPaymentInProgress = true
+
+        #if DEBUG
+        print("✅ [PaymentViewModel] 기존 주문으로 결제 시작: \(existingOrder.orderCode)")
+        #endif
+
+        // 기존 주문 정보 가져오기
+        guard let pending = PaymentStateManager.shared.getPendingPayment() else {
+            // PendingPayment가 없으면 새 주문 생성으로 전환
+            isPaymentInProgress = false
+            createOrder()
+            return
+        }
+
+        // createOrder를 건너뛰고 바로 OrderInfo 생성
+        // orderId는 빈 문자열 사용 (PG 결제에는 orderCode만 필요)
+        let orderInfo = OrderInfo(
+            orderId: "",  // PG 결제에는 사용되지 않음
+            orderCode: existingOrder.orderCode,
+            totalPrice: existingOrder.totalPrice,
+            createdAt: pending.createdAt  // UserDefaults에서 가져온 생성 시간
+        )
+
+        // PG 결제 화면 표시 (기존 로직과 동일)
+        requestIamportPaymentSubject.send(orderInfo)
+        loadingStateSubject.send(.idle)
+    }
 
     /// [Step 1] 주문 번호 생성 요청
     /// - 서버에 필터 구매 주문을 생성하고 orderCode(merchant_uid)를 발급받습니다

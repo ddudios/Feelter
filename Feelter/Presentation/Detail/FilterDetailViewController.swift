@@ -42,11 +42,16 @@ final class FilterDetailViewController: BaseViewController {
     let filterId: String  // internal로 변경 (중복 push 방지를 위해)
     private let viewModel: FilterDetailViewModel
 
+    /// 미완료 결제 복구를 위한 기존 주문 정보
+    /// - filterId가 일치하는 PendingPayment가 있으면 저장됨
+    private var existingOrder: (orderCode: String, totalPrice: Int)?
+
     private lazy var paymentViewModel: PaymentViewModel = {
         PaymentViewModel(
             usecase: DIContainer.shared.resolve(PaymentUsecaseProtocol.self),
             filterId: filterId,
-            price: currentFilterDetail?.price ?? 0
+            price: currentFilterDetail?.price ?? 0,
+            existingOrder: existingOrder  // 기존 주문 정보 전달
         )
     }()
 
@@ -148,9 +153,38 @@ final class FilterDetailViewController: BaseViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        // 미완료 결제 확인 (같은 filterId인 경우)
+        checkForPendingPayment()
+
         setupDataSource()
         bindFilterDetailViewModel()
         viewDidLoadSubject.send(filterId)
+    }
+
+    /// 미완료 결제가 있는지 확인하고 existingOrder에 저장
+    ///
+    /// 동작:
+    /// 1. PaymentStateManager에서 PendingPayment 조회
+    /// 2. filterId가 현재 화면과 일치하는지 확인
+    /// 3. 일치하면 existingOrder에 저장 (paymentViewModel이 사용)
+    ///
+    /// 고려사항:
+    /// - 다른 필터의 미완료 결제는 무시 (filterId 불일치)
+    /// - 24시간 경과한 주문은 자동 만료 (PaymentStateManager 내부 처리)
+    /// - 주문 재사용으로 중복 주문 생성 방지 (서버 부하 감소)
+    private func checkForPendingPayment() {
+        guard let pending = PaymentStateManager.shared.getPendingPayment(),
+              pending.filterId == self.filterId else {
+            return
+        }
+
+        // 기존 주문 정보 저장 (paymentViewModel 초기화 시 사용됨)
+        existingOrder = (orderCode: pending.orderCode, totalPrice: pending.totalPrice)
+
+        #if DEBUG
+        print("✅ [FilterDetailViewController] 미완료 결제 감지: \(pending.orderCode)")
+        #endif
     }
     
     override func viewWillDisappear(_ animated: Bool) {
