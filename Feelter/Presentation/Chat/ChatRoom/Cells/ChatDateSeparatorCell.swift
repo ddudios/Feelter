@@ -74,7 +74,7 @@ final class ChatDateSeparatorCell: UITableViewCell {
         leftLineView.backgroundColor = .Feelter.gray90
         rightLineView.backgroundColor = .Feelter.gray90
 
-        dateLabel.font = TextStyle.Pretendard.caption1
+        dateLabel.font = TextStyle.Pretendard.caption2
         dateLabel.textColor = .Feelter.gray60
         dateLabel.textAlignment = .center
     }

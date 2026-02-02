@@ -95,7 +95,7 @@ final class FeelterTextField: UITextField {
 
     // MARK: - Setup
     private func setupTextField(placeholder: String) {
-        font = TextStyle.Pretendard.caption1
+        font = TextStyle.Pretendard.caption2
         textColor = .Feelter.gray0
         attributedPlaceholder = NSAttributedString(
             string: placeholder,

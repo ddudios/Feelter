@@ -42,7 +42,7 @@ final class VideoListCell: BaseCollectionViewCell {
 
     private let metadataLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray60
         label.numberOfLines = 1
         return label
@@ -67,7 +67,7 @@ final class VideoListCell: BaseCollectionViewCell {
     private let viewCountCapsuleLabel: PaddingLabel = {
         let label = PaddingLabel()
         label.padding = UIEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .white
         label.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         label.layer.cornerRadius = 12
@@ -79,7 +79,7 @@ final class VideoListCell: BaseCollectionViewCell {
     private let likeCountCapsuleLabel: PaddingLabel = {
         let label = PaddingLabel()
         label.padding = UIEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .white
         label.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         label.layer.cornerRadius = 12

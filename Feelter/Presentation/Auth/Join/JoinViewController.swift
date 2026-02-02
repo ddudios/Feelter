@@ -44,7 +44,7 @@ final class JoinViewController: BaseViewController {
         button.setTitle("중복확인", for: .normal)
         button.setTitleColor(.Feelter.gray100, for: .normal)
         button.setTitleColor(.Feelter.gray75, for: .disabled)
-        button.titleLabel?.font = TextStyle.Pretendard.caption1
+        button.titleLabel?.font = TextStyle.Pretendard.caption2
         button.backgroundColor = .Feelter.deepTurquoise
         button.layer.cornerRadius = 8
         button.isEnabled = false
@@ -53,7 +53,7 @@ final class JoinViewController: BaseViewController {
 
     private let emailValidationLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption2
+        label.font = TextStyle.Pretendard.caption3
         label.textColor = .Feelter.gray75
         label.isHidden = true
         return label
@@ -67,7 +67,7 @@ final class JoinViewController: BaseViewController {
 
     private let passwordValidationLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption2
+        label.font = TextStyle.Pretendard.caption3
         label.textColor = .Feelter.gray75
         label.isHidden = true
         return label
@@ -81,7 +81,7 @@ final class JoinViewController: BaseViewController {
 
     private let passwordMatchLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption2
+        label.font = TextStyle.Pretendard.caption3
         label.textColor = .Feelter.gray75
         label.isHidden = true
         return label
@@ -95,7 +95,7 @@ final class JoinViewController: BaseViewController {
 
     private let nicknameValidationLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption2
+        label.font = TextStyle.Pretendard.caption3
         label.textColor = .Feelter.gray75
         label.isHidden = true
         return label

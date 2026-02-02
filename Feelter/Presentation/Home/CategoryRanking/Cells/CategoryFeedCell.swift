@@ -47,7 +47,7 @@ final class CategoryFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegat
 
     private let categoryLabel = {
         let label = CapsuleLabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray60
         label.backgroundColor = UIColor.Feelter.blackTurquoise
         return label
@@ -62,7 +62,7 @@ final class CategoryFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegat
 
     private let descriptionLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray60
         label.numberOfLines = 3
         return label

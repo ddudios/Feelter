@@ -15,11 +15,13 @@ import KakaoSDKCommon
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
+
         // 1. SDK 초기화 (앱 실행 시 최초 1회)
         KakaoSDK.initSDK(appKey: Config.kakaoLoginKey)
+
+        // Firebase 초기화 (Info.plist에서 Analytics/Crashlytics는 비활성화됨)
         FirebaseApp.configure()
-        
+
         // 2. 알림 권한 설정 및 델리게이트 연결
         setupNotification(application)
         

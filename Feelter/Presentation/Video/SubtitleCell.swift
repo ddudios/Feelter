@@ -14,7 +14,7 @@ final class SubtitleCell: UITableViewCell {
 
     private let timeLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.brightTurquoise
         label.setContentHuggingPriority(.required, for: .horizontal)
         label.setContentCompressionResistancePriority(.required, for: .horizontal)

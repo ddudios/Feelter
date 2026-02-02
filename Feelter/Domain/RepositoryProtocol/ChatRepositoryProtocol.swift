@@ -194,4 +194,18 @@ protocol ChatRepositoryProtocol {
     /// - Returns: 재전송된 메시지
     /// - Throws: 네트워크 에러, 서버 에러
     func retryFailedMessage(chatId: String) async throws -> ChatMessage
+
+    // MARK: - 읽지 않은 메시지 관리
+
+    /// 모든 채팅방의 읽지 않은 메시지 개수를 한 번에 조회
+    ///
+    /// 성능 최적화:
+    /// - 각 채팅방마다 별도 조회 대신 Batch Query로 한 번에 처리
+    /// - CoreData의 count(for:) 사용으로 메모리 사용 최소화
+    ///
+    /// 사용처:
+    /// - 채팅방 목록 화면에서 각 채팅방의 배지 개수 표시
+    ///
+    /// - Returns: [roomId: unreadCount] Dictionary
+    func fetchAllUnreadCounts() -> [String: Int]
 }

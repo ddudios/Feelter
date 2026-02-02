@@ -32,6 +32,9 @@ final class ChatRoomListViewModel {
 
         /// 선택된 채팅방 (화면 이동용)
         let selectedChatRoom: AnyPublisher<ChatRoom, Never>
+
+        /// 읽지 않은 메시지 개수 (Dictionary: [roomId: unreadCount])
+        let unreadCounts: AnyPublisher<[String: Int], Never>
     }
 
     // MARK: - Dependencies
@@ -43,6 +46,9 @@ final class ChatRoomListViewModel {
 
     /// 현재 채팅방 목록
     private let chatRoomsSubject = CurrentValueSubject<[ChatRoom], Never>([])
+
+    /// 읽지 않은 메시지 개수 Dictionary [roomId: unreadCount]
+    private let unreadCountsSubject = CurrentValueSubject<[String: Int], Never>([:])
 
     /// Cancellables
     private var cancellables = Set<AnyCancellable>()
@@ -102,7 +108,8 @@ final class ChatRoomListViewModel {
         return Output(
             chatRooms: chatRoomsSubject.eraseToAnyPublisher(),
             error: errorSubject.eraseToAnyPublisher(),
-            selectedChatRoom: selectedChatRoomSubject.eraseToAnyPublisher()
+            selectedChatRoom: selectedChatRoomSubject.eraseToAnyPublisher(),
+            unreadCounts: unreadCountsSubject.eraseToAnyPublisher()
         )
     }
 
@@ -144,12 +151,21 @@ final class ChatRoomListViewModel {
     /// - Socket.IO로 새 메시지 수신 시
     /// - CoreData 변경 시
     /// → 자동으로 chatRoomsSubject 업데이트
+    /// → 자동으로 unreadCountsSubject 업데이트 (Batch Query)
     ///
     private func setupRealtimeUpdates() {
         repository.observeChatRooms()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] chatRooms in
-                self?.chatRoomsSubject.send(chatRooms)
+                guard let self = self else { return }
+
+                // 1. 채팅방 목록 업데이트
+                self.chatRoomsSubject.send(chatRooms)
+
+                // 2. 읽지 않은 메시지 개수 갱신 (Batch Query)
+                // Repository의 fetchAllUnreadCounts()는 동기 메서드 (빠름)
+                let unreadCounts = self.repository.fetchAllUnreadCounts()
+                self.unreadCountsSubject.send(unreadCounts)
             }
             .store(in: &cancellables)
     }

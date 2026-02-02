@@ -89,7 +89,7 @@ final class FilterMakeViewController: BaseViewController {
         let button = UIButton(type: .system)
         button.setTitle("수정하기", for: .normal)
         button.setTitleColor(.Feelter.gray75, for: .normal)
-        button.titleLabel?.font = TextStyle.Pretendard.caption1
+        button.titleLabel?.font = TextStyle.Pretendard.caption2
         button.isHidden = true
         return button
     }()
@@ -258,7 +258,7 @@ final class FilterMakeViewController: BaseViewController {
 
         filterNameTextField.autocapitalizationType = .words
 
-        descriptionTextView.font = TextStyle.Pretendard.caption1
+        descriptionTextView.font = TextStyle.Pretendard.caption2
         descriptionTextView.textColor = .Feelter.gray0
         descriptionTextView.backgroundColor = .clear
         descriptionTextView.layer.borderWidth = 1
@@ -271,7 +271,7 @@ final class FilterMakeViewController: BaseViewController {
         descriptionTextView.delegate = self
 
         descriptionPlaceholderLabel.text = "이 필터에 대해 간단하게 소개해주세요."
-        descriptionPlaceholderLabel.font = TextStyle.Pretendard.caption1
+        descriptionPlaceholderLabel.font = TextStyle.Pretendard.caption2
         descriptionPlaceholderLabel.textColor = .Feelter.gray75
         descriptionPlaceholderLabel.isUserInteractionEnabled = false
         descriptionTextView.addSubview(descriptionPlaceholderLabel)
@@ -350,7 +350,7 @@ final class FilterMakeViewController: BaseViewController {
         container.isUserInteractionEnabled = false
         let label = UILabel()
         label.text = "원"
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray60
         label.isUserInteractionEnabled = false
         container.addSubview(label)

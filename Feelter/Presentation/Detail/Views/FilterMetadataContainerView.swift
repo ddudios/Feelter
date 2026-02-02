@@ -141,7 +141,7 @@ final class FilterMetadataContainerView: UIView {
         mapPlaceholderImageView.tintColor = .Feelter.gray75
         mapPlaceholderImageView.image = UIImage.Icon.noLocation?.withRenderingMode(.alwaysTemplate)
 
-        mapPlaceholderLabel.font = TextStyle.Pretendard.caption1
+        mapPlaceholderLabel.font = TextStyle.Pretendard.caption2
         mapPlaceholderLabel.textColor = .Feelter.gray75
         mapPlaceholderLabel.text = "No Location"
 

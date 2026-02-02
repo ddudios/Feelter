@@ -649,6 +649,29 @@ final class ChatRepository: ChatRepositoryProtocol {
         )
     }
 
+    /// 모든 채팅방의 읽지 않은 메시지 개수를 한 번에 조회
+    ///
+    /// 동작:
+    /// 1. Keychain에서 currentUserId 조회
+    /// 2. CoreDataManager의 Batch Query 호출
+    /// 3. Dictionary 반환
+    ///
+    /// - Returns: [roomId: unreadCount] Dictionary
+    func fetchAllUnreadCounts() -> [String: Int] {
+        // 1. currentUserId 확인
+        guard let userId = currentUserId else {
+            return [:]  // 로그인 안 되어 있으면 빈 Dictionary
+        }
+
+        // 2. CoreDataManager의 Batch Query 호출
+        do {
+            return try coreDataManager.fetchUnreadMessageCounts(currentUserId: userId)
+        } catch {
+            // 에러 발생 시 빈 Dictionary 반환 (앱이 멈추면 안 됨)
+            return [:]
+        }
+    }
+
     // MARK: - Private Helpers
     /// Socket.IO 메시지 리스너 설정
     ///

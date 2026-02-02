@@ -259,7 +259,7 @@ final class SearchPostCell: UITableViewCell {
         authorNameLabel.font = TextStyle.Pretendard.body2
         authorNameLabel.textColor = .Feelter.gray15
 
-        locationLabel.font = TextStyle.Pretendard.caption1
+        locationLabel.font = TextStyle.Pretendard.caption2
         locationLabel.textColor = .Feelter.gray60
 
         moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
@@ -278,21 +278,21 @@ final class SearchPostCell: UITableViewCell {
         likeButton.tintColor = .Feelter.gray0
         likeButton.addTarget(self, action: #selector(likeButtonTapped), for: .touchUpInside)
 
-        likeCountLabel.font = TextStyle.Pretendard.caption1
+        likeCountLabel.font = TextStyle.Pretendard.caption2
         likeCountLabel.textColor = .Feelter.gray45
 
         commentButton.setImage(UIImage(systemName: "message.fill"), for: .normal)
         commentButton.tintColor = .Feelter.gray45
         commentButton.addTarget(self, action: #selector(commentButtonTapped), for: .touchUpInside)
 
-        commentCountLabel.font = TextStyle.Pretendard.caption1
+        commentCountLabel.font = TextStyle.Pretendard.caption2
         commentCountLabel.textColor = .Feelter.gray45
 
         titleLabel.font = TextStyle.Pretendard.body1
         titleLabel.textColor = .Feelter.gray15
         titleLabel.numberOfLines = 2
 
-        categoryLabel.font = TextStyle.Pretendard.caption1
+        categoryLabel.font = TextStyle.Pretendard.caption2
         categoryLabel.textColor = .Feelter.gray60
         categoryLabel.backgroundColor = UIColor.Feelter.blackTurquoise
 
@@ -300,7 +300,7 @@ final class SearchPostCell: UITableViewCell {
         contentLabel.textColor = .Feelter.gray60
         contentLabel.numberOfLines = 0
 
-        timeLabel.font = TextStyle.Pretendard.caption1
+        timeLabel.font = TextStyle.Pretendard.caption2
         timeLabel.textColor = .Feelter.gray75
     }
 

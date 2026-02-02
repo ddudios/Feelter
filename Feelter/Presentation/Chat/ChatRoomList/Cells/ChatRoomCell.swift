@@ -30,7 +30,8 @@ final class ChatRoomCell: UITableViewCell {
             left: Layout.badgeHorizontalPadding,
             bottom: Layout.badgeVerticalPadding,
             right: Layout.badgeHorizontalPadding
-        )
+        ),
+        forceCircle: true  // ✅ 정원 모양 강제
     )
     private let failedMessageIconView = UIImageView()
 
@@ -144,7 +145,7 @@ final class ChatRoomCell: UITableViewCell {
         nameLabel.textColor = .Feelter.gray15
         nameLabel.numberOfLines = 1
 
-        timeLabel.font = TextStyle.Pretendard.caption1
+        timeLabel.font = TextStyle.Pretendard.caption2
         timeLabel.textColor = .Feelter.gray60
         timeLabel.textAlignment = .right
 

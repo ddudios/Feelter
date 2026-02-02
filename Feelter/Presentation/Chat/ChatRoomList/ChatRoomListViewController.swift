@@ -45,6 +45,14 @@ final class ChatRoomListViewController: BaseViewController {
         }
     }
 
+    /// 읽지 않은 메시지 개수 Dictionary [roomId: unreadCount]
+    private var unreadCounts: [String: Int] = [:] {
+        didSet {
+            // unreadCounts가 업데이트되면 테이블뷰 리로드
+            chatRoomTableView.reloadData()
+        }
+    }
+
     private var currentUserId: String? {
         return KeychainManager.shared.read(account: "userId")
     }
@@ -155,6 +163,14 @@ final class ChatRoomListViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] chatRoom in
                 self?.navigateToChatRoom(chatRoom)
+            }
+            .store(in: &cancellables)
+
+        // 읽지 않은 메시지 개수 업데이트
+        output.unreadCounts
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] unreadCounts in
+                self?.unreadCounts = unreadCounts
             }
             .store(in: &cancellables)
     }
@@ -274,12 +290,14 @@ extension ChatRoomListViewController: UITableViewDataSource {
 
         let chatRoom = chatRooms[indexPath.row]
         let hasFailedMessages = viewModel.hasFailedMessages(roomId: chatRoom.roomId)
-        // TODO: 읽지 않은 메시지 개수 계산 (Repository에서 가져와야 함)
-        // 일단은 0을 전달하여 "N"으로 표시
+
+        // ✅ Dictionary에서 읽지 않은 메시지 개수 조회 (O(1) 룩업)
+        let unreadCount = unreadCounts[chatRoom.roomId] ?? 0
+
         cell.configure(
             with: chatRoom,
             currentUserId: currentUserId,
-            unreadCount: 0,
+            unreadCount: unreadCount,
             hasFailedMessages: hasFailedMessages
         )
         return cell

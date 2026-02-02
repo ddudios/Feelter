@@ -303,7 +303,7 @@ final class ProfileViewController: BaseViewController {
         filterBoxView.clipsToBounds = true
 
         filterBoxIconView.text = "Filter"
-        filterBoxIconView.font = TextStyle.Pretendard.caption2
+        filterBoxIconView.font = TextStyle.Pretendard.caption3
         filterBoxIconView.textColor = .Feelter.gray60
 
         filterBoxCountLabel.font = TextStyle.Mulgyeol.body1
@@ -338,7 +338,7 @@ final class ProfileViewController: BaseViewController {
         hashTagsCollectionView.setContentHuggingPriority(.defaultLow, for: .horizontal)
         hashTagsCollectionView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        introductionLabel.font = TextStyle.Pretendard.caption1
+        introductionLabel.font = TextStyle.Pretendard.caption2
         introductionLabel.textColor = .Feelter.gray60
         introductionLabel.textAlignment = .left
         introductionLabel.numberOfLines = 0
@@ -729,7 +729,7 @@ private final class ProfileTagCell: UICollectionViewCell {
         tagLabel.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-        tagLabel.font = TextStyle.Pretendard.caption1
+        tagLabel.font = TextStyle.Pretendard.caption2
         tagLabel.textColor = .Feelter.gray60
         tagLabel.backgroundColor = .Feelter.blackTurquoise
     }

@@ -121,7 +121,7 @@ final class TodayAuthorCell: BaseCollectionViewCell {
         introductionLabel.textColor = .Feelter.gray60
         introductionLabel.numberOfLines = 0
 
-        descriptionLabel.font = TextStyle.Pretendard.caption1
+        descriptionLabel.font = TextStyle.Pretendard.caption2
         descriptionLabel.textColor = .Feelter.gray60
         descriptionLabel.numberOfLines = 0
     }
@@ -246,7 +246,7 @@ private final class TagWrapView: UIView {
 
         for tag in tags {
             let label = CapsuleLabel(padding: UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12))
-            label.font = TextStyle.Pretendard.caption1
+            label.font = TextStyle.Pretendard.caption2
             label.textColor = .Feelter.gray60
             label.backgroundColor = .Feelter.blackTurquoise
             label.text = tag.hasPrefix("#") ? tag : "#\(tag)"

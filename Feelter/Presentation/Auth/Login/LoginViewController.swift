@@ -42,7 +42,7 @@ final class LoginViewController: BaseViewController {
     private let emailTextField = FeelterTextField(placeholder: "이메일", textContentType: .emailAddress)
     private let emailErrorLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption2
+        label.font = TextStyle.Pretendard.caption3
         label.textColor = .Feelter.red
         label.numberOfLines = 0
         label.isHidden = true
@@ -52,7 +52,7 @@ final class LoginViewController: BaseViewController {
     private let passwordTextField = FeelterTextField(placeholder: "비밀번호", isSecure: true, textContentType: .password)
     private let passwordErrorLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption2
+        label.font = TextStyle.Pretendard.caption3
         label.textColor = .Feelter.red
         label.numberOfLines = 0
         label.isHidden = true
@@ -64,7 +64,7 @@ final class LoginViewController: BaseViewController {
         let button = UIButton()
         button.setTitle("회원가입", for: .normal)
         button.setTitleColor(.Feelter.gray0, for: .normal)
-        button.titleLabel?.font = TextStyle.Pretendard.caption1
+        button.titleLabel?.font = TextStyle.Pretendard.caption2
         button.backgroundColor = .clear
         return button
     }()
@@ -79,7 +79,7 @@ final class LoginViewController: BaseViewController {
 
         let label = UILabel()
         label.text = "간편 로그인"
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray75
         label.textAlignment = .center
         containerView.addSubview(label)

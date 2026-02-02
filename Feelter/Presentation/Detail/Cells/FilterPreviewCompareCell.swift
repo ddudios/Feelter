@@ -210,12 +210,12 @@ final class FilterPreviewCompareCell: BaseCollectionViewCell, UIGestureRecognize
         imageContainerView.clipsToBounds = true
 
         afterLabel.text = "After"
-        afterLabel.font = TextStyle.Pretendard.caption1
+        afterLabel.font = TextStyle.Pretendard.caption2
         afterLabel.textColor = .Feelter.gray60
         afterLabel.backgroundColor = UIColor.Feelter.gray90?.withAlphaComponent(0.7)
 
         beforeLabel.text = "Before"
-        beforeLabel.font = TextStyle.Pretendard.caption1
+        beforeLabel.font = TextStyle.Pretendard.caption2
         beforeLabel.textColor = .Feelter.gray60
         beforeLabel.backgroundColor = UIColor.Feelter.gray90?.withAlphaComponent(0.7)
 

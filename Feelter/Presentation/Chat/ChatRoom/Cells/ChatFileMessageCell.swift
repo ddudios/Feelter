@@ -81,7 +81,7 @@ final class ChatFileMessageCell: UITableViewCell {
     /// 시간 라벨
     private let timeLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray60
         return label
     }()

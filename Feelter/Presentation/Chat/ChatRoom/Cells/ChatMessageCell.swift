@@ -316,7 +316,7 @@ final class ChatMessageCell: UITableViewCell {
         textBubbleView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // UITextView 설정 (복사 가능)
-        messageTextView.font = TextStyle.Pretendard.body2
+        messageTextView.font = TextStyle.Pretendard.caption1
         messageTextView.textColor = .Feelter.gray0
         messageTextView.backgroundColor = .clear
         messageTextView.isEditable = false
@@ -334,10 +334,10 @@ final class ChatMessageCell: UITableViewCell {
         timeStackView.spacing = 2
         timeStackView.alignment = .trailing
 
-        timeLabel.font = TextStyle.Pretendard.caption1
+        timeLabel.font = TextStyle.Pretendard.caption2
         timeLabel.textColor = .Feelter.gray60
 
-        statusLabel.font = TextStyle.Pretendard.caption2
+        statusLabel.font = TextStyle.Pretendard.caption3
         statusLabel.textColor = .Feelter.gray60
 
         statusIconImageView.contentMode = .scaleAspectFit

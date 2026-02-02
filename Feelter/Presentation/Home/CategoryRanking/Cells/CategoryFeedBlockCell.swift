@@ -39,7 +39,7 @@ final class CategoryFeedBlockCell: BaseCollectionViewCell, UIGestureRecognizerDe
 
     private let creatorNameLabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray90
         return label
     }()

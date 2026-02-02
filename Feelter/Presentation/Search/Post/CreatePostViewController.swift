@@ -102,7 +102,7 @@ final class CreatePostViewController: BaseViewController {
         let button = UIButton(type: .system)
         button.setTitle("추가하기", for: .normal)
         button.setTitleColor(.Feelter.gray75, for: .normal)
-        button.titleLabel?.font = TextStyle.Pretendard.caption1
+        button.titleLabel?.font = TextStyle.Pretendard.caption2
         return button
     }()
 
@@ -259,7 +259,7 @@ final class CreatePostViewController: BaseViewController {
         titleTextField.autocapitalizationType = .sentences
         titleTextField.delegate = self
 
-        contentTextView.font = TextStyle.Pretendard.caption1
+        contentTextView.font = TextStyle.Pretendard.caption2
         contentTextView.textColor = .Feelter.gray0
         contentTextView.backgroundColor = .clear
         contentTextView.layer.borderWidth = 1
@@ -269,7 +269,7 @@ final class CreatePostViewController: BaseViewController {
         contentTextView.delegate = self
 
         contentPlaceholderLabel.text = "내용을 입력해주세요."
-        contentPlaceholderLabel.font = TextStyle.Pretendard.caption1
+        contentPlaceholderLabel.font = TextStyle.Pretendard.caption2
         contentPlaceholderLabel.textColor = .Feelter.gray75
         contentPlaceholderLabel.isUserInteractionEnabled = false
         contentTextView.addSubview(contentPlaceholderLabel)
@@ -656,7 +656,7 @@ final class CreatePostViewController: BaseViewController {
         button.setTitle("필터 적용", for: .normal)
         button.setTitleColor(.Feelter.gray45, for: .normal)
         button.setImage(UIImage.TabBar.filterFill, for: .normal)
-        button.titleLabel?.font = TextStyle.Pretendard.caption1
+        button.titleLabel?.font = TextStyle.Pretendard.caption2
         button.imageView?.contentMode = .scaleAspectFit
         button.semanticContentAttribute = .forceLeftToRight
         button.tintColor = .Feelter.gray45

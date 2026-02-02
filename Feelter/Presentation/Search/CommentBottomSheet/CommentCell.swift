@@ -119,10 +119,10 @@ final class CommentCell: UITableViewCell {
         profileImageView.layer.borderColor = UIColor.Feelter.gray75?.withAlphaComponent(0.5).cgColor
         profileImageView.backgroundColor = .Feelter.gray100
 
-        nicknameLabel.font = TextStyle.Pretendard.caption1
+        nicknameLabel.font = TextStyle.Pretendard.caption2
         nicknameLabel.textColor = .Feelter.gray15
 
-        timeLabel.font = TextStyle.Pretendard.caption2
+        timeLabel.font = TextStyle.Pretendard.caption3
         timeLabel.textColor = .Feelter.gray75
 
         contentLabel.font = TextStyle.Pretendard.body2

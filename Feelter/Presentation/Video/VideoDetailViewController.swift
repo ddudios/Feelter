@@ -69,7 +69,7 @@ final class VideoDetailViewController: BaseViewController {
 
     private lazy var currentTimeLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .white
         label.text = "00:00"
         return label
@@ -77,7 +77,7 @@ final class VideoDetailViewController: BaseViewController {
 
     private lazy var durationLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .white
         label.text = "00:00"
         return label
@@ -125,7 +125,7 @@ final class VideoDetailViewController: BaseViewController {
 
     private lazy var statsLabel: UILabel = {
         let label = UILabel()
-        label.font = TextStyle.Pretendard.caption1
+        label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray30
         return label
     }()
