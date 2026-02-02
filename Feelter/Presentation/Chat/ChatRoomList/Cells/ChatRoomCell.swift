@@ -13,7 +13,7 @@ final class ChatRoomCell: UITableViewCell {
     private enum Layout {
         static let profileSize: CGFloat = 52
         static let horizontalInset: CGFloat = 20
-        static let verticalInset: CGFloat = 16
+        static let verticalInset: CGFloat = 20
         static let contentSpacing: CGFloat = 12
         static let stackSpacing: CGFloat = 6
         static let badgeHorizontalPadding: CGFloat = 6

@@ -20,13 +20,20 @@ final class ChatFileMessageCell: UITableViewCell {
     private enum Layout {
         static let profileSize: CGFloat = 36
         static let horizontalPadding: CGFloat = 16
-        static let verticalPadding: CGFloat = 4
+        static let normalTopInset: CGFloat = 6  // 같은 발신자 메시지 간격
+        static let senderChangedTopInset: CGFloat = normalTopInset * 3  // 발신자 변경 시 간격(3배)
         static let elementSpacing: CGFloat = 8
+        static let nicknameBottomSpacing: CGFloat = 6
+        static let profileToNicknameSpacing: CGFloat = 12
         static let bubbleCornerRadius: CGFloat = 12
         static let bubblePadding: CGFloat = 12
         static let maxBubbleWidthRatio: CGFloat = 0.65
         static let fileIconSize: CGFloat = 30
     }
+
+    private var profileTopConstraint: Constraint?
+    private var nicknameTopConstraint: Constraint?
+    private var bubbleTopConstraint: Constraint?
 
     // MARK: - UI Components
 
@@ -38,6 +45,16 @@ final class ChatFileMessageCell: UITableViewCell {
         imageView.layer.cornerRadius = Layout.profileSize / 2
         imageView.backgroundColor = .clear
         return imageView
+    }()
+
+    private let nicknameLabel: UILabel = {
+        let label = UILabel()
+        label.font = TextStyle.Pretendard.caption2
+        label.textColor = .Feelter.gray60
+        label.numberOfLines = 1
+        label.lineBreakMode = .byTruncatingTail
+        label.isHidden = true
+        return label
     }()
 
     /// 파일 정보를 담는 버블
@@ -123,6 +140,8 @@ final class ChatFileMessageCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         profileImageView.image = nil
+        nicknameLabel.text = nil
+        nicknameLabel.isHidden = true
         fileNameLabel.text = nil
         timeLabel.text = nil
         currentIsOutgoing = false
@@ -137,18 +156,34 @@ final class ChatFileMessageCell: UITableViewCell {
         isOutgoing: Bool,
         showsTime: Bool,
         showsProfile: Bool,
-        opponentProfileImagePath: String?
+        opponentProfileImagePath: String?,
+        opponentNickname: String?,
+        isFirstFromDifferentSender: Bool = false
     ) {
         currentIsOutgoing = isOutgoing
-
 
         fileNameLabel.text = file.fileName
 
         timeLabel.text = Self.timeFormatter.string(from: date)
         timeStackView.isHidden = !showsTime
 
-        // 레이아웃 방향
-        updateLayoutDirection(isOutgoing: isOutgoing)
+        // ✅ 발신자 변경 시 상단 여백 조정 (레이아웃 설정 전에 계산)
+        let topInset = isFirstFromDifferentSender ? Layout.senderChangedTopInset : Layout.normalTopInset
+        let trimmedNickname = opponentNickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shouldShowNickname = !isOutgoing && showsProfile && !(trimmedNickname?.isEmpty ?? true)
+        nicknameLabel.text = shouldShowNickname ? trimmedNickname : nil
+        nicknameLabel.isHidden = !shouldShowNickname
+
+        let nicknameHeight = shouldShowNickname ? ceil(nicknameLabel.font?.lineHeight ?? 0) : 0
+        let nicknameSpacing = shouldShowNickname ? Layout.nicknameBottomSpacing : 0
+        let bubbleTopInset = topInset + nicknameHeight + nicknameSpacing
+
+        // 레이아웃 방향 (계산된 topInset 전달)
+        updateLayoutDirection(isOutgoing: isOutgoing, topInset: bubbleTopInset)
+
+        // 프로필 및 닉네임 constraint 업데이트 (이들은 remakeConstraints에서 재생성되지 않음)
+        profileTopConstraint?.update(inset: topInset)
+        nicknameTopConstraint?.update(inset: topInset)
 
         // 프로필 이미지 표시 로직
         if isOutgoing {
@@ -173,6 +208,7 @@ final class ChatFileMessageCell: UITableViewCell {
 
     private func configureHierarchy() {
         contentView.addSubview(profileImageView)
+        contentView.addSubview(nicknameLabel)
         contentView.addSubview(bubbleContainerView)
         contentView.addSubview(timeStackView)
 
@@ -190,9 +226,15 @@ final class ChatFileMessageCell: UITableViewCell {
     private func configureLayout() {
         // 프로필 이미지 (좌측 상단 고정)
         profileImageView.snp.makeConstraints { make in
-            make.top.equalToSuperview().inset(Layout.verticalPadding)
+            profileTopConstraint = make.top.equalToSuperview().inset(Layout.normalTopInset).constraint
             make.leading.equalToSuperview().inset(Layout.horizontalPadding)
             make.width.height.equalTo(Layout.profileSize)
+        }
+
+        nicknameLabel.snp.makeConstraints { make in
+            nicknameTopConstraint = make.top.equalToSuperview().inset(Layout.normalTopInset).constraint
+            make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.profileToNicknameSpacing)
+            make.trailing.lessThanOrEqualToSuperview().inset(Layout.horizontalPadding)
         }
 
         // 버블 내부 스택뷰
@@ -212,7 +254,7 @@ final class ChatFileMessageCell: UITableViewCell {
         fileIconImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // 초기 레이아웃 (수신 메시지 기본값)
-        updateLayoutDirection(isOutgoing: false)
+        updateLayoutDirection(isOutgoing: false, topInset: Layout.normalTopInset)
     }
 
     private func configureView() {
@@ -237,7 +279,7 @@ final class ChatFileMessageCell: UITableViewCell {
         }
     }
 
-    private func updateLayoutDirection(isOutgoing: Bool) {
+    private func updateLayoutDirection(isOutgoing: Bool, topInset: CGFloat) {
         let maxBubbleWidth = UIScreen.main.bounds.width * Layout.maxBubbleWidthRatio
 
         // 기존 제약조건 제거
@@ -247,8 +289,8 @@ final class ChatFileMessageCell: UITableViewCell {
         if isOutgoing {
             // 발신: 우측 정렬
             bubbleContainerView.snp.makeConstraints { make in
-                make.top.equalToSuperview().inset(Layout.verticalPadding)
-                make.bottom.equalToSuperview().inset(Layout.verticalPadding)
+                bubbleTopConstraint = make.top.equalToSuperview().inset(topInset).constraint
+                make.bottom.equalToSuperview().inset(4)
                 make.trailing.equalToSuperview().inset(Layout.horizontalPadding)
                 make.width.lessThanOrEqualTo(maxBubbleWidth)
             }
@@ -260,8 +302,8 @@ final class ChatFileMessageCell: UITableViewCell {
         } else {
             // 수신: 좌측 정렬 (프로필 이미지 옆)
             bubbleContainerView.snp.makeConstraints { make in
-                make.top.equalToSuperview().inset(Layout.verticalPadding)
-                make.bottom.equalToSuperview().inset(Layout.verticalPadding)
+                bubbleTopConstraint = make.top.equalToSuperview().inset(topInset).constraint
+                make.bottom.equalToSuperview().inset(4)
                 make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.elementSpacing)
                 make.width.lessThanOrEqualTo(maxBubbleWidth)
             }

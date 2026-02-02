@@ -63,6 +63,7 @@ struct ChatMessageViewItem {
     var status: MessageSendStatus
     var showsTime: Bool
     var showsProfile: Bool  // 프로필 이미지 표시 여부
+    var isFirstFromDifferentSender: Bool = false  // 발신자가 바뀐 첫 메시지 여부
 
     /// 파일 첨부가 있는지 여부 (이미지 제외 파일)
     var hasFiles: Bool {
@@ -88,9 +89,19 @@ final class ChatMessageCell: UITableViewCell {
         static let bubbleSpacing: CGFloat = 6
         static let bubbleCornerRadius: CGFloat = Radius.l
         static let statusIconSize: CGFloat = 16
+        static let normalTopInset: CGFloat = 6  // 같은 발신자 메시지 간격
+        static let senderChangedTopInset: CGFloat = normalTopInset * 3  // 발신자 변경 시 간격(3배)
+        static let nicknameBottomSpacing: CGFloat = 6
+        static let profileToNicknameSpacing: CGFloat = 12
+        static let profileToBubbleSpacing: CGFloat = 8
     }
 
+    private var profileTopConstraint: Constraint?
+    private var nicknameTopConstraint: Constraint?
+    private var horizontalStackTopConstraint: Constraint?
+
     private let profileImageView = UIImageView()
+    private let nicknameLabel = UILabel()
     private let bubbleContainerView = UIView()
     private let bubbleStackView = UIStackView()
     private let messageTextView = UITextView()  // UITextView로 변경
@@ -146,6 +157,8 @@ final class ChatMessageCell: UITableViewCell {
         currentIsOutgoing = false
         hasImageAndText = false
         messageTextView.text = nil
+        nicknameLabel.text = nil
+        nicknameLabel.isHidden = true
         timeLabel.text = nil
         statusLabel.text = nil
         statusIconImageView.image = nil
@@ -159,14 +172,34 @@ final class ChatMessageCell: UITableViewCell {
         textBubbleView.snp.removeConstraints()
     }
 
-    func configure(with item: ChatMessageViewItem, opponentProfileImagePath: String?) {
+    func configure(
+        with item: ChatMessageViewItem,
+        opponentProfileImagePath: String?,
+        opponentNickname: String?
+    ) {
         currentIsOutgoing = item.isOutgoing
+
+        // ✅ 닉네임 및 여백 계산 (configureLayoutDirection 전에 미리 계산)
+        let topInset = item.isFirstFromDifferentSender ? Layout.senderChangedTopInset : Layout.normalTopInset
+        let trimmedNickname = opponentNickname?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shouldShowNickname = !item.isOutgoing && item.showsProfile && !(trimmedNickname?.isEmpty ?? true)
+        nicknameLabel.text = shouldShowNickname ? trimmedNickname : nil
+        nicknameLabel.isHidden = !shouldShowNickname
+
+        let nicknameHeight = shouldShowNickname ? ceil(nicknameLabel.font?.lineHeight ?? 0) : 0
+        let nicknameSpacing = shouldShowNickname ? Layout.nicknameBottomSpacing : 0
+        let bubbleTopInset = topInset + nicknameHeight + nicknameSpacing
+
         configureMessageContent(text: item.text, images: item.images)
         configureTextWithTimeLayout(isOutgoing: item.isOutgoing)
         configureTimeLabel(date: item.date, showsTime: item.showsTime, status: item.status)
         configureStatus(for: item.status, showsTime: item.showsTime, isOutgoing: item.isOutgoing)
-        configureLayoutDirection(isOutgoing: item.isOutgoing)
+        configureLayoutDirection(isOutgoing: item.isOutgoing, topInset: bubbleTopInset)
         configureColors(isOutgoing: item.isOutgoing)
+
+        // ✅ 프로필 및 닉네임 constraint 업데이트
+        profileTopConstraint?.update(inset: topInset)
+        nicknameTopConstraint?.update(inset: topInset)
 
         // 이미지 탭 제스처 연결
         imageGridView.onImageTapped = { [weak self] tappedIndex in
@@ -226,6 +259,7 @@ final class ChatMessageCell: UITableViewCell {
 
     private func configureHierarchy() {
         contentView.addSubview(profileImageView)
+        contentView.addSubview(nicknameLabel)
         contentView.addSubview(horizontalStackView)
         bubbleContainerView.addSubview(bubbleStackView)
 
@@ -242,14 +276,21 @@ final class ChatMessageCell: UITableViewCell {
     private func configureLayout() {
         // 프로필 이미지: 상단 고정, 크기 고정 (셀 높이와 무관하게 36x36 유지)
         profileImageView.snp.makeConstraints { make in
-            make.top.equalToSuperview().inset(4)
+            profileTopConstraint = make.top.equalToSuperview().inset(Layout.normalTopInset).constraint
             make.leading.equalToSuperview().inset(16)
             make.width.equalTo(Layout.profileSize).priority(.required)
             make.height.equalTo(Layout.profileSize).priority(.required)
         }
 
+        nicknameLabel.snp.makeConstraints { make in
+            nicknameTopConstraint = make.top.equalToSuperview().inset(Layout.normalTopInset).constraint
+            make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.profileToNicknameSpacing)
+            make.trailing.lessThanOrEqualToSuperview().inset(16)
+        }
+
         horizontalStackView.snp.makeConstraints { make in
-            make.top.bottom.equalToSuperview().inset(4).priority(.high)
+            horizontalStackTopConstraint = make.top.equalToSuperview().inset(Layout.normalTopInset).constraint
+            make.bottom.equalToSuperview().inset(4).priority(.high)
             make.trailing.equalToSuperview().inset(16)
         }
 
@@ -290,6 +331,12 @@ final class ChatMessageCell: UITableViewCell {
         profileImageView.setContentHuggingPriority(.required, for: .horizontal)
         profileImageView.setContentCompressionResistancePriority(.required, for: .vertical)
         profileImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        nicknameLabel.font = TextStyle.Pretendard.caption2
+        nicknameLabel.textColor = .Feelter.gray60
+        nicknameLabel.numberOfLines = 1
+        nicknameLabel.lineBreakMode = .byTruncatingTail
+        nicknameLabel.isHidden = true
 
         bubbleContainerView.layer.cornerRadius = 0  // 컨테이너는 투명
         bubbleContainerView.clipsToBounds = false
@@ -526,7 +573,7 @@ final class ChatMessageCell: UITableViewCell {
         bubbleMaxWidthConstraint?.update(offset: offset)
     }
 
-    private func configureLayoutDirection(isOutgoing: Bool) {
+    private func configureLayoutDirection(isOutgoing: Bool, topInset: CGFloat) {
         horizontalStackView.arrangedSubviews.forEach { view in
             horizontalStackView.removeArrangedSubview(view)
             view.removeFromSuperview()
@@ -539,13 +586,14 @@ final class ChatMessageCell: UITableViewCell {
 
         // horizontalStackView의 leading 제약조건 업데이트
         horizontalStackView.snp.remakeConstraints { make in
-            make.top.bottom.equalToSuperview().inset(4).priority(.high)
+            horizontalStackTopConstraint = make.top.equalToSuperview().inset(topInset).constraint
+            make.bottom.equalToSuperview().inset(4).priority(.high)
             make.trailing.equalToSuperview().inset(16)
             if isOutgoing {
                 make.leading.equalToSuperview().inset(16)
             } else {
                 // 프로필 이미지 오른쪽에 위치
-                make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.stackSpacing)
+                make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.profileToBubbleSpacing)
             }
         }
 

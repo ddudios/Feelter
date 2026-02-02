@@ -56,6 +56,7 @@ final class ChatRoomViewController: BaseViewController {
     private var selectedImagesHeightConstraint: Constraint?
     private var textViewHeightConstraint: Constraint?
     private var items: [Item] = []
+    private var lastMessageRowIndex: Int?
     private var messages: [ChatMessageViewItem] = [] {
         didSet {
             rebuildItems()
@@ -536,6 +537,10 @@ final class ChatRoomViewController: BaseViewController {
     private func rebuildItems() {
         let oldItemsCount = items.count
         items = buildItems(from: messages)
+        lastMessageRowIndex = items.lastIndex { item in
+            if case .message = item { return true }
+            return false
+        }
 
         // ✅ TableView 업데이트 (reloadData만 사용 - 행 개수 변경 시)
         // beginUpdates/endUpdates는 이미지 로딩 완료 시에만 사용 (셀 높이 재계산용)
@@ -578,7 +583,6 @@ final class ChatRoomViewController: BaseViewController {
 
             // 이전 메시지 체크
             let previousMessage = index > 0 ? sortedMessages[index - 1] : nil
-            let isPreviousFailed = previousMessage?.status == .failed
 
             // showsTime 계산
             if index < sortedMessages.count - 1 {
@@ -588,15 +592,16 @@ final class ChatRoomViewController: BaseViewController {
                     equalTo: nextMessage.date,
                     toGranularity: .minute
                 )
+                let isSameSender = nextMessage.isOutgoing == message.isOutgoing
 
-                // 다음 메시지가 failed이거나 이전 메시지가 failed이면 시간 표시
-                if nextMessage.status == .failed || isPreviousFailed {
-                    updatedMessage.showsTime = true
+                if message.status == .failed {
+                    updatedMessage.showsTime = false
                 } else {
-                    updatedMessage.showsTime = !isSameMinute
+                    // 같은 사람 + 같은 시간(분) 연속이면 마지막 버블에만 시간 표시
+                    updatedMessage.showsTime = !(isSameSender && isSameMinute)
                 }
             } else {
-                updatedMessage.showsTime = true
+                updatedMessage.showsTime = message.status != .failed
             }
 
             // showsProfile 계산 (상대방 메시지만 해당)
@@ -614,7 +619,24 @@ final class ChatRoomViewController: BaseViewController {
                 updatedMessage.showsProfile = false
             }
 
+            // isFirstFromDifferentSender 계산 (발신자가 바뀐 첫 메시지)
+            if let prev = previousMessage {
+                // 이전 메시지와 발신자가 다르면 true
+                updatedMessage.isFirstFromDifferentSender = (prev.isOutgoing != message.isOutgoing)
+            } else {
+                // 첫 메시지는 발신자 전환으로 보지 않음
+                updatedMessage.isFirstFromDifferentSender = false
+            }
+
             result.append(.message(updatedMessage))
+        }
+
+        // 마지막 버블은 failed가 아닌 경우 항상 시간 표시
+        if let lastIndex = result.lastIndex(where: { if case .message = $0 { return true } else { return false } }),
+           case .message(var lastMessage) = result[lastIndex],
+           lastMessage.status != .failed {
+            lastMessage.showsTime = true
+            result[lastIndex] = .message(lastMessage)
         }
 
         return result
@@ -962,6 +984,7 @@ extension ChatRoomViewController: UITableViewDataSource {
         cellForRowAt indexPath: IndexPath
     ) -> UITableViewCell {
         let item = items[indexPath.row]
+        let isLastMessageRow = indexPath.row == lastMessageRowIndex
 
         switch item {
         case .date(let date):
@@ -975,22 +998,29 @@ extension ChatRoomViewController: UITableViewDataSource {
             return cell
 
         case .message(let message):
+            var displayMessage = message
+            if isLastMessageRow, message.status != .failed {
+                displayMessage.showsTime = true
+            }
+
             // 파일 첨부가 있고 이미지가 없으면 파일 전용 셀 사용
-            if message.hasFiles && message.images.isEmpty {
+            if displayMessage.hasFiles && displayMessage.images.isEmpty {
                 guard let cell = tableView.dequeueReusableCell(
                     withIdentifier: ChatFileMessageCell.identifier,
                     for: indexPath
                 ) as? ChatFileMessageCell,
-                      let file = message.files.first else {
+                      let file = displayMessage.files.first else {
                     return UITableViewCell()
                 }
                 cell.configure(
                     with: file,
-                    date: message.date,
-                    isOutgoing: message.isOutgoing,
-                    showsTime: message.showsTime,
-                    showsProfile: message.showsProfile,
-                    opponentProfileImagePath: chatRoom.opponent.profileImage
+                    date: displayMessage.date,
+                    isOutgoing: displayMessage.isOutgoing,
+                    showsTime: displayMessage.showsTime,
+                    showsProfile: displayMessage.showsProfile,
+                    opponentProfileImagePath: chatRoom.opponent.profileImage,
+                    opponentNickname: chatRoom.opponent.nick,
+                    isFirstFromDifferentSender: displayMessage.isFirstFromDifferentSender
                 )
 
                 // 파일 탭 시 뷰어로 열기 (PDF는 전용 뷰어, 그 외는 Quick Look)
@@ -1008,12 +1038,16 @@ extension ChatRoomViewController: UITableViewDataSource {
             ) as? ChatMessageCell else {
                 return UITableViewCell()
             }
-            cell.configure(with: message, opponentProfileImagePath: chatRoom.opponent.profileImage)
+            cell.configure(
+                with: displayMessage,
+                opponentProfileImagePath: chatRoom.opponent.profileImage,
+                opponentNickname: chatRoom.opponent.nick
+            )
             cell.onRetryTapped = { [weak self] in
-                self?.retryMessage(id: message.id)
+                self?.retryMessage(id: displayMessage.id)
             }
             cell.onDeleteTapped = { [weak self] in
-                self?.showDeleteConfirmation(messageId: message.id)
+                self?.showDeleteConfirmation(messageId: displayMessage.id)
             }
             cell.onImageTapped = { [weak self] images, tappedIndex in
                 guard let self = self else { return }
