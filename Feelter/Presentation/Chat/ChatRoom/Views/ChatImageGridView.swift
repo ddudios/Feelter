@@ -226,6 +226,7 @@ final class ChatImageGridView: UIView {
                                 imageView.image = thumb
                                 imageView.contentMode = .scaleAspectFill
                                 self.addPlayIcon(to: containerView)
+                                self.applySingleVideoThumbnailSizeIfNeeded(thumb, configureId: configureId)
                             }
                         }
                     }
@@ -237,35 +238,42 @@ final class ChatImageGridView: UIView {
 
             // 탭 제스처 추가
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:)))
-            tapGesture.cancelsTouchesInView = true
+            tapGesture.cancelsTouchesInView = false
             containerView.addGestureRecognizer(tapGesture)
 
             imageViews.append(containerView)
         }
 
-        // 이미지 개수에 따른 높이 설정
+        // 이미지 개수에 따른 높이/너비 설정
         let imageCount = imageViews.count
-        let targetHeight: CGFloat
+        let targetSize: CGSize
 
-        switch imageCount {
-        case 2:
-            targetHeight = Layout.maxSize / 2
-        case 5:
-            // 위 3개: maxSize/3 높이, 아래 2개: maxSize/3 높이 → 총 2/3 높이
-            targetHeight = Layout.maxSize * 2 / 3
-        default:
-            targetHeight = Layout.maxSize
+        if imageCount == 1,
+           case .video(let thumbnailImage, _, _) = limitedImages[0],
+           let thumbnail = thumbnailImage {
+            targetSize = sizeForSingleVideoThumbnail(thumbnail)
+        } else {
+            let targetHeight: CGFloat
+            switch imageCount {
+            case 2:
+                targetHeight = Layout.maxSize / 2
+            case 5:
+                // 위 3개: maxSize/3 높이, 아래 2개: maxSize/3 높이 → 총 2/3 높이
+                targetHeight = Layout.maxSize * 2 / 3
+            default:
+                targetHeight = Layout.maxSize
+            }
+            targetSize = CGSize(width: Layout.maxSize, height: targetHeight)
         }
 
-
         // intrinsicContentSize 업데이트 (레이아웃 겹침 방지)
-        currentHeight = targetHeight
-        currentWidth = Layout.maxSize
+        currentHeight = targetSize.height
+        currentWidth = targetSize.width
         invalidateIntrinsicContentSize()
 
         snp.remakeConstraints { make in
-            heightConstraint = make.height.equalTo(targetHeight).priority(.required).constraint
-            widthConstraint = make.width.equalTo(Layout.maxSize).priority(.required).constraint
+            heightConstraint = make.height.equalTo(targetSize.height).priority(.required).constraint
+            widthConstraint = make.width.equalTo(targetSize.width).priority(.required).constraint
             maxHeightConstraint = make.height.lessThanOrEqualTo(Layout.maxSize).constraint
         }
 
@@ -363,6 +371,41 @@ final class ChatImageGridView: UIView {
             make.center.equalToSuperview()
             make.width.height.equalTo(44)
         }
+    }
+
+    private func sizeForSingleVideoThumbnail(_ image: UIImage) -> CGSize {
+        let width = image.size.width
+        let height = image.size.height
+        guard width > 0, height > 0 else {
+            return CGSize(width: Layout.maxSize, height: Layout.maxSize)
+        }
+
+        let aspectRatio = width / height
+        if aspectRatio >= 1 {
+            let targetWidth = Layout.maxSize
+            let targetHeight = Layout.maxSize / aspectRatio
+            return CGSize(width: targetWidth, height: max(1, targetHeight))
+        } else {
+            let targetHeight = Layout.maxSize
+            let targetWidth = Layout.maxSize * aspectRatio
+            return CGSize(width: max(1, targetWidth), height: targetHeight)
+        }
+    }
+
+    private func applySingleVideoThumbnailSizeIfNeeded(_ image: UIImage, configureId: UUID) {
+        guard configureId == currentConfigureId else { return }
+        guard currentImages.count == 1 else { return }
+        guard case .video = currentImages[0] else { return }
+
+        let targetSize = sizeForSingleVideoThumbnail(image)
+        currentHeight = targetSize.height
+        currentWidth = targetSize.width
+        invalidateIntrinsicContentSize()
+        heightConstraint?.update(offset: targetSize.height)
+        widthConstraint?.update(offset: targetSize.width)
+        setNeedsLayout()
+        layoutIfNeeded()
+        onImageLoadingCompleted?()
     }
 
     private func makeVideoAsset(for url: URL) -> AVAsset {

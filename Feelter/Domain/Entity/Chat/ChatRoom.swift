@@ -78,7 +78,9 @@ struct ChatRoom: Equatable, Hashable, Identifiable {
     /// 마지막 메시지 미리보기 텍스트
     ///
     /// 채팅방 목록에 표시할 텍스트
-    /// - 파일이 있으면: "사진 N장"
+    /// - 이미지 파일이 있으면: "사진"
+    /// - 동영상 파일이 있으면: "동영상"
+    /// - PDF 파일이 있으면: "파일"
     /// - 텍스트만 있으면: 내용
     /// - 메시지 없으면: "대화를 시작해보세요"
     var lastMessagePreview: String {
@@ -86,8 +88,23 @@ struct ChatRoom: Equatable, Hashable, Identifiable {
             return "대화를 시작해보세요"
         }
 
-        if lastMessage.hasFiles {
-            return "사진 \(lastMessage.files.count)장"
+        if lastMessage.hasFiles, let firstFile = lastMessage.files.first {
+            let fileExtension = (firstFile as NSString).pathExtension.lowercased()
+
+            // 이미지 확장자
+            let imageExtensions = ["jpg", "jpeg", "png", "gif", "heic", "heif", "webp"]
+            if imageExtensions.contains(fileExtension) {
+                return "사진"
+            }
+
+            // 동영상 확장자
+            let videoExtensions = ["mp4", "mov", "m4v", "avi", "mkv"]
+            if videoExtensions.contains(fileExtension) {
+                return "동영상"
+            }
+
+            // PDF 또는 기타 파일
+            return "파일"
         }
 
         return lastMessage.content ?? ""

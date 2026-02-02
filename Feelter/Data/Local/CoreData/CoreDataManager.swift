@@ -182,7 +182,22 @@ extension CoreDataManager {
         let fetchRequest = ChatRoomEntity.fetchRequest()
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
 
-        return try viewContext.fetch(fetchRequest)
+        var result: [ChatRoomEntity] = []
+        var fetchError: Error?
+
+        viewContext.performAndWait {
+            do {
+                result = try viewContext.fetch(fetchRequest)
+            } catch {
+                fetchError = error
+            }
+        }
+
+        if let fetchError = fetchError {
+            throw fetchError
+        }
+
+        return result
     }
 
     /// 특정 채팅방의 메시지 조회
@@ -194,7 +209,22 @@ extension CoreDataManager {
         fetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
 
-        return try viewContext.fetch(fetchRequest)
+        var result: [ChatMessageEntity] = []
+        var fetchError: Error?
+
+        viewContext.performAndWait {
+            do {
+                result = try viewContext.fetch(fetchRequest)
+            } catch {
+                fetchError = error
+            }
+        }
+
+        if let fetchError = fetchError {
+            throw fetchError
+        }
+
+        return result
     }
 
     /// 모든 채팅방의 읽지 않은 메시지 개수를 한 번에 조회 (Batch Query)
@@ -212,49 +242,60 @@ extension CoreDataManager {
     /// - Parameter currentUserId: 현재 사용자 ID (내가 보낸 메시지는 제외)
     /// - Returns: [roomId: unreadCount] Dictionary
     func fetchUnreadMessageCounts(currentUserId: String) throws -> [String: Int] {
-        // 1. 모든 채팅방 조회 (roomId, lastReadAt만 필요)
-        let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
-        chatRoomFetchRequest.propertiesToFetch = ["roomId", "lastReadAt"]  // 필요한 속성만 조회 (최적화)
-        let chatRooms = try viewContext.fetch(chatRoomFetchRequest)
-
         var unreadCounts: [String: Int] = [:]
+        var fetchError: Error?
 
-        // 2. 각 채팅방마다 읽지 않은 메시지 개수 계산
-        for chatRoom in chatRooms {
-            guard let roomId = chatRoom.roomId else { continue }
-
-            // 3. 읽지 않은 메시지 조건 설정
-            let messageFetchRequest = ChatMessageEntity.fetchRequest()
-
-            if let lastReadAt = chatRoom.lastReadAt {
-                // lastReadAt이 있으면: 그 이후 + 상대방이 보낸 + 전송 성공한 메시지만
-                // ✅ status == "sent" 추가: .sending, .failed 메시지 제외
-                messageFetchRequest.predicate = NSPredicate(
-                    format: "roomId == %@ AND senderId != %@ AND createdAt > %@ AND status == %@",
-                    roomId,
-                    currentUserId,
-                    lastReadAt as NSDate,
-                    MessageSendStatus.sent.rawValue
-                )
-            } else {
-                // lastReadAt이 없으면: 상대방이 보낸 + 전송 성공한 모든 메시지
-                messageFetchRequest.predicate = NSPredicate(
-                    format: "roomId == %@ AND senderId != %@ AND status == %@",
-                    roomId,
-                    currentUserId,
-                    MessageSendStatus.sent.rawValue
-                )
-            }
-
-            // 4. count(for:) 사용: 실제 데이터를 메모리에 로드하지 않고 COUNT만 실행
-            // 이 방법이 fetch() 후 count보다 훨씬 빠름!
+        viewContext.performAndWait {
             do {
-                let count = try viewContext.count(for: messageFetchRequest)
-                unreadCounts[roomId] = count
+                // 1. 모든 채팅방 조회 (roomId, lastReadAt만 필요)
+                let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
+                chatRoomFetchRequest.propertiesToFetch = ["roomId", "lastReadAt"]  // 필요한 속성만 조회 (최적화)
+                let chatRooms = try viewContext.fetch(chatRoomFetchRequest)
+
+                // 2. 각 채팅방마다 읽지 않은 메시지 개수 계산
+                for chatRoom in chatRooms {
+                    guard let roomId = chatRoom.roomId else { continue }
+
+                    // 3. 읽지 않은 메시지 조건 설정
+                    let messageFetchRequest = ChatMessageEntity.fetchRequest()
+
+                    if let lastReadAt = chatRoom.lastReadAt {
+                        // lastReadAt이 있으면: 그 이후 + 상대방이 보낸 + 전송 성공한 메시지만
+                        // ✅ status == "sent" 추가: .sending, .failed 메시지 제외
+                        messageFetchRequest.predicate = NSPredicate(
+                            format: "roomId == %@ AND senderId != %@ AND createdAt > %@ AND status == %@",
+                            roomId,
+                            currentUserId,
+                            lastReadAt as NSDate,
+                            MessageSendStatus.sent.rawValue
+                        )
+                    } else {
+                        // lastReadAt이 없으면: 상대방이 보낸 + 전송 성공한 모든 메시지
+                        messageFetchRequest.predicate = NSPredicate(
+                            format: "roomId == %@ AND senderId != %@ AND status == %@",
+                            roomId,
+                            currentUserId,
+                            MessageSendStatus.sent.rawValue
+                        )
+                    }
+
+                    // 4. count(for:) 사용: 실제 데이터를 메모리에 로드하지 않고 COUNT만 실행
+                    // 이 방법이 fetch() 후 count보다 훨씬 빠름!
+                    do {
+                        let count = try viewContext.count(for: messageFetchRequest)
+                        unreadCounts[roomId] = count
+                    } catch {
+                        // 특정 채팅방 count 실패 시 0으로 처리 (전체 로직은 계속 진행)
+                        unreadCounts[roomId] = 0
+                    }
+                }
             } catch {
-                // 특정 채팅방 count 실패 시 0으로 처리 (전체 로직은 계속 진행)
-                unreadCounts[roomId] = 0
+                fetchError = error
             }
+        }
+
+        if let fetchError = fetchError {
+            throw fetchError
         }
 
         return unreadCounts

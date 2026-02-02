@@ -503,11 +503,24 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///
     /// - Parameter chatRoom: 저장할 채팅방 정보
     func ensureChatRoomExists(_ chatRoom: ChatRoom) throws {
-        // 1. 이미 존재하는지 확인
-        let fetchRequest = ChatRoomEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "roomId == %@", chatRoom.roomId)
+        var results: [ChatRoomEntity] = []
+        var fetchError: Error?
 
-        let results = try coreDataManager.viewContext.fetch(fetchRequest)
+        // 1. 이미 존재하는지 확인 (Thread-safe)
+        coreDataManager.viewContext.performAndWait {
+            let fetchRequest = ChatRoomEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "roomId == %@", chatRoom.roomId)
+
+            do {
+                results = try coreDataManager.viewContext.fetch(fetchRequest)
+            } catch {
+                fetchError = error
+            }
+        }
+
+        if let fetchError = fetchError {
+            throw fetchError
+        }
 
         if results.isEmpty {
             // 2. 존재하지 않으면 저장
@@ -532,22 +545,23 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///
     /// - Parameter roomId: 채팅방 ID
     func updateLastReadDate(roomId: String) async throws {
+        try await MainActor.run {
+            // CoreData에서 ChatRoomEntity 조회
+            let fetchRequest = ChatRoomEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
 
-        // CoreData에서 ChatRoomEntity 조회
-        let fetchRequest = ChatRoomEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "roomId == %@", roomId)
+            let results = try coreDataManager.viewContext.fetch(fetchRequest)
+            guard let chatRoomEntity = results.first else {
+                return
+            }
 
-        let results = try coreDataManager.viewContext.fetch(fetchRequest)
-        guard let chatRoomEntity = results.first else {
-            return
+            let beforeDate = chatRoomEntity.lastReadAt
+
+            // lastReadAt 업데이트
+            chatRoomEntity.lastReadAt = Date()
+
+            try coreDataManager.saveContext()
         }
-
-        let beforeDate = chatRoomEntity.lastReadAt
-
-        // lastReadAt 업데이트
-        chatRoomEntity.lastReadAt = Date()
-
-        try coreDataManager.saveContext()
 
         // 채팅방 목록 갱신 (배지 업데이트를 위해)
         await refreshChatRoomsFromCoreData()
@@ -580,28 +594,30 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// - Returns: 실패한 메시지 배열
     /// - Throws: CoreData 에러
     func fetchFailedMessages(roomId: String) async throws -> [ChatMessage] {
-        let fetchRequest = ChatMessageEntity.fetchRequest()
+        return try await MainActor.run {
+            let fetchRequest = ChatMessageEntity.fetchRequest()
 
-        // 24시간 이내
-        let twentyFourHoursAgo = Date().addingTimeInterval(-24 * 60 * 60)
+            // 24시간 이내
+            let twentyFourHoursAgo = Date().addingTimeInterval(-24 * 60 * 60)
 
-        // 조건: roomId 일치, status가 failed, 24시간 이내
-        fetchRequest.predicate = NSPredicate(
-            format: "roomId == %@ AND status == %@ AND createdAt >= %@",
-            roomId,
-            MessageSendStatus.failed.rawValue,
-            twentyFourHoursAgo as NSDate
-        )
+            // 조건: roomId 일치, status가 failed, 24시간 이내
+            fetchRequest.predicate = NSPredicate(
+                format: "roomId == %@ AND status == %@ AND createdAt >= %@",
+                roomId,
+                MessageSendStatus.failed.rawValue,
+                twentyFourHoursAgo as NSDate
+            )
 
-        // 정렬: createdAt 오름차순 (FIFO - 오래된 것부터)
-        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+            // 정렬: createdAt 오름차순 (FIFO - 오래된 것부터)
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
 
-        // 최대 20개
-        fetchRequest.fetchLimit = 20
+            // 최대 20개
+            fetchRequest.fetchLimit = 20
 
-        let results = try coreDataManager.viewContext.fetch(fetchRequest)
+            let results = try coreDataManager.viewContext.fetch(fetchRequest)
 
-        return results.map { $0.toDomain() }
+            return results.map { $0.toDomain() }
+        }
     }
 
     /// 특정 채팅방에 실패한 메시지가 있는지 확인
@@ -609,20 +625,26 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// - Parameter roomId: 채팅방 ID
     /// - Returns: 실패한 메시지가 있으면 true
     func hasFailedMessages(roomId: String) -> Bool {
-        let fetchRequest = ChatMessageEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(
-            format: "roomId == %@ AND status == %@",
-            roomId,
-            MessageSendStatus.failed.rawValue
-        )
-        fetchRequest.fetchLimit = 1
+        var result = false
 
-        do {
-            let count = try coreDataManager.viewContext.count(for: fetchRequest)
-            return count > 0
-        } catch {
-            return false
+        coreDataManager.viewContext.performAndWait {
+            let fetchRequest = ChatMessageEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(
+                format: "roomId == %@ AND status == %@",
+                roomId,
+                MessageSendStatus.failed.rawValue
+            )
+            fetchRequest.fetchLimit = 1
+
+            do {
+                let count = try coreDataManager.viewContext.count(for: fetchRequest)
+                result = count > 0
+            } catch {
+                result = false
+            }
         }
+
+        return result
     }
 
     /// 실패한 메시지 재전송
@@ -630,16 +652,18 @@ final class ChatRepository: ChatRepositoryProtocol {
     /// - Parameter chatId: 재전송할 메시지 ID
     /// - Returns: ChatMessage (재전송된 메시지)
     func retryFailedMessage(chatId: String) async throws -> ChatMessage {
-        // CoreData에서 메시지 조회
-        let fetchRequest = ChatMessageEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "chatId == %@", chatId)
+        let message = try await MainActor.run {
+            // CoreData에서 메시지 조회
+            let fetchRequest = ChatMessageEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "chatId == %@", chatId)
 
-        let results = try coreDataManager.viewContext.fetch(fetchRequest)
-        guard let messageEntity = results.first else {
-            throw RepositoryError.messageNotFound
+            let results = try coreDataManager.viewContext.fetch(fetchRequest)
+            guard let messageEntity = results.first else {
+                throw RepositoryError.messageNotFound
+            }
+
+            return messageEntity.toDomain()
         }
-
-        let message = messageEntity.toDomain()
 
         // 재전송
         return try await sendMessage(
@@ -805,50 +829,74 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///   1. files는 이제 Transformable 타입으로 자동 변환되므로 직접 전달
     ///   2. 메시지 저장 전에 항상 ChatRoom이 존재하는지 확인 (크래시 방지)
     private func saveMessageToCoreData(_ message: ChatMessage) throws {
-        // ✅ 1. ChatRoom이 존재하는지 확인
-        let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
-        chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", message.roomId)
-        let existingChatRooms = try coreDataManager.viewContext.fetch(chatRoomFetchRequest)
+        var saveError: Error?
 
-        // ✅ 2. ChatRoom이 없으면 최소한의 정보로 생성
-        if existingChatRooms.isEmpty {
-            _ = try coreDataManager.upsertChatRoom(
-                roomId: message.roomId,
-                createdAt: message.createdAt,
-                updatedAt: message.createdAt
-            )
-            // 즉시 저장하여 relationship 설정 가능하도록 보장
-            try coreDataManager.saveContext()
+        coreDataManager.viewContext.performAndWait {
+            do {
+                // ✅ 1. ChatRoom이 존재하는지 확인
+                let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
+                chatRoomFetchRequest.predicate = NSPredicate(format: "roomId == %@", message.roomId)
+                let existingChatRooms = try coreDataManager.viewContext.fetch(chatRoomFetchRequest)
+
+                // ✅ 2. ChatRoom이 없으면 최소한의 정보로 생성
+                if existingChatRooms.isEmpty {
+                    _ = try coreDataManager.upsertChatRoom(
+                        roomId: message.roomId,
+                        createdAt: message.createdAt,
+                        updatedAt: message.createdAt
+                    )
+                    // 즉시 저장하여 relationship 설정 가능하도록 보장
+                    try coreDataManager.saveContext()
+                }
+
+                // ✅ 3. 메시지 저장 (이제 ChatRoom이 확실히 존재함)
+                _ = try coreDataManager.upsertChatMessage(
+                    chatId: message.chatId,
+                    roomId: message.roomId,
+                    content: message.content,
+                    senderId: message.senderId,
+                    senderNick: message.senderNick,
+                    senderProfileImage: message.senderProfileImage,
+                    createdAt: message.createdAt,
+                    files: message.files.isEmpty ? nil : message.files,  // ✅ 직접 전달 (빈 배열은 nil로)
+                    status: message.status.rawValue
+                )
+
+                try coreDataManager.saveContext()
+            } catch {
+                saveError = error
+            }
         }
 
-        // ✅ 3. 메시지 저장 (이제 ChatRoom이 확실히 존재함)
-        _ = try coreDataManager.upsertChatMessage(
-            chatId: message.chatId,
-            roomId: message.roomId,
-            content: message.content,
-            senderId: message.senderId,
-            senderNick: message.senderNick,
-            senderProfileImage: message.senderProfileImage,
-            createdAt: message.createdAt,
-            files: message.files.isEmpty ? nil : message.files,  // ✅ 직접 전달 (빈 배열은 nil로)
-            status: message.status.rawValue
-        )
-
-        try coreDataManager.saveContext()
+        if let saveError = saveError {
+            throw saveError
+        }
     }
 
     /// CoreData에서 메시지 삭제
     ///
     /// - Parameter chatId: 삭제할 메시지의 chatId
     private func deleteMessageFromCoreData(chatId: String) throws {
-        let fetchRequest = ChatMessageEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "chatId == %@", chatId)
+        var deleteError: Error?
 
-        let results = try coreDataManager.viewContext.fetch(fetchRequest)
+        coreDataManager.viewContext.performAndWait {
+            do {
+                let fetchRequest = ChatMessageEntity.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "chatId == %@", chatId)
 
-        if let messageToDelete = results.first {
-            coreDataManager.viewContext.delete(messageToDelete)
-            try coreDataManager.saveContext()
+                let results = try coreDataManager.viewContext.fetch(fetchRequest)
+
+                if let messageToDelete = results.first {
+                    coreDataManager.viewContext.delete(messageToDelete)
+                    try coreDataManager.saveContext()
+                }
+            } catch {
+                deleteError = error
+            }
+        }
+
+        if let deleteError = deleteError {
+            throw deleteError
         }
     }
 

@@ -215,22 +215,22 @@ final class ChatMessageCell: UITableViewCell {
             while view != nil {
                 if let tableView = view as? UITableView {
                     guard tableView.window != nil else { break }
-                    let contentHeight = tableView.contentSize.height
-                    let scrollViewHeight = tableView.bounds.height
-                    let contentOffsetY = tableView.contentOffset.y
-                    let bottomInset = tableView.adjustedContentInset.bottom
-                    let isNearBottom = contentOffsetY + scrollViewHeight + bottomInset >= contentHeight - 50
+                    let lastIndexPath: IndexPath? = {
+                        guard tableView.numberOfSections > 0 else { return nil }
+                        let lastSection = tableView.numberOfSections - 1
+                        let lastRow = tableView.numberOfRows(inSection: lastSection) - 1
+                        guard lastRow >= 0 else { return nil }
+                        return IndexPath(row: lastRow, section: lastSection)
+                    }()
+                    let visibleRows = tableView.indexPathsForVisibleRows ?? []
+                    let shouldKeepAtBottom = lastIndexPath.map { visibleRows.contains($0) } ?? false
+                    let isUserInteracting = tableView.isTracking || tableView.isDragging || tableView.isDecelerating
                     UIView.performWithoutAnimation {
                         tableView.beginUpdates()
                         tableView.endUpdates()
                     }
-                    if isNearBottom, tableView.numberOfSections > 0 {
-                        let lastSection = tableView.numberOfSections - 1
-                        let lastRow = tableView.numberOfRows(inSection: lastSection) - 1
-                        if lastRow >= 0 {
-                            let indexPath = IndexPath(row: lastRow, section: lastSection)
-                            tableView.scrollToRow(at: indexPath, at: .bottom, animated: false)
-                        }
+                    if shouldKeepAtBottom, !isUserInteracting, let lastIndexPath = lastIndexPath {
+                        tableView.scrollToRow(at: lastIndexPath, at: .bottom, animated: false)
                     }
                     break
                 }

@@ -179,7 +179,6 @@ final class ChatRoomViewController: BaseViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateMessageTableInsets()
-        scrollToBottomIfNeeded()
     }
 
     override func configureHierarchy() {
