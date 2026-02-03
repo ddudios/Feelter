@@ -29,8 +29,14 @@ struct OrderDTO: Decodable {
 extension OrderDTO {
     func toDomain() -> Order? {
         let filterDetail = filter.toDetailDomain()
-        guard let paidDate = ISO8601DateFormatter().date(from: paidAt),
-              let createdDate = ISO8601DateFormatter().date(from: createdAt) else {
+
+        // ISO8601DateFormatter 설정 (밀리초 포함 형식 지원)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        guard let paidDate = formatter.date(from: paidAt),
+              let createdDate = formatter.date(from: createdAt) else {
+            print("⚠️ [OrderDTO] 날짜 파싱 실패 - paidAt: \(paidAt), createdAt: \(createdAt)")
             return nil
         }
 

@@ -25,17 +25,25 @@ final class FetchMyFiltersUsecase {
     /// - Parameter userId: 현재 사용자 ID
     /// - Returns: FilterDetail 배열
     func execute(userId: String) async throws -> [FilterDetail] {
+        print("🎨 [FetchMyFiltersUsecase] 필터 조회 시작")
+
         async let myFiltersTask = fetchAllMyFilters(userId: userId)
         async let purchasedFiltersTask = fetchPurchasedFilters()
 
         let (myFilters, purchasedFilters) = try await (myFiltersTask, purchasedFiltersTask)
+
+        print("🎨 [FetchMyFiltersUsecase] 내가 만든 필터: \(myFilters.count)개")
+        print("🎨 [FetchMyFiltersUsecase] 구매한 필터: \(purchasedFilters.count)개")
 
         // 중복 제거 (filter_id 기준)
         var filterDict: [String: FilterDetail] = [:]
         myFilters.forEach { filterDict[$0.id] = $0 }
         purchasedFilters.forEach { filterDict[$0.id] = $0 }
 
-        return Array(filterDict.values)
+        let result = Array(filterDict.values)
+        print("🎨 [FetchMyFiltersUsecase] 최종 필터 개수 (중복 제거 후): \(result.count)개")
+
+        return result
     }
 
     // MARK: - Private Methods
@@ -86,7 +94,20 @@ final class FetchMyFiltersUsecase {
 
     /// 결제한 필터 조회
     private func fetchPurchasedFilters() async throws -> [FilterDetail] {
-        let orders = try await orderRepository.fetchOrders()
-        return orders.map { $0.filter }
+        do {
+            let orders = try await orderRepository.fetchOrders()
+            print("🎨 [FetchMyFiltersUsecase] Order API 응답: \(orders.count)개")
+
+            let filters = orders.map { $0.filter }
+            filters.enumerated().forEach { index, filter in
+                print("   [구매한 필터 \(index)] \(filter.title) (ID: \(filter.id))")
+            }
+
+            return filters
+        } catch {
+            print("❌ [FetchMyFiltersUsecase] 구매한 필터 조회 실패: \(error.localizedDescription)")
+            // 구매한 필터 조회 실패 시 빈 배열 반환 (내가 만든 필터는 계속 표시)
+            return []
+        }
     }
 }
