@@ -58,19 +58,32 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     // 포그라운드 알림 수신
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let userInfo = notification.request.content.userInfo
-        
+
         guard let payload = NotificationPayload.from(userInfo: userInfo),
               let pushRoomId = payload.roomId else {
-            completionHandler([.banner, .list, .sound, .badge])
+            completionHandler(presentationOptions())
             return
         }
 
         // UI 상태 확인 (iOS 16+에서는 Scene을 통해 접근)
-        if let currentChatRoomId = getCurrentVisibleChatRoomId(), currentChatRoomId == pushRoomId {
-            // 동일 채팅방이면 알림 생략
-            completionHandler([])
+        if let currentChatRoomId = getCurrentVisibleChatRoomId() {
+            if currentChatRoomId == pushRoomId {
+                // 동일 채팅방이면 알림 생략
+                completionHandler([])
+            } else {
+                completionHandler(presentationOptions())
+            }
         } else {
-            completionHandler([.banner, .list, .sound, .badge])
+            completionHandler(presentationOptions())
+        }
+    }
+
+    /// iOS 버전에 맞는 알림 표시 옵션 반환
+    private func presentationOptions() -> UNNotificationPresentationOptions {
+        if #available(iOS 14.0, *) {
+            return [.banner, .list, .sound, .badge]
+        } else {
+            return [.alert, .sound, .badge]
         }
     }
 
@@ -109,15 +122,52 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 extension AppDelegate: MessagingDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
-        
+
         Task {
             await updateDeviceTokenToServer(token)
         }
     }
 
+    /// Data-only 메시지 수신 (포그라운드/백그라운드 모두)
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        // data-only 메시지인 경우 수동으로 로컬 푸시 생성
+        if userInfo["gcm.message_id"] != nil {
+            // FCM data 메시지
+            showLocalNotification(from: userInfo)
+        }
+
+        completionHandler(.newData)
+    }
+
+    /// 로컬 푸시 생성 (data-only 메시지용)
+    private func showLocalNotification(from userInfo: [AnyHashable: Any]) {
+        // 같은 채팅방에 있으면 푸시 안 보냄
+        if let payload = NotificationPayload.from(userInfo: userInfo),
+           let pushRoomId = payload.roomId,
+           let currentChatRoomId = getCurrentVisibleChatRoomId(),
+           currentChatRoomId == pushRoomId {
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = (userInfo["title"] as? String) ?? "새 메시지"
+        content.body = (userInfo["body"] as? String) ?? "새로운 채팅 메시지가 도착했습니다."
+        content.sound = .default
+        content.badge = (userInfo["badge"] as? NSNumber) ?? 1
+        content.userInfo = userInfo
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil  // 즉시 표시
+        )
+
+        UNUserNotificationCenter.current().add(request)
+    }
+
     private func updateDeviceTokenToServer(_ token: String) async {
         guard let accessToken = KeychainManager.shared.read(account: "accessToken"), !accessToken.isEmpty else { return }
-        
+
         do {
             let networkManager = NetworkManager()
             try await networkManager.requestWithEmptyResponse(UserRouter.updateDeviceToken(body: .init(deviceToken: token)))
