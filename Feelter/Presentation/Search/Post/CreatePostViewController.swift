@@ -462,7 +462,7 @@ final class CreatePostViewController: BaseViewController {
         if let previewImage = item.previewImage {
             image = previewImage
         } else if let remotePath = item.remotePath {
-            // 원격 이미지를 먼저 로드해야 함
+            // 원격 이미지는 필터 적용 불가 (이미 업로드된 이미지)
             showAlert(message: "기존 이미지는 필터를 적용할 수 없습니다.")
             return
         } else {
@@ -637,16 +637,20 @@ final class CreatePostViewController: BaseViewController {
             make.width.height.equalTo(Layout.attachmentRemoveButtonSize)
         }
 
-        let applyButton = makeApplyFilterButton()
-        applyButton.tag = index
-        applyButton.addTarget(self, action: #selector(applyFilterButtonTapped), for: .touchUpInside)
+        // 필터 적용 버튼 (동영상이거나 기존 이미지면 숨김)
+        let shouldShowFilterButton = !item.isVideo && item.remotePath == nil
+        if shouldShowFilterButton {
+            let applyButton = makeApplyFilterButton()
+            applyButton.tag = index
+            applyButton.addTarget(self, action: #selector(applyFilterButtonTapped), for: .touchUpInside)
 
-        applyButton.snp.makeConstraints { make in
-            make.height.equalTo(Layout.attachmentButtonHeight)
-            make.width.equalTo(Layout.attachmentPreviewSize)
+            applyButton.snp.makeConstraints { make in
+                make.height.equalTo(Layout.attachmentButtonHeight)
+                make.width.equalTo(Layout.attachmentPreviewSize)
+            }
+
+            containerStackView.addArrangedSubview(applyButton)
         }
-
-        containerStackView.addArrangedSubview(applyButton)
 
         return containerStackView
     }

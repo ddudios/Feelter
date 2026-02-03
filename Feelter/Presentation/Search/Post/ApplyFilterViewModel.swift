@@ -7,6 +7,7 @@
 
 import UIKit
 import Combine
+import Kingfisher
 
 @MainActor
 final class ApplyFilterViewModel {
@@ -169,11 +170,110 @@ final class ApplyFilterViewModel {
             return
         }
 
-        let result = FilteredImageResult(
-            image: finalImage,
-            appliedFilter: currentFilter
-        )
+        // 필터가 적용되지 않은 경우 (원본) - 워터마크 없이 저장
+        guard let filter = currentFilter else {
+            print("💾 [ApplyFilterViewModel] 원본 이미지 저장 (워터마크 없음)")
+            let result = FilteredImageResult(
+                image: finalImage,
+                appliedFilter: nil
+            )
+            saveCompletedSubject.send(result)
+            return
+        }
 
+        // 필터가 적용된 경우 - 워터마크 추가
+        print("💾 [ApplyFilterViewModel] 필터 적용 이미지 저장 - 워터마크 추가 중...")
+        print("   필터: \(filter.title)")
+        print("   작가: \(filter.creator.nickname)")
+
+        addWatermarkAndSave(to: finalImage, with: filter)
+    }
+
+    /// 워터마크를 추가하고 저장합니다
+    private func addWatermarkAndSave(to image: UIImage, with filter: FilterDetail) {
+        // 1. 필터 썸네일 다운로드
+        guard let thumbnailURLString = filter.previewImages.first else {
+            print("⚠️ [ApplyFilterViewModel] 필터 썸네일 URL 없음 - 워터마크 없이 저장")
+            saveWithoutWatermark(image: image, filter: filter)
+            return
+        }
+
+        // URL 생성 (Feelter 이미지 경로 처리)
+        let fullURL = normalizedFeelterURL(from: thumbnailURLString)
+        guard let url = fullURL else {
+            print("⚠️ [ApplyFilterViewModel] 잘못된 썸네일 URL - 워터마크 없이 저장")
+            saveWithoutWatermark(image: image, filter: filter)
+            return
+        }
+
+        print("📥 [ApplyFilterViewModel] 필터 썸네일 다운로드 시작: \(url)")
+
+        // Kingfisher로 썸네일 다운로드 (캐시 우선)
+        KingfisherManager.shared.retrieveImage(with: url) { [weak self] result in
+            guard let self = self else { return }
+
+            Task { @MainActor in
+                switch result {
+                case .success(let value):
+                    print("✅ [ApplyFilterViewModel] 썸네일 다운로드 성공")
+                    let watermarkedImage = image.addingWatermark(
+                        filterName: filter.title,
+                        creatorNickname: filter.creator.nickname,
+                        filterThumbnail: value.image
+                    )
+                    self.completeImageSave(image: watermarkedImage, filter: filter)
+
+                case .failure(let error):
+                    print("❌ [ApplyFilterViewModel] 썸네일 다운로드 실패: \(error.localizedDescription)")
+                    // 실패 시 Placeholder로 워터마크 추가
+                    let watermarkedImage = image.addingWatermark(
+                        filterName: filter.title,
+                        creatorNickname: filter.creator.nickname,
+                        filterThumbnail: nil
+                    )
+                    self.completeImageSave(image: watermarkedImage, filter: filter)
+                }
+            }
+        }
+    }
+
+    /// 워터마크 없이 저장 (Fallback)
+    private func saveWithoutWatermark(image: UIImage, filter: FilterDetail) {
+        let result = FilteredImageResult(
+            image: image,
+            appliedFilter: filter
+        )
         saveCompletedSubject.send(result)
+    }
+
+    /// 이미지 저장 완료
+    private func completeImageSave(image: UIImage, filter: FilterDetail) {
+        print("✅ [ApplyFilterViewModel] 워터마크 추가 완료 - 저장")
+        let result = FilteredImageResult(
+            image: image,
+            appliedFilter: filter
+        )
+        saveCompletedSubject.send(result)
+    }
+
+    /// Feelter 이미지 URL 정규화 (/data/... → full URL)
+    private func normalizedFeelterURL(from path: String) -> URL? {
+        // 이미 전체 URL인 경우
+        if let url = URL(string: path), url.scheme != nil {
+            return url
+        }
+
+        // 상대 경로인 경우 baseURL 추가
+        let baseURLString = Config.baseURL.absoluteString
+        let cleanedBase = baseURLString.hasSuffix("/") ? String(baseURLString.dropLast()) : baseURLString
+
+        var urlPath = path
+        if urlPath.hasPrefix("/data/") {
+            urlPath = "/v1" + urlPath
+        } else if !urlPath.hasPrefix("/v1/") {
+            urlPath = "/v1/" + urlPath
+        }
+
+        return URL(string: cleanedBase + urlPath)
     }
 }
