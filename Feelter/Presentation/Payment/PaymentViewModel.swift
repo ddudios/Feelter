@@ -109,6 +109,9 @@ final class PaymentViewModel: ViewModelProtocol {
             .sink { [weak self] (success, impUid, errorMsg) in
                 guard let self else { return }
 
+                // 결제 진행 플래그 해제 (성공/실패 모두)
+                PaymentStateManager.shared.clearPaymentInProgress()
+
                 if success, let impUid = impUid {
                     self.validatePayment(impUid: impUid)
                 } else {

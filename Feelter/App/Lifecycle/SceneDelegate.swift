@@ -47,6 +47,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         guard let url = URLContexts.first?.url else { return }
 
+        #if DEBUG
+        print("✅ [SceneDelegate] URL Scheme 수신: \(url.absoluteString)")
+        #endif
+
         // 1. 카카오 로그인 리다이렉트 처리
         if AuthApi.isKakaoTalkLoginUrl(url) {
             _ = AuthController.handleOpenUrl(url: url)
@@ -55,14 +59,22 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         // 2. 아임포트 결제 콜백 처리 (기존 AppDelegate에서 이동)
         Iamport.shared.receivedURL(url)
+
+        #if DEBUG
+        print("✅ [SceneDelegate] 아임포트로 URL 전달 완료")
+        #endif
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         // 백그라운드에서 돌아올 때마다 미완료 결제 체크
+        // 단, 결제 진행 중일 때는 체크하지 않음 (중복 알럿 방지)
         checkForPendingPayment()
     }
 
     private func checkForPendingPayment() {
+        // 결제 진행 중이면 알럿 표시 안 함
+        guard !PaymentStateManager.shared.isPaymentInProgress() else { return }
+
         guard let pending = PaymentStateManager.shared.getPendingPayment() else { return }
         NotificationCenter.default.post(name: .pendingPaymentDetected, object: nil, userInfo: [
             "filterId": pending.filterId,

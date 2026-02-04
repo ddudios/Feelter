@@ -686,6 +686,9 @@ final class FilterDetailViewController: BaseViewController {
     // MARK: - Payment Handling (KG Inicis + WebView)
 
     private func launchIamportPayment(orderInfo: OrderInfo) {
+        // ✅ 결제 진행 플래그 설정 (미완료 결제 알럿 방지)
+        PaymentStateManager.shared.setPaymentInProgress()
+
         // ✅ 내 가맹점 식별코드
         let userCode = "imp14511373"
 
@@ -719,16 +722,40 @@ final class FilterDetailViewController: BaseViewController {
             userCode: userCode,
             payment: payment
         ) { [weak self, weak webViewController] response in
-            guard let self = self else { return }
+            guard let self = self else {
+                #if DEBUG
+                print("⚠️ [Payment] self가 해제되어 결제 결과를 처리할 수 없습니다.")
+                #endif
+                return
+            }
+
+            #if DEBUG
+            print("✅ [Payment] 아임포트 콜백 수신 - success: \(response?.success ?? false), imp_uid: \(response?.imp_uid ?? "nil"), error: \(response?.error_msg ?? "nil")")
+            #endif
 
             // ✨ [Full Screen] 닫기 (dismiss)
-            webViewController?.dismiss(animated: true)
-
-            if let success = response?.success, success {
-                self.iamportResponseSubject.send((true, response?.imp_uid, nil))
+            // WebView가 이미 dismiss된 경우를 대비한 안전 처리
+            if webViewController?.presentingViewController != nil {
+                webViewController?.dismiss(animated: true) {
+                    self.processPaymentResult(response: response)
+                }
             } else {
-                self.iamportResponseSubject.send((false, nil, response?.error_msg ?? "결제가 취소되었습니다."))
+                // 이미 dismiss된 경우 바로 결과 처리
+                self.processPaymentResult(response: response)
             }
+        }
+    }
+
+    /// 아임포트 결제 결과 처리
+    private func processPaymentResult(response: IamportResponse?) {
+        #if DEBUG
+        print("✅ [Payment] 결제 결과 처리 시작")
+        #endif
+
+        if let success = response?.success, success {
+            self.iamportResponseSubject.send((true, response?.imp_uid, nil))
+        } else {
+            self.iamportResponseSubject.send((false, nil, response?.error_msg ?? "결제가 취소되었습니다."))
         }
     }
 

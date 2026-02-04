@@ -18,6 +18,7 @@ final class PaymentStateManager {
     // MARK: - Constants
     private enum Keys {
         static let pendingPayment = "com.feelter.pendingPayment"
+        static let isPaymentInProgress = "com.feelter.isPaymentInProgress"
     }
 
     // MARK: - Payment State
@@ -82,5 +83,21 @@ final class PaymentStateManager {
     /// 미완료 결제가 있는지 확인
     func hasPendingPayment() -> Bool {
         return getPendingPayment() != nil
+    }
+
+    // MARK: - Payment Progress State
+    /// 결제 진행 시작 (PG 결제 화면 표시 시)
+    func setPaymentInProgress() {
+        UserDefaults.standard.set(true, forKey: Keys.isPaymentInProgress)
+    }
+
+    /// 결제 진행 완료/취소 (결과 수신 후)
+    func clearPaymentInProgress() {
+        UserDefaults.standard.removeObject(forKey: Keys.isPaymentInProgress)
+    }
+
+    /// 결제 진행 중인지 확인
+    func isPaymentInProgress() -> Bool {
+        return UserDefaults.standard.bool(forKey: Keys.isPaymentInProgress)
     }
 }
