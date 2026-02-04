@@ -42,8 +42,10 @@ final class CommentBottomSheetViewController: UIViewController {
     private let inputTextView = UITextView()
     private let placeholderLabel = UILabel()
     private let sendButton = UIButton(type: .system)
+    private let editingIndicatorLabel = UILabel()
 
     private var inputContainerBottomConstraint: Constraint?
+    private var editingComment: Comment?
 
     private var currentUserId: String? {
         return KeychainManager.shared.read(account: "userId")
@@ -92,6 +94,7 @@ final class CommentBottomSheetViewController: UIViewController {
         contentView.addSubview(inputContainerView)
 
         inputContainerView.addSubview(profileImageView)
+        inputContainerView.addSubview(editingIndicatorLabel)
         inputContainerView.addSubview(inputTextView)
         inputContainerView.addSubview(sendButton)
         inputTextView.addSubview(placeholderLabel)
@@ -100,7 +103,7 @@ final class CommentBottomSheetViewController: UIViewController {
     private func configureLayout() {
         contentView.snp.makeConstraints { make in
             make.leading.trailing.bottom.equalToSuperview()
-            make.height.equalToSuperview().multipliedBy(0.7)
+            make.height.equalToSuperview().multipliedBy(0.68)
         }
 
         handleView.snp.makeConstraints { make in
@@ -127,11 +130,19 @@ final class CommentBottomSheetViewController: UIViewController {
             make.size.equalTo(Layout.profileImageSize)
         }
 
+        editingIndicatorLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview().inset(8)
+            make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.profileImageSpacing)
+            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
+        }
+
         inputTextView.snp.makeConstraints { make in
-            make.top.bottom.equalToSuperview().inset(Layout.verticalInset)
+            make.top.equalTo(editingIndicatorLabel.snp.bottom).offset(4)
+            make.bottom.equalToSuperview().inset(Layout.verticalInset)
             make.leading.equalTo(profileImageView.snp.trailing).offset(Layout.profileImageSpacing)
             make.trailing.equalTo(sendButton.snp.leading).offset(-8)
             make.height.greaterThanOrEqualTo(Layout.inputTextViewMinHeight)
+            make.height.lessThanOrEqualTo(Layout.inputTextViewMaxHeight)
         }
 
         placeholderLabel.snp.makeConstraints { make in
@@ -147,7 +158,7 @@ final class CommentBottomSheetViewController: UIViewController {
         }
 
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(Layout.verticalInset)
+            make.top.equalTo(titleLabel.snp.bottom).offset(8)
             make.leading.trailing.equalToSuperview()
             make.bottom.equalTo(inputContainerView.snp.top)
         }
@@ -205,6 +216,11 @@ final class CommentBottomSheetViewController: UIViewController {
         placeholderLabel.textColor = .Feelter.gray100
         placeholderLabel.isUserInteractionEnabled = false
 
+        editingIndicatorLabel.text = "댓글 수정 중"
+        editingIndicatorLabel.font = TextStyle.Pretendard.caption2
+        editingIndicatorLabel.textColor = .Feelter.brightTurquoise
+        editingIndicatorLabel.isHidden = true
+
         sendButton.setImage(UIImage.Icon.message, for: .normal)
         sendButton.tintColor = .Feelter.brightTurquoise
         sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
@@ -258,22 +274,47 @@ final class CommentBottomSheetViewController: UIViewController {
         sendButton.isEnabled = false
         inputTextView.isEditable = false
 
-        Task {
-            do {
-                _ = try await postUsecase.createComment(postId: postId, content: content)
-                await MainActor.run {
-                    inputTextView.text = ""
-                    inputTextView.isEditable = true
-                    sendButton.isEnabled = false
-                    placeholderLabel.isHidden = false
-                    loadComments()
-                    onCommentAdded?()
+        if let editingComment = editingComment {
+            // 수정 모드
+            Task {
+                do {
+                    _ = try await postUsecase.updateComment(
+                        postId: postId,
+                        commentId: editingComment.id,
+                        content: content
+                    )
+                    await MainActor.run {
+                        cancelEditing()
+                        loadComments()
+                        onCommentAdded?()
+                    }
+                } catch {
+                    await MainActor.run {
+                        inputTextView.isEditable = true
+                        sendButton.isEnabled = true
+                        showErrorAlert(message: "댓글 수정에 실패했습니다.")
+                    }
                 }
-            } catch {
-                await MainActor.run {
-                    inputTextView.isEditable = true
-                    sendButton.isEnabled = true
-                    showErrorAlert(message: "댓글 작성에 실패했습니다.")
+            }
+        } else {
+            // 새 댓글 작성 모드
+            Task {
+                do {
+                    _ = try await postUsecase.createComment(postId: postId, content: content)
+                    await MainActor.run {
+                        inputTextView.text = ""
+                        inputTextView.isEditable = true
+                        sendButton.isEnabled = false
+                        placeholderLabel.isHidden = false
+                        loadComments()
+                        onCommentAdded?()
+                    }
+                } catch {
+                    await MainActor.run {
+                        inputTextView.isEditable = true
+                        sendButton.isEnabled = true
+                        showErrorAlert(message: "댓글 작성에 실패했습니다.")
+                    }
                 }
             }
         }
@@ -299,40 +340,21 @@ final class CommentBottomSheetViewController: UIViewController {
     }
 
     private func showEditComment(comment: Comment) {
-        let alert = UIAlertController(title: "댓글 수정", message: nil, preferredStyle: .alert)
-        alert.addTextField { textField in
-            textField.text = comment.content
-            textField.placeholder = "댓글을 입력하세요"
-        }
+        editingComment = comment
+        inputTextView.text = comment.content
+        inputTextView.becomeFirstResponder()
+        editingIndicatorLabel.isHidden = false
+        placeholderLabel.isHidden = true
+        sendButton.isEnabled = true
+    }
 
-        alert.addAction(UIAlertAction(title: "수정", style: .default) { [weak self] _ in
-            guard let self = self,
-                  let content = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !content.isEmpty else {
-                return
-            }
-
-            Task {
-                do {
-                    _ = try await self.postUsecase.updateComment(
-                        postId: self.postId,
-                        commentId: comment.id,
-                        content: content
-                    )
-                    await MainActor.run {
-                        self.loadComments()
-                        self.onCommentAdded?()
-                    }
-                } catch {
-                    await MainActor.run {
-                        self.showErrorAlert(message: "댓글 수정에 실패했습니다.")
-                    }
-                }
-            }
-        })
-
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        present(alert, animated: true)
+    private func cancelEditing() {
+        editingComment = nil
+        inputTextView.text = ""
+        inputTextView.isEditable = true
+        editingIndicatorLabel.isHidden = true
+        placeholderLabel.isHidden = false
+        sendButton.isEnabled = false
     }
 
     private func showDeleteConfirmation(comment: Comment) {
@@ -501,5 +523,8 @@ extension CommentBottomSheetViewController: UITextViewDelegate {
         let content = textView.text.trimmingCharacters(in: .whitespacesAndNewlines)
         sendButton.isEnabled = !content.isEmpty
         placeholderLabel.isHidden = !textView.text.isEmpty
+
+        let size = textView.sizeThatFits(CGSize(width: textView.frame.width, height: .infinity))
+        textView.isScrollEnabled = size.height > Layout.inputTextViewMaxHeight
     }
 }
