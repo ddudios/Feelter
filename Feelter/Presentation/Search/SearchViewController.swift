@@ -17,12 +17,14 @@ final class SearchViewController: BaseViewController {
     private enum Layout {
         static let horizontalInset: CGFloat = 16
         static let topBarHeight: CGFloat = 44
+        static let topBarToTableSpacing: CGFloat = 4
         static let logoSize: CGFloat = 80
         static let searchFieldHeight: CGFloat = 36
         static let searchButtonSize: CGFloat = 32
         static let sectionSpacing: CGFloat = 12
         static let sliderHeight: CGFloat = 28
         static let tableBottomInset: CGFloat = 100
+        static let sliderPadding: CGFloat = 16
     }
 
     private struct DistanceOption {
@@ -31,11 +33,8 @@ final class SearchViewController: BaseViewController {
     }
 
     private let distanceOptions: [DistanceOption] = [
-        DistanceOption(title: "100m", maxDistance: 100),
-        DistanceOption(title: "300m", maxDistance: 300),
         DistanceOption(title: "500m", maxDistance: 500),
         DistanceOption(title: "1km", maxDistance: 1_000),
-        DistanceOption(title: "3km", maxDistance: 3_000),
         DistanceOption(title: "5km", maxDistance: 5_000),
         DistanceOption(title: "전체", maxDistance: nil)
     ]
@@ -45,16 +44,20 @@ final class SearchViewController: BaseViewController {
     weak var coordinator: SearchCoordinator?
 
     private let topBarContainerView = UIView()
-    private let logoImageView = UIImageView()
+    private let locationButton = UIButton(type: .system)
     private let searchTextField = UITextField()
-    private let searchButton = UIButton(type: .system)
+    private let dimBackgroundView = UIView()
 
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private let distanceHeaderView = UIView()
+    private let distanceBlurBackgroundView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    private let distanceSelectedTrack = UIView()
     private let distanceTitleLabel = UILabel()
     private let distanceValueLabel = UILabel()
     private let distanceSlider = UISlider()
+    private let sliderStartGuide = UIView()
+    private let sliderEndGuide = UIView()
 
     private var posts: [SearchPostItem] = [] {
         didSet {
@@ -63,6 +66,9 @@ final class SearchViewController: BaseViewController {
     }
 
     private var currentDistanceIndex = 0
+    private var selectedTrackWidthConstraint: Constraint?
+    private var isUpdatingSliderProgrammatically = false
+    private var isDistancePopupVisible = false
 
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let refreshSubject = PassthroughSubject<Void, Never>()
@@ -100,6 +106,7 @@ final class SearchViewController: BaseViewController {
         bind()
         currentDistanceIndex = distanceOptions.count - 1
         applyDistanceSelection(index: currentDistanceIndex, shouldNotify: false)
+        updateLocationButtonTitle()
         viewDidLoadSubject.send(())
     }
 
@@ -111,71 +118,92 @@ final class SearchViewController: BaseViewController {
     override func configureHierarchy() {
         super.configureHierarchy()
         view.addSubview(topBarContainerView)
-        view.addSubview(distanceHeaderView)
         view.addSubview(tableView)
 
-        topBarContainerView.addSubview(logoImageView)
+        topBarContainerView.addSubview(locationButton)
         topBarContainerView.addSubview(searchTextField)
-        topBarContainerView.addSubview(searchButton)
 
-        distanceHeaderView.addSubview(distanceTitleLabel)
-        distanceHeaderView.addSubview(distanceValueLabel)
-        distanceHeaderView.addSubview(distanceSlider)
+        view.addSubview(dimBackgroundView)
+        view.addSubview(distanceHeaderView)
+
+        distanceHeaderView.addSubview(distanceBlurBackgroundView)
+        distanceBlurBackgroundView.contentView.addSubview(distanceSelectedTrack)
+        distanceBlurBackgroundView.contentView.addSubview(sliderStartGuide)
+        distanceBlurBackgroundView.contentView.addSubview(sliderEndGuide)
+        distanceBlurBackgroundView.contentView.addSubview(distanceTitleLabel)
+        distanceBlurBackgroundView.contentView.addSubview(distanceValueLabel)
+        distanceBlurBackgroundView.contentView.addSubview(distanceSlider)
     }
 
     override func configureLayout() {
         super.configureLayout()
         topBarContainerView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(Layout.sectionSpacing)
-            make.leading.equalToSuperview()
-            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
+            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
             make.height.equalTo(Layout.topBarHeight)
         }
 
-        logoImageView.snp.makeConstraints { make in
-            make.leading.equalToSuperview()
+        locationButton.snp.makeConstraints { make in
             make.centerY.equalToSuperview()
-            make.size.equalTo(Layout.logoSize)
-        }
-
-        searchButton.snp.makeConstraints { make in
             make.trailing.equalToSuperview()
-            make.centerY.equalToSuperview()
-            make.size.equalTo(Layout.searchButtonSize)
         }
 
         searchTextField.snp.makeConstraints { make in
-            make.leading.equalTo(logoImageView.snp.trailing)
-            make.trailing.equalTo(searchButton.snp.leading).offset(-Layout.sectionSpacing)
+            make.leading.equalToSuperview()
+            make.trailing.equalTo(locationButton.snp.leading).offset(-8)
             make.centerY.equalToSuperview()
             make.height.equalTo(Layout.searchFieldHeight)
         }
 
+        dimBackgroundView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
         distanceHeaderView.snp.makeConstraints { make in
-            make.top.equalTo(topBarContainerView.snp.bottom).offset(Layout.sectionSpacing)
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
+        }
+
+        distanceBlurBackgroundView.snp.makeConstraints { make in
+            make.top.bottom.equalToSuperview().inset(Layout.sectionSpacing)
             make.leading.trailing.equalToSuperview()
+            make.height.equalTo(40)
+        }
+
+        distanceSelectedTrack.snp.makeConstraints { make in
+            make.leading.top.bottom.equalToSuperview()
+            selectedTrackWidthConstraint = make.width.equalTo(0).constraint
+        }
+
+        sliderStartGuide.snp.makeConstraints { make in
+            make.leading.top.bottom.equalToSuperview()
+            make.width.equalToSuperview().multipliedBy(1.0/3.0)
+        }
+
+        sliderEndGuide.snp.makeConstraints { make in
+            make.leading.top.bottom.equalToSuperview()
+            make.width.equalToSuperview().multipliedBy(5.0/6.0)
         }
 
         distanceTitleLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().inset(Layout.sectionSpacing)
-            make.leading.equalToSuperview().inset(Layout.horizontalInset)
+            make.centerY.equalToSuperview()
+            make.leading.equalToSuperview().inset(Layout.sliderPadding)
         }
 
         distanceValueLabel.snp.makeConstraints { make in
-            make.centerY.equalTo(distanceTitleLabel)
-            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.leading.greaterThanOrEqualTo(distanceTitleLabel.snp.trailing).offset(Layout.sectionSpacing)
+            make.centerY.equalToSuperview()
+            make.trailing.equalToSuperview().inset(Layout.sliderPadding)
         }
 
         distanceSlider.snp.makeConstraints { make in
-            make.top.equalTo(distanceTitleLabel.snp.bottom).offset(Layout.sectionSpacing)
-            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.height.equalTo(Layout.sliderHeight)
-            make.bottom.equalToSuperview().inset(Layout.sectionSpacing)
+            make.centerY.equalToSuperview()
+            make.height.equalToSuperview()
+            make.leading.equalTo(sliderStartGuide.snp.trailing)
+            make.trailing.equalTo(sliderEndGuide.snp.trailing)
         }
 
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(distanceHeaderView.snp.bottom)
+            make.top.equalTo(topBarContainerView.snp.bottom).offset(Layout.topBarToTableSpacing)
             make.leading.trailing.bottom.equalToSuperview()
         }
     }
@@ -184,8 +212,22 @@ final class SearchViewController: BaseViewController {
         super.configureView()
         view.backgroundColor = .Feelter.gray100
 
-        logoImageView.image = UIImage(named: "appIcon")
-        logoImageView.contentMode = .scaleAspectFit
+        locationButton.setTitle(nil, for: .normal)
+        locationButton.setImage(UIImage.Icon.pin, for: .normal)
+        locationButton.tintColor = .Feelter.gray75
+        locationButton.accessibilityLabel = "거리 필터"
+        locationButton.contentHorizontalAlignment = .leading
+        locationButton.contentEdgeInsets = .zero
+        locationButton.titleEdgeInsets = .zero
+        locationButton.setContentHuggingPriority(.required, for: .horizontal)
+        locationButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        locationButton.addTarget(self, action: #selector(locationButtonTapped), for: .touchUpInside)
+
+        dimBackgroundView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        dimBackgroundView.isHidden = true
+        dimBackgroundView.alpha = 0
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dimBackgroundTapped))
+        dimBackgroundView.addGestureRecognizer(tapGesture)
 
         searchTextField.delegate = self
         searchTextField.placeholder = "검색어를 입력하세요"
@@ -195,14 +237,19 @@ final class SearchViewController: BaseViewController {
         searchTextField.layer.cornerRadius = Radius.m
         searchTextField.layer.borderWidth = 1
         searchTextField.layer.borderColor = UIColor.Feelter.gray75?.cgColor
-        searchTextField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
+
+        // leftView에 검색 아이콘 추가
+        let leftContainer = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 36))
+        let searchIconView = UIImageView(image: UIImage.TabBar.searchEmpty)
+        searchIconView.tintColor = .Feelter.gray15
+        searchIconView.contentMode = .scaleAspectFit
+        searchIconView.frame = CGRect(x: 8, y: 8, width: 20, height: 20)
+        leftContainer.addSubview(searchIconView)
+        searchTextField.leftView = leftContainer
         searchTextField.leftViewMode = .always
+
         searchTextField.clearButtonMode = .whileEditing
         searchTextField.returnKeyType = .search
-
-        searchButton.setImage(UIImage.TabBar.searchEmpty, for: .normal)
-        searchButton.tintColor = .Feelter.gray15
-        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
     }
 
     private func configureLocation() {
@@ -228,22 +275,51 @@ final class SearchViewController: BaseViewController {
     }
 
     private func configureTableHeaderView() {
-        distanceHeaderView.backgroundColor = .Feelter.gray100
+        distanceHeaderView.backgroundColor = .clear
+        distanceHeaderView.isHidden = true
+        distanceHeaderView.alpha = 0
+
+        distanceBlurBackgroundView.layer.cornerRadius = Radius.m
+        distanceBlurBackgroundView.clipsToBounds = true
+
+        distanceSelectedTrack.backgroundColor = UIColor.white.withAlphaComponent(0.2)
+
+        sliderStartGuide.backgroundColor = .clear
+        sliderStartGuide.isUserInteractionEnabled = false
+
+        sliderEndGuide.backgroundColor = .clear
+        sliderEndGuide.isUserInteractionEnabled = false
 
         distanceTitleLabel.text = "현재 위치 반경"
         distanceTitleLabel.font = TextStyle.Pretendard.body2
-        distanceTitleLabel.textColor = .Feelter.gray15
+        distanceTitleLabel.textColor = .white
 
         distanceValueLabel.font = TextStyle.Pretendard.body2
-        distanceValueLabel.textColor = .Feelter.gray60
+        distanceValueLabel.textColor = .white
         distanceValueLabel.textAlignment = .right
 
         distanceSlider.minimumValue = 0
         distanceSlider.maximumValue = Float(distanceOptions.count - 1)
         distanceSlider.isContinuous = true
-        distanceSlider.minimumTrackTintColor = .Feelter.deepTurquoise
-        distanceSlider.maximumTrackTintColor = .Feelter.gray75
+        distanceSlider.minimumTrackTintColor = .clear
+        distanceSlider.maximumTrackTintColor = .clear
+        distanceSlider.setThumbImage(createThumbImage(), for: .normal)
+        distanceSlider.setThumbImage(createThumbImage(), for: .highlighted)
         distanceSlider.addTarget(self, action: #selector(distanceSliderChanged(_:)), for: .valueChanged)
+    }
+
+    private func createThumbImage() -> UIImage? {
+        let width: CGFloat = 2
+        let height: CGFloat = 40
+        let size = CGSize(width: width, height: height)
+
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+
+        UIColor.white.setFill()
+        UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
+
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
 
     private func applyDistanceSelection(index: Int, shouldNotify: Bool) {
@@ -251,10 +327,31 @@ final class SearchViewController: BaseViewController {
         currentDistanceIndex = index
         let option = distanceOptions[index]
         distanceValueLabel.text = option.title
+        updateLocationButtonTitle()
+        isUpdatingSliderProgrammatically = true
         distanceSlider.setValue(Float(index), animated: false)
+        isUpdatingSliderProgrammatically = false
+        updateSelectedTrackWidth()
         if shouldNotify {
             distanceChangedSubject.send(option.maxDistance)
         }
+    }
+
+    private func updateLocationButtonTitle() {
+        let locationName = distanceTitleLabel.text?.replacingOccurrences(of: " 반경", with: "") ?? "현재 위치"
+        let distanceText = distanceValueLabel.text ?? "전체"
+        locationButton.accessibilityValue = "\(locationName) 반경 \(distanceText)"
+    }
+
+    private func updateSelectedTrackWidth() {
+        let sliderValue = distanceSlider.value
+        // 원래 7개 옵션 중 2/6 ~ 5/6 범위에 매핑
+        // value 0 (500m) → 1/3, value 3 (전체) → 5/6
+        let percentage = 1.0/3.0 + CGFloat(sliderValue) / 6.0
+        let totalWidth = distanceBlurBackgroundView.frame.width
+        guard totalWidth > 0 else { return }
+        let targetWidth = totalWidth * percentage
+        selectedTrackWidthConstraint?.update(offset: targetWidth)
     }
 
     private func bind() {
@@ -358,6 +455,7 @@ final class SearchViewController: BaseViewController {
             let locationName = self.makeLocationName(from: placemarks?.first) ?? "현재 위치"
             Task { @MainActor in
                 self.distanceTitleLabel.text = "\(locationName) 반경"
+                self.updateLocationButtonTitle()
             }
         }
     }
@@ -386,17 +484,59 @@ final class SearchViewController: BaseViewController {
         refreshSubject.send(())
     }
 
-    @objc private func searchButtonTapped() {
-        searchRequestedSubject.send(searchTextField.text ?? "")
-        view.endEditing(true)
+    @objc private func locationButtonTapped() {
+        toggleDistancePopup()
+    }
+
+    @objc private func dimBackgroundTapped() {
+        hideDistancePopup()
+    }
+
+    private func toggleDistancePopup() {
+        if isDistancePopupVisible {
+            hideDistancePopup()
+        } else {
+            showDistancePopup()
+        }
+    }
+
+    private func showDistancePopup() {
+        isDistancePopupVisible = true
+        dimBackgroundView.isHidden = false
+        distanceHeaderView.isHidden = false
+
+        view.bringSubviewToFront(dimBackgroundView)
+        view.bringSubviewToFront(distanceHeaderView)
+
+        UIView.animate(withDuration: 0.3) {
+            self.dimBackgroundView.alpha = 1
+            self.distanceHeaderView.alpha = 1
+        }
+    }
+
+    private func hideDistancePopup() {
+        isDistancePopupVisible = false
+
+        UIView.animate(withDuration: 0.3) {
+            self.dimBackgroundView.alpha = 0
+            self.distanceHeaderView.alpha = 0
+        } completion: { _ in
+            self.dimBackgroundView.isHidden = true
+            self.distanceHeaderView.isHidden = true
+        }
     }
 
     @objc private func distanceSliderChanged(_ slider: UISlider) {
+        guard !isUpdatingSliderProgrammatically else { return }
         let index = Int(round(slider.value))
         if index != currentDistanceIndex {
             applyDistanceSelection(index: index, shouldNotify: true)
+            // 슬라이더 값이 변경되면 팝업 닫기
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.hideDistancePopup()
+            }
         } else {
-            slider.setValue(Float(index), animated: false)
+            updateSelectedTrackWidth()
         }
     }
 

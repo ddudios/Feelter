@@ -63,6 +63,7 @@ extension UIImage {
         static var add: UIImage? { template("Add") }
         static var delete: UIImage? { template("delete") }
         static var restart: UIImage? { template("Restart") }
+        static var pin: UIImage? { template("Pin") }
     }
 }
 
