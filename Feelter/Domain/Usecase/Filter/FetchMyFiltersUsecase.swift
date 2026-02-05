@@ -76,17 +76,24 @@ final class FetchMyFiltersUsecase {
             }
         } while true
 
-        // FilterSummary → FilterDetail 변환
-        return try await withThrowingTaskGroup(of: FilterDetail.self) { group in
+        // FilterSummary → FilterDetail 변환 (삭제된 필터는 제외)
+        return await withTaskGroup(of: FilterDetail?.self) { group in
             for filter in filters {
                 group.addTask {
-                    try await self.filterRepository.fetchFilter(id: filter.id)
+                    do {
+                        return try await self.filterRepository.fetchFilter(id: filter.id)
+                    } catch {
+                        print("⚠️ [FetchMyFiltersUsecase] 필터 상세 조회 실패 (삭제된 필터일 수 있음): \(filter.title) (ID: \(filter.id))")
+                        return nil
+                    }
                 }
             }
 
             var details: [FilterDetail] = []
-            for try await detail in group {
-                details.append(detail)
+            for await detail in group {
+                if let detail = detail {
+                    details.append(detail)
+                }
             }
             return details
         }
