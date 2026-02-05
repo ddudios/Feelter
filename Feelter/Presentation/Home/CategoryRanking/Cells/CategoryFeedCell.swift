@@ -42,6 +42,7 @@ final class CategoryFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegat
         label.font = TextStyle.Mulgyeol.body1
         label.textColor = .Feelter.gray15
         label.numberOfLines = 1
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return label
     }()
 
@@ -50,6 +51,7 @@ final class CategoryFeedCell: BaseCollectionViewCell, UIGestureRecognizerDelegat
         label.font = TextStyle.Pretendard.caption2
         label.textColor = .Feelter.gray60
         label.backgroundColor = UIColor.Feelter.blackTurquoise
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
         return label
     }()
 
