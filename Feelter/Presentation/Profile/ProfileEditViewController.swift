@@ -392,10 +392,25 @@ final class ProfileEditViewController: BaseViewController {
     }
 
     private func parseHashTags(from text: String) -> [String] {
-        let tags = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        return tags.map { tag in
-            tag.hasPrefix("#") ? tag : "#\(tag)"
-        }.filter { !$0.isEmpty && $0 != "#" }
+        // 쉼표, 공백, 개행 등으로 구분된 해시태그 파싱
+        let separators = CharacterSet(charactersIn: ",\n")
+        let tags = text.components(separatedBy: separators)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        // # 접두사 추가 및 중복 제거
+        var uniqueTags = [String]()
+        var seenTags = Set<String>()
+
+        for tag in tags {
+            let normalizedTag = tag.hasPrefix("#") ? tag : "#\(tag)"
+            if normalizedTag != "#" && !seenTags.contains(normalizedTag.lowercased()) {
+                uniqueTags.append(normalizedTag)
+                seenTags.insert(normalizedTag.lowercased())
+            }
+        }
+
+        return uniqueTags
     }
 
     // MARK: - Helpers
