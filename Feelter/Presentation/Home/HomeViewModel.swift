@@ -31,18 +31,21 @@ final class HomeViewModel: ViewModelProtocol {
     private let bannerUsecase: BannerUsecaseProtocol
     private let tokenRepository: TokenRepositoryProtocol
     private let todayAuthorUsecase: TodayAuthorUsecaseProtocol
+    private let userRepository: UserRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
 
     init(
         filterUsecase: FilterUsecaseProtocol,
         bannerUsecase: BannerUsecaseProtocol,
         tokenRepository: TokenRepositoryProtocol,
-        todayAuthorUsecase: TodayAuthorUsecaseProtocol
+        todayAuthorUsecase: TodayAuthorUsecaseProtocol,
+        userRepository: UserRepositoryProtocol
     ) {
         self.filterUsecase = filterUsecase
         self.bannerUsecase = bannerUsecase
         self.tokenRepository = tokenRepository
         self.todayAuthorUsecase = todayAuthorUsecase
+        self.userRepository = userRepository
     }
 
     func transform(input: Input) -> Output {
@@ -63,25 +66,71 @@ final class HomeViewModel: ViewModelProtocol {
 
                 Task {
                     do {
-                        // 오늘의 필터, 배너, 핫 트렌드, 오늘의 작가를 동시에 가져오기
-                        async let filter = self.filterUsecase.fetchTodayFilter()
-                        async let banners = self.bannerUsecase.fetchBanners()
-                        async let hotTrends = self.filterUsecase.fetchHotTrends()
-                        async let todayAuthor = self.todayAuthorUsecase.fetchTodayAuthor()
+                        // ========================================
+                        // 🔴 목데이터 모드 (개발/테스트용)
+                        // ========================================
+                        // 사용 시: 아래 주석 해제 + 원본 API 모드 주석 처리
 
-                        let (filterResult, bannersResult, hotTrendsResult, todayAuthorResult) = try await (
-                            filter,
-                            banners,
-                            hotTrends,
-                            todayAuthor
+                        async let filterDetailResult = self.filterUsecase.fetchFilter(id: "69853b342d826cebc45840c5")
+                        async let bannersResult = self.bannerUsecase.fetchBanners()
+                        async let hotTrendsResult = self.filterUsecase.fetchHotTrends()
+                        async let userProfileResult = self.userRepository.fetchProfile(userId: "6957530cf1736c2b36c4e02e")
+                        async let userFiltersResult = self.filterUsecase.fetchUserFilters(userId: "6957530cf1736c2b36c4e02e", next: nil, limit: nil)
+
+                        let (filterDetail, banners, hotTrends, userProfile, userFilters) = try await (
+                            filterDetailResult,
+                            bannersResult,
+                            hotTrendsResult,
+                            userProfileResult,
+                            userFiltersResult
                         )
 
+                        // FilterDetail을 TodayFilter로 변환
+                        let todayFilter = TodayFilter(
+                            id: filterDetail.id,
+                            title: filterDetail.title,
+                            introduction: "공기를 담은 필터",
+                            description: filterDetail.description,
+                            mainImageURL: filterDetail.previewImages.first ?? "",
+                            createdAt: filterDetail.createdAt
+                        )
+
+                        // User를 TodayAuthor로 변환 (커스텀 introduction, description 사용)
+                        let authorInfo = AuthorInfo(
+                            id: userProfile.id,
+                            nickname: userProfile.nickname,
+                            name: userProfile.name ?? "",
+                            introduction: "빛과 공기의 온도를 사진에 담아내는 작가",
+                            description: "과하지 않은 보정과 절제된 색감을 통해\n사진이 가진 본연의 분위기를 섬세하게 살려내는 사진작가입니다.\n일상의 순간이 조금 더 부드럽게 기억되길 바라는 사람들,\n자연스러운 톤과 감정의 흐름을 중요하게 여기는 이들에게\n김하린의 필터는 조용한 선택지가 되어줍니다.",
+                            profileImageURL: userProfile.profileImageURL,
+                            hashTags: userProfile.hashTags
+                        )
+                        let todayAuthor = TodayAuthor(author: authorInfo, filters: userFilters.filters)
+
+                        // ========================================
+                        // ✅ 원본 API 모드 (프로덕션용)
+                        // ========================================
+                        // 사용 시: 아래 주석 해제 + 목데이터 모드 주석 처리
+
+//                        async let todayFilterResult = self.filterUsecase.fetchTodayFilter()
+//                        async let bannersResult = self.bannerUsecase.fetchBanners()
+//                        async let hotTrendsResult = self.filterUsecase.fetchHotTrends()
+//                        async let todayAuthorResult = self.todayAuthorUsecase.fetchTodayAuthor()
+//
+//                        let (todayFilter, banners, hotTrends, todayAuthor) = try await (
+//                            todayFilterResult,
+//                            bannersResult,
+//                            hotTrendsResult,
+//                            todayAuthorResult
+//                        )
+                        
+                        // 공통
                         await MainActor.run {
                             isLoadingSubject.send(false)
-                            todayFilterSubject.send(filterResult)
-                            bannersSubject.send(bannersResult)
-                            hotTrendsSubject.send(hotTrendsResult)
-                            todayAuthorSubject.send(todayAuthorResult)
+                            todayFilterSubject.send(todayFilter)
+                            bannersSubject.send(banners)
+                            hotTrendsSubject.send(hotTrends)
+                            todayAuthorSubject.send(todayAuthor)
                         }
                     } catch {
                         await MainActor.run {

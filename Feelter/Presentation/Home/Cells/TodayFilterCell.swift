@@ -39,7 +39,7 @@ final class TodayFilterCell: BaseCollectionViewCell {
         let label = UILabel()
         label.text = "오늘의 필터 소개"
         label.font = TextStyle.Pretendard.body3
-        label.textColor = .Feelter.gray60
+        label.textColor = .Feelter.gray45
         return label
     }()
     

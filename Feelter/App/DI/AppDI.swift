@@ -154,11 +154,13 @@ func registerDependencies() {
         let bannerUsecase = container.resolve(BannerUsecaseProtocol.self)
         let tokenRepository = container.resolve(TokenRepositoryProtocol.self)
         let todayAuthorUsecase = container.resolve(TodayAuthorUsecaseProtocol.self)
+        let userRepository = container.resolve(UserRepositoryProtocol.self)
         return HomeViewModel(
             filterUsecase: filterUsecase,
             bannerUsecase: bannerUsecase,
             tokenRepository: tokenRepository,
-            todayAuthorUsecase: todayAuthorUsecase
+            todayAuthorUsecase: todayAuthorUsecase,
+            userRepository: userRepository
         )
     }
 

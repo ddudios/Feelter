@@ -107,6 +107,7 @@ final class HomeViewController: BaseViewController {
         setupDataSource()
         bind()
         viewDidLoadSubject.send(())
+        print(KeychainManager.shared.read(account: "accessToken"))
     }
 
     override func viewWillAppear(_ animated: Bool) {
