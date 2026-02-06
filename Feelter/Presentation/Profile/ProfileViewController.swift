@@ -53,17 +53,19 @@ final class ProfileViewController: BaseViewController {
     private var profileUserId: String?
     private var isMenuVisible = false
     private var menuTrailingConstraint: Constraint?
+    private var hashTagsHeightConstraint: Constraint?
 
     // UI Components
     // HashTags Section
     private let hashTagsCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.minimumLineSpacing = Layout.tagSpacing
-        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+        layout.scrollDirection = .vertical
+        layout.minimumLineSpacing = 2
+        layout.minimumInteritemSpacing = 0
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
-        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.isScrollEnabled = false
         return collectionView
     }()
 
@@ -137,13 +139,13 @@ final class ProfileViewController: BaseViewController {
 
         filterBoxView.addSubview(filterBoxIconView)
         filterBoxView.addSubview(filterBoxCountLabel)
+        filterBoxView.addSubview(hashTagsCollectionView)
 
         chatBoxView.addSubview(chatBoxIconView)
         chatBoxView.addSubview(chatBoxLabel)
 
         // Info Section
         view.addSubview(nameLabel)
-        view.addSubview(hashTagsCollectionView)
         view.addSubview(introductionLabel)
 
         // Filter Scroll Section
@@ -204,6 +206,13 @@ final class ProfileViewController: BaseViewController {
             make.leading.top.equalToSuperview().inset(Layout.boxPadding)
         }
 
+        hashTagsCollectionView.snp.makeConstraints { make in
+            make.top.equalTo(filterBoxIconView.snp.bottom).offset(4)
+            make.leading.trailing.equalToSuperview().inset(Layout.boxPadding)
+            make.bottom.lessThanOrEqualToSuperview().inset(Layout.boxPadding)
+            hashTagsHeightConstraint = make.height.equalTo(0).constraint
+        }
+
         filterBoxCountLabel.snp.makeConstraints { make in
             make.trailing.bottom.equalToSuperview().inset(Layout.boxPadding)
         }
@@ -221,15 +230,7 @@ final class ProfileViewController: BaseViewController {
         // Info Section
         nameLabel.snp.makeConstraints { make in
             make.top.equalTo(profileSectionView.snp.bottom).offset(8)
-            make.leading.equalToSuperview().inset(Layout.horizontalInset)
-        }
-
-        // HashTags (이름 옆에)
-        hashTagsCollectionView.snp.makeConstraints { make in
-            make.leading.equalTo(nameLabel.snp.trailing).offset(Layout.smallSpacing)
-            make.centerY.equalTo(nameLabel)
-            make.trailing.equalToSuperview().inset(Layout.horizontalInset)
-            make.height.equalTo(Layout.tagRowHeight)
+            make.leading.trailing.equalToSuperview().inset(Layout.horizontalInset)
         }
 
         introductionLabel.snp.makeConstraints { make in
@@ -331,12 +332,6 @@ final class ProfileViewController: BaseViewController {
         // Info Section
         nameLabel.font = TextStyle.Pretendard.body2
         nameLabel.textColor = .Feelter.gray0
-        nameLabel.setContentHuggingPriority(.required, for: .horizontal)
-        nameLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        // HashTags CollectionView
-        hashTagsCollectionView.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        hashTagsCollectionView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         introductionLabel.font = TextStyle.Pretendard.caption2
         introductionLabel.textColor = .Feelter.gray60
@@ -485,6 +480,13 @@ final class ProfileViewController: BaseViewController {
 
         // HashTags
         hashTags = user.hashTags
+
+        // Update hashTags height based on count
+        let tagHeight: CGFloat = 16
+        let tagSpacing: CGFloat = 2
+        let totalHeight = hashTags.isEmpty ? 0 : CGFloat(hashTags.count) * tagHeight + CGFloat(max(0, hashTags.count - 1)) * tagSpacing
+        hashTagsHeightConstraint?.update(offset: totalHeight)
+
         hashTagsCollectionView.reloadData()
     }
 
@@ -652,8 +654,8 @@ final class ProfileViewController: BaseViewController {
     }
 }
 
-// MARK: - UICollectionViewDataSource, UICollectionViewDelegate
-extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+// MARK: - UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout
+extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return hashTags.count
     }
@@ -670,6 +672,15 @@ extension ProfileViewController: UICollectionViewDataSource, UICollectionViewDel
         }
         cell.configure(tag: hashTags[indexPath.item])
         return cell
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        sizeForItemAt indexPath: IndexPath
+    ) -> CGSize {
+        let width = collectionView.bounds.width
+        return CGSize(width: width, height: 16)
     }
 }
 
@@ -713,7 +724,7 @@ private final class ProfileFilterCell: UICollectionViewCell {
 
 private final class ProfileTagCell: UICollectionViewCell {
 
-    private let tagLabel = CapsuleLabel(padding: UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12))
+    private let tagLabel = UILabel()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -729,9 +740,9 @@ private final class ProfileTagCell: UICollectionViewCell {
         tagLabel.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-        tagLabel.font = TextStyle.Pretendard.caption2
+        tagLabel.font = TextStyle.Pretendard.caption3
         tagLabel.textColor = .Feelter.gray60
-        tagLabel.backgroundColor = .Feelter.blackTurquoise
+        tagLabel.textAlignment = .left
     }
 
     func configure(tag: String) {
