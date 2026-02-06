@@ -395,7 +395,7 @@ final class ChatMessageCell: UITableViewCell {
         retryButton.setTitle(nil, for: .normal)
         retryButton.addTarget(self, action: #selector(retryButtonTapped), for: .touchUpInside)
 
-        deleteButton.setImage(UIImage.Icon.delete, for: .normal)
+        deleteButton.setImage(UIImage.Icon.xmark, for: .normal)
         deleteButton.setTitle(nil, for: .normal)
         deleteButton.addTarget(self, action: #selector(deleteButtonTapped), for: .touchUpInside)
 

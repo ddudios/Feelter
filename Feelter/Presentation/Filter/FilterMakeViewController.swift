@@ -568,7 +568,9 @@ final class FilterMakeViewController: BaseViewController {
             self.updatePhotoUploadButton(with: filteredImage)
         }
 
-        navigationController?.pushViewController(viewController, animated: true)
+        let navigationController = UINavigationController(rootViewController: viewController)
+        navigationController.modalPresentationStyle = .fullScreen
+        present(navigationController, animated: true)
     }
 
     @objc private func priceTextFieldDidChange() {

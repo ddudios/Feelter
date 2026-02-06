@@ -77,6 +77,13 @@ final class FilterEditViewController: BaseViewController {
     override func configureView() {
         super.configureView()
         title = "EDIT"
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            image: UIImage.Icon.xmark,
+            style: .plain,
+            target: self,
+            action: #selector(cancelButtonTapped)
+        )
+        navigationItem.leftBarButtonItem?.tintColor = .Feelter.gray75
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             image: UIImage.Icon.save,
             style: .plain,
@@ -211,11 +218,7 @@ final class FilterEditViewController: BaseViewController {
     }
 
     @objc private func cancelButtonTapped() {
-        if let navigationController {
-            navigationController.popViewController(animated: true)
-        } else {
-            dismiss(animated: true)
-        }
+        dismiss(animated: true)
     }
 
     @objc private func saveButtonTapped() {
@@ -232,7 +235,7 @@ final class FilterEditViewController: BaseViewController {
         onSaveComplete?(filteredImage, selectedImage, currentFilterValues)
 
         // 4. 이전 화면으로 돌아가기
-        navigationController?.popViewController(animated: true)
+        dismiss(animated: true)
     }
 
     private func showErrorAlert(_ message: String) {
