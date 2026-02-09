@@ -300,6 +300,100 @@ extension CoreDataManager {
 
         return unreadCounts
     }
+
+    /// 모든 채팅방의 읽지 않은 메시지 개수를 마지막 읽은 메시지 ID 기준으로 조회
+    ///
+    /// 동작 원리:
+    /// 1. UserDefaults에서 각 채팅방의 lastReadMessageId 가져오기
+    /// 2. 각 채팅방마다 lastReadMessageId 이후의 메시지 개수 계산
+    /// 3. Dictionary로 반환: [roomId: unreadCount]
+    ///
+    /// 서버에서 읽음 처리를 지원하지 않는 경우:
+    /// - 로컬에 lastReadMessageId 저장 (UserDefaults)
+    /// - CoreData에서 해당 메시지 이후의 메시지만 카운팅
+    ///
+    /// - Parameters:
+    ///   - currentUserId: 현재 사용자 ID (내가 보낸 메시지는 제외)
+    ///   - lastReadMessageIds: [roomId: lastReadMessageId] Dictionary
+    /// - Returns: [roomId: unreadCount] Dictionary
+    func fetchUnreadMessageCountsByMessageId(
+        currentUserId: String,
+        lastReadMessageIds: [String: String]
+    ) throws -> [String: Int] {
+        var unreadCounts: [String: Int] = [:]
+        var fetchError: Error?
+
+        viewContext.performAndWait {
+            do {
+                // 1. 모든 채팅방 조회
+                let chatRoomFetchRequest = ChatRoomEntity.fetchRequest()
+                chatRoomFetchRequest.propertiesToFetch = ["roomId"]
+                let chatRooms = try viewContext.fetch(chatRoomFetchRequest)
+
+                // 2. 각 채팅방마다 읽지 않은 메시지 개수 계산
+                for chatRoom in chatRooms {
+                    guard let roomId = chatRoom.roomId else { continue }
+
+                    let messageFetchRequest = ChatMessageEntity.fetchRequest()
+
+                    if let lastReadMessageId = lastReadMessageIds[roomId] {
+                        // lastReadMessageId가 있으면: 해당 메시지 이후 + 상대방이 보낸 + 전송 성공한 메시지
+                        // 1) 먼저 lastReadMessageId의 createdAt을 조회
+                        let lastMessageFetchRequest = ChatMessageEntity.fetchRequest()
+                        lastMessageFetchRequest.predicate = NSPredicate(
+                            format: "chatId == %@",
+                            lastReadMessageId
+                        )
+                        lastMessageFetchRequest.fetchLimit = 1
+
+                        if let lastReadMessage = try viewContext.fetch(lastMessageFetchRequest).first,
+                           let lastReadDate = lastReadMessage.createdAt {
+                            // 2) 해당 날짜 이후의 메시지 개수 계산
+                            messageFetchRequest.predicate = NSPredicate(
+                                format: "roomId == %@ AND senderId != %@ AND createdAt > %@ AND status == %@",
+                                roomId,
+                                currentUserId,
+                                lastReadDate as NSDate,
+                                MessageSendStatus.sent.rawValue
+                            )
+                        } else {
+                            // lastReadMessageId를 찾지 못하면 모든 메시지를 안읽음으로 간주
+                            messageFetchRequest.predicate = NSPredicate(
+                                format: "roomId == %@ AND senderId != %@ AND status == %@",
+                                roomId,
+                                currentUserId,
+                                MessageSendStatus.sent.rawValue
+                            )
+                        }
+                    } else {
+                        // lastReadMessageId가 없으면: 상대방이 보낸 + 전송 성공한 모든 메시지
+                        messageFetchRequest.predicate = NSPredicate(
+                            format: "roomId == %@ AND senderId != %@ AND status == %@",
+                            roomId,
+                            currentUserId,
+                            MessageSendStatus.sent.rawValue
+                        )
+                    }
+
+                    // 3. count(for:) 사용
+                    do {
+                        let count = try viewContext.count(for: messageFetchRequest)
+                        unreadCounts[roomId] = count
+                    } catch {
+                        unreadCounts[roomId] = 0
+                    }
+                }
+            } catch {
+                fetchError = error
+            }
+        }
+
+        if let fetchError = fetchError {
+            throw fetchError
+        }
+
+        return unreadCounts
+    }
 }
 
 // MARK: - UPSERT Methods

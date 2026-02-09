@@ -677,8 +677,13 @@ final class ChatRepository: ChatRepositoryProtocol {
     ///
     /// 동작:
     /// 1. Keychain에서 currentUserId 조회
-    /// 2. CoreDataManager의 Batch Query 호출
-    /// 3. Dictionary 반환
+    /// 2. UserDefaults에서 lastReadMessageIds 조회
+    /// 3. CoreDataManager의 Batch Query 호출 (lastReadMessageId 기준)
+    /// 4. Dictionary 반환
+    ///
+    /// 서버에서 읽음 처리를 지원하지 않는 경우:
+    /// - 로컬에 lastReadMessageId 저장 (UserDefaults)
+    /// - CoreData에서 해당 메시지 이후의 메시지만 카운팅
     ///
     /// - Returns: [roomId: unreadCount] Dictionary
     func fetchAllUnreadCounts() -> [String: Int] {
@@ -687,9 +692,15 @@ final class ChatRepository: ChatRepositoryProtocol {
             return [:]  // 로그인 안 되어 있으면 빈 Dictionary
         }
 
-        // 2. CoreDataManager의 Batch Query 호출
+        // 2. UserDefaults에서 lastReadMessageIds 조회
+        let lastReadMessageIds = ChatUserDefaults.shared.getAllLastReadMessageIds()
+
+        // 3. CoreDataManager의 Batch Query 호출 (lastReadMessageId 기준)
         do {
-            return try coreDataManager.fetchUnreadMessageCounts(currentUserId: userId)
+            return try coreDataManager.fetchUnreadMessageCountsByMessageId(
+                currentUserId: userId,
+                lastReadMessageIds: lastReadMessageIds
+            )
         } catch {
             // 에러 발생 시 빈 Dictionary 반환 (앱이 멈추면 안 됨)
             return [:]
@@ -765,6 +776,14 @@ final class ChatRepository: ChatRepositoryProtocol {
                         // - lastMessage, updatedAt 변경 반영
                         // - 채팅방 목록 화면에서 실시간 갱신
                         await self.refreshChatRoomsFromCoreData()
+
+                        // 6. 새 메시지 수신 알림 발송 (푸시 알림 대응)
+                        // - ChatRoomListViewModel에서 구독하여 안읽은 메시지 카운트 증가
+                        NotificationCenter.default.post(
+                            name: .newMessageReceived,
+                            object: nil,
+                            userInfo: ["roomId": message.roomId]
+                        )
 
                     } catch {
                     }
@@ -956,4 +975,8 @@ enum RepositoryError: LocalizedError {
 extension Notification.Name {
     /// 재로그인 필요 (토큰 만료, 인증 실패 등)
     static let requiresReauthentication = Notification.Name("requiresReauthentication")
+
+    /// 새 메시지 수신 (푸시 알림 또는 Socket.IO)
+    /// userInfo: ["roomId": String]
+    static let newMessageReceived = Notification.Name("newMessageReceived")
 }

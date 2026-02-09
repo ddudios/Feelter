@@ -75,9 +75,20 @@ final class ChatRoomListViewController: BaseViewController {
         configureEmptyStateView()
         updateEmptyState()
         bind()
+        setupAppLifecycleObservers()
 
         // 초기 로드 트리거
         viewDidLoadSubject.send()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 화면이 다시 나타날 때마다 데이터 새로고침 (푸시 알림 대응)
+        refreshSubject.send(())
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func configureHierarchy() {
@@ -263,6 +274,28 @@ final class ChatRoomListViewController: BaseViewController {
             action: #selector(searchButtonTapped)
         )
         navigationItem.rightBarButtonItem = searchButton
+    }
+
+    /// 앱 라이프사이클 옵저버 설정
+    ///
+    /// 앱이 포그라운드로 돌아올 때 데이터 새로고침
+    /// - 백그라운드에서 푸시 알림을 받고 돌아왔을 때
+    /// - 다른 앱에서 돌아왔을 때
+    private func setupAppLifecycleObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    /// 앱이 활성화될 때 호출 (백그라운드에서 복귀)
+    ///
+    /// 푸시 알림을 받고 앱으로 돌아왔을 때 데이터 새로고침
+    @objc private func appDidBecomeActive() {
+        // 데이터 새로고침 (안읽은 메시지 카운트 포함)
+        refreshSubject.send(())
     }
 
     @objc private func searchButtonTapped() {

@@ -71,9 +71,13 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 // 동일 채팅방이면 알림 생략
                 completionHandler([])
             } else {
+                // 다른 채팅방의 메시지 수신 → 배지 카운팅 증가
+                notifyNewMessageReceived(roomId: pushRoomId)
                 completionHandler(presentationOptions())
             }
         } else {
+            // ChatRoomList 또는 다른 화면에 있을 때 → 배지 카운팅 증가
+            notifyNewMessageReceived(roomId: pushRoomId)
             completionHandler(presentationOptions())
         }
     }
@@ -105,7 +109,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
               var topVC = window.rootViewController else { return nil }
 
         while let presented = topVC.presentedViewController { topVC = presented }
-        
+
         // 네비게이션/탭바 내부의 최상위 뷰 탐색 루프
         var current: UIViewController? = topVC
         while true {
@@ -115,6 +119,18 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         }
 
         return (current as? ChatRoomViewController)?.getCurrentChatRoomId()
+    }
+
+    /// 새 메시지 수신 알림 발송 (ChatRoomList 배지 카운팅용)
+    ///
+    /// ChatRoomList에서 구독하여 해당 채팅방의 배지 카운트 +1
+    /// - Parameter roomId: 메시지를 받은 채팅방 ID
+    private func notifyNewMessageReceived(roomId: String) {
+        NotificationCenter.default.post(
+            name: .newMessageReceived,
+            object: nil,
+            userInfo: ["roomId": roomId]
+        )
     }
 }
 
@@ -134,6 +150,12 @@ extension AppDelegate: MessagingDelegate {
         if userInfo["gcm.message_id"] != nil {
             // FCM data 메시지
             showLocalNotification(from: userInfo)
+
+            // 배지 카운팅 증가 (백그라운드에서 푸시 수신 시)
+            if let payload = NotificationPayload.from(userInfo: userInfo),
+               let roomId = payload.roomId {
+                notifyNewMessageReceived(roomId: roomId)
+            }
         }
 
         completionHandler(.newData)

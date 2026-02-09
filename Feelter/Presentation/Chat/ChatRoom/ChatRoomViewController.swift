@@ -172,6 +172,9 @@ final class ChatRoomViewController: BaseViewController {
         super.viewWillDisappear(animated)
         setCustomTabBarHidden(false)
 
+        // 마지막 읽은 메시지 ID 저장 (안읽은 메시지 카운팅용)
+        saveLastReadMessageId()
+
         // Socket 연결 해제 트리거
         viewWillDisappearSubject.send()
     }
@@ -735,6 +738,21 @@ final class ChatRoomViewController: BaseViewController {
     /// - appDidBecomeActive: 백그라운드에서 복귀 시
     private func markChatRoomAsRead() {
         viewModel.markChatRoomAsRead()
+    }
+
+    /// 마지막 읽은 메시지 ID 저장
+    /// - viewWillDisappear: 채팅방 나갈 때
+    ///
+    /// 서버에서 읽음 처리를 지원하지 않는 경우:
+    /// - 로컬에 lastReadMessageId 저장 (UserDefaults)
+    /// - 안읽은 메시지 카운팅 시 이 ID 이후의 메시지만 카운팅
+    private func saveLastReadMessageId() {
+        // 마지막 메시지의 ID를 저장
+        // messages 배열에서 가장 최근 메시지 (상대방 메시지 또는 내 메시지 모두 포함)
+        guard let lastMessage = messages.last else { return }
+
+        // UserDefaults에 저장
+        ChatUserDefaults.shared.saveLastReadMessageId(lastMessage.id, for: chatRoom.roomId)
     }
 
     private func updateMessageTableInsets() {

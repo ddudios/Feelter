@@ -154,6 +154,7 @@ final class ChatRoomListViewModel {
     /// → 자동으로 unreadCountsSubject 업데이트 (Batch Query)
     ///
     private func setupRealtimeUpdates() {
+        // 1. Repository의 채팅방 목록 변경 구독
         repository.observeChatRooms()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] chatRooms in
@@ -166,6 +167,20 @@ final class ChatRoomListViewModel {
                 // Repository의 fetchAllUnreadCounts()는 동기 메서드 (빠름)
                 let unreadCounts = self.repository.fetchAllUnreadCounts()
                 self.unreadCountsSubject.send(unreadCounts)
+            }
+            .store(in: &cancellables)
+
+        // 2. 새 메시지 수신 알림 구독 (푸시 알림 대응)
+        NotificationCenter.default.publisher(for: .newMessageReceived)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self = self,
+                      let roomId = notification.userInfo?["roomId"] as? String else { return }
+
+                // 해당 채팅방의 안읽은 메시지 카운트 +1
+                var currentCounts = self.unreadCountsSubject.value
+                currentCounts[roomId, default: 0] += 1
+                self.unreadCountsSubject.send(currentCounts)
             }
             .store(in: &cancellables)
     }
