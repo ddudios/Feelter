@@ -21,6 +21,8 @@ final class CreatePostViewModel: ViewModelProtocol {
         let title: String
         let content: String
         let filePaths: [String]
+        let latitude: Double
+        let longitude: Double
     }
 
     struct Input {

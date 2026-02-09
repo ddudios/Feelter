@@ -151,7 +151,9 @@ final class CreatePostViewController: BaseViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = editContext == nil ? "POST" : "EDIT"
-        configureLocation()
+        if editContext == nil {
+            configureLocation()
+        }
         setupKeyboardObservers()
         bindViewModel()
         viewDidLoadSubject.send(())
@@ -322,6 +324,14 @@ final class CreatePostViewController: BaseViewController {
         updateCategorySelection(selectedCategory: context.category)
         attachmentItems = context.filePaths.map { makeExistingAttachmentItem(from: $0) }
         updateAttachmentPreviews()
+
+        let coordinate = CLLocationCoordinate2D(
+            latitude: context.latitude,
+            longitude: context.longitude
+        )
+        currentLocation = coordinate
+        hasReceivedLocation = true
+        updateLocationMetadata(coordinate: coordinate)
     }
 
     private func updateCategorySelection(selectedCategory: String) {

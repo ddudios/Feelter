@@ -420,7 +420,9 @@ final class SearchViewController: BaseViewController {
             category: item.category,
             title: item.title,
             content: item.content,
-            filePaths: item.imagePaths
+            filePaths: item.imagePaths,
+            latitude: item.latitude,
+            longitude: item.longitude
         )
 
         if let coordinator {

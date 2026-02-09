@@ -13,6 +13,8 @@ struct SearchPostItem: Hashable {
     let authorName: String
     let profileImagePath: String?
     let locationText: String?
+    let latitude: Double
+    let longitude: Double
     let imagePaths: [String]
     let isLiked: Bool
     let likeCount: Int
