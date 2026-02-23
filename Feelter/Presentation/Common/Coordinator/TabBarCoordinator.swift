@@ -6,17 +6,23 @@
 //
 
 import UIKit
+import PhotosUI
+import Combine
 
+@MainActor
 final class TabBarCoordinator: Coordinator, CustomTabBarControllerDelegate {
 
     var childCoordinators: [Coordinator] = []
     var navigationController: UINavigationController
     private let tabBarController: CustomTabBarController
     private weak var filterNavigationController: UINavigationController?
+    private var cancellables = Set<AnyCancellable>()
+    private var photoPickerDelegateProxy: PhotoPickerDelegateProxy?
 
     init(navigationController: UINavigationController) {
         self.navigationController = navigationController
         self.tabBarController = CustomTabBarController()
+        bindBackgroundFilterExportEvents()
     }
 
     @MainActor
@@ -135,10 +141,14 @@ final class TabBarCoordinator: Coordinator, CustomTabBarControllerDelegate {
         let postAction = UIAlertAction(title: "게시글 작성", style: .default) { [weak self] _ in
             self?.showCreatePost()
         }
+        let applyFilterAction = UIAlertAction(title: "필터 적용", style: .default) { [weak self] _ in
+            self?.showApplyFilter()
+        }
         let cancelAction = UIAlertAction(title: "취소", style: .cancel)
 
         actionSheetController.addAction(filterAction)
         actionSheetController.addAction(postAction)
+        actionSheetController.addAction(applyFilterAction)
         actionSheetController.addAction(cancelAction)
 
         if let popoverController = actionSheetController.popoverPresentationController {
@@ -162,5 +172,118 @@ final class TabBarCoordinator: Coordinator, CustomTabBarControllerDelegate {
         let viewModel = DIContainer.shared.resolve(CreatePostViewModel.self)
         let viewController = CreatePostViewController(viewModel: viewModel)
         filterNavigationController.setViewControllers([viewController], animated: false)
+    }
+
+    @MainActor
+    private func showApplyFilter() {
+        var configuration = PHPickerConfiguration()
+        configuration.selectionLimit = 1
+        configuration.filter = .images
+
+        let picker = PHPickerViewController(configuration: configuration)
+        let delegateProxy = PhotoPickerDelegateProxy { [weak self] picker, results in
+            picker.dismiss(animated: true)
+            self?.photoPickerDelegateProxy = nil
+            self?.handlePickedImageForFilterApply(results: results)
+        }
+
+        photoPickerDelegateProxy = delegateProxy
+        picker.delegate = delegateProxy
+        tabBarController.present(picker, animated: true)
+    }
+
+    @MainActor
+    private func handlePickedImageForFilterApply(results: [PHPickerResult]) {
+        guard let result = results.first,
+              result.itemProvider.canLoadObject(ofClass: UIImage.self) else {
+            return
+        }
+
+        result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+            Task { @MainActor in
+                guard let self else { return }
+                guard let image = object as? UIImage else {
+                    self.showExportFailureAlert(message: "이미지를 불러오지 못했습니다.")
+                    return
+                }
+
+                let fetchMyFiltersUsecase = DIContainer.shared.resolve(FetchMyFiltersUsecase.self)
+                let viewModel = ApplyFilterViewModel(
+                    originalImage: image,
+                    fetchMyFiltersUsecase: fetchMyFiltersUsecase,
+                    mode: .exportToPhotoLibrary
+                )
+                let viewController = ApplyFilterViewController(viewModel: viewModel)
+
+                guard let filterNavigationController = self.filterNavigationController else { return }
+                let rootViewController = filterNavigationController.viewControllers.first ?? FilterMakeViewController()
+                filterNavigationController.setViewControllers([rootViewController, viewController], animated: false)
+            }
+        }
+    }
+
+    private func bindBackgroundFilterExportEvents() {
+        BackgroundFilterExportManager.shared.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                Task { @MainActor in
+                    self?.handleBackgroundFilterExportEvent(event)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    @MainActor
+    private func handleBackgroundFilterExportEvent(_ event: BackgroundFilterExportEvent) {
+        switch event {
+        case .succeeded:
+            GlobalToastPresenter.shared.show(
+                message: "사진첩에 저장이 완료되었습니다.",
+                duration: 3
+            )
+        case .failed(let message):
+            showExportFailureAlert(message: message)
+        }
+    }
+
+    @MainActor
+    private func showExportFailureAlert(message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+
+        if let topViewController = getTopViewController() {
+            topViewController.present(alert, animated: true)
+        }
+    }
+
+    private func getTopViewController() -> UIViewController? {
+        var topViewController = navigationController.viewControllers.first
+
+        while let presentedViewController = topViewController?.presentedViewController {
+            topViewController = presentedViewController
+        }
+
+        if let tabBarController = topViewController as? UITabBarController {
+            topViewController = tabBarController.selectedViewController
+        }
+
+        if let navigationController = topViewController as? UINavigationController {
+            topViewController = navigationController.viewControllers.last
+        }
+
+        return topViewController
+    }
+}
+
+private final class PhotoPickerDelegateProxy: NSObject, PHPickerViewControllerDelegate {
+
+    private let didFinishPicking: (PHPickerViewController, [PHPickerResult]) -> Void
+
+    init(didFinishPicking: @escaping (PHPickerViewController, [PHPickerResult]) -> Void) {
+        self.didFinishPicking = didFinishPicking
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        didFinishPicking(picker, results)
     }
 }

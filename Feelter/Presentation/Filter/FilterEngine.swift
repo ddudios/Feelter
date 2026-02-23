@@ -422,6 +422,120 @@ class FilterEngine: ObservableObject {
         return nil
     }
 
+    /// 원본 이미지를 백그라운드 작업에서 렌더링하기 위한 정적 헬퍼입니다.
+    nonisolated static func renderOriginalImage(from originalImage: UIImage, values: FilterValues) -> UIImage? {
+        guard let inputImage = CIImage(image: originalImage) else { return nil }
+
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        let brightnessFilter = CIFilter.colorControls()
+        let exposureFilter = CIFilter.exposureAdjust()
+        let highlightsFilter = CIFilter.highlightShadowAdjust()
+        let temperatureFilter = CIFilter.temperatureAndTint()
+        let sharpenFilter = CIFilter.sharpenLuminance()
+        let vignetteFilter = CIFilter.vignette()
+        let blurFilter = CIFilter.gaussianBlur()
+        let noiseReductionFilter = CIFilter.noiseReduction()
+        let toneCurveFilter = CIFilter.toneCurve()
+
+        var outputImage = inputImage
+
+        // Brightness, Contrast, Saturation
+        if values.brightness != 0.0 || values.contrast != 1.0 || values.saturation != 1.0 {
+            brightnessFilter.inputImage = outputImage
+            brightnessFilter.brightness = Float(values.brightness)
+            brightnessFilter.contrast = Float(values.contrast)
+            brightnessFilter.saturation = Float(values.saturation)
+            if let result = brightnessFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Exposure
+        if values.exposure != 0.0 {
+            exposureFilter.inputImage = outputImage
+            exposureFilter.ev = Float(values.exposure)
+            if let result = exposureFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Highlights & Shadows
+        if values.highlights != 0.0 || values.shadows != 0.0 {
+            highlightsFilter.inputImage = outputImage
+            highlightsFilter.highlightAmount = Float(values.highlights)
+            highlightsFilter.shadowAmount = Float(values.shadows)
+            if let result = highlightsFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Temperature & Tint
+        if values.temperature != 6500 || values.tint != 0.0 {
+            temperatureFilter.inputImage = outputImage
+            temperatureFilter.neutral = CIVector(x: CGFloat(values.temperature), y: CGFloat(values.tint))
+            temperatureFilter.targetNeutral = CIVector(x: 6500, y: 0)
+            if let result = temperatureFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Sharpness
+        if values.sharpness > 0.0 {
+            sharpenFilter.inputImage = outputImage
+            sharpenFilter.sharpness = Float(values.sharpness)
+            if let result = sharpenFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Vignette
+        if values.vignette > 0.0 {
+            vignetteFilter.inputImage = outputImage
+            vignetteFilter.intensity = Float(values.vignette)
+            vignetteFilter.radius = 1.0
+            if let result = vignetteFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Blur
+        if values.blur > 0.0 {
+            blurFilter.inputImage = outputImage
+            blurFilter.radius = Float(values.blur)
+            if let result = blurFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Noise Reduction
+        if values.noiseReduction > 0.0 {
+            noiseReductionFilter.inputImage = outputImage
+            noiseReductionFilter.noiseLevel = Float(values.noiseReduction)
+            noiseReductionFilter.sharpness = 0.4
+            if let result = noiseReductionFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        // Black Point
+        if values.blackPoint > 0.0 {
+            toneCurveFilter.inputImage = outputImage
+            toneCurveFilter.point0 = CGPoint(x: 0, y: CGFloat(values.blackPoint))
+            toneCurveFilter.point1 = CGPoint(x: 0.25, y: 0.25)
+            toneCurveFilter.point2 = CGPoint(x: 0.5, y: 0.5)
+            toneCurveFilter.point3 = CGPoint(x: 0.75, y: 0.75)
+            toneCurveFilter.point4 = CGPoint(x: 1, y: 1)
+            if let result = toneCurveFilter.outputImage {
+                outputImage = result
+            }
+        }
+
+        guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
     // MARK: - Server Upload
 
     /// 필터가 적용된 고화질 이미지를 서버에 업로드하고 필터를 생성합니다.

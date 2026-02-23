@@ -9,6 +9,11 @@ import UIKit
 import Combine
 import Kingfisher
 
+enum ApplyFilterFlowMode {
+    case applyToPost
+    case exportToPhotoLibrary
+}
+
 @MainActor
 final class ApplyFilterViewModel {
 
@@ -24,6 +29,7 @@ final class ApplyFilterViewModel {
         let filters: AnyPublisher<[FilterDetail], Never>
         let currentFilteredImage: AnyPublisher<UIImage?, Never>
         let saveCompleted: AnyPublisher<FilteredImageResult, Never>
+        let exportQueued: AnyPublisher<Void, Never>
         let error: AnyPublisher<String?, Never>
     }
 
@@ -36,10 +42,13 @@ final class ApplyFilterViewModel {
 
     private let originalImage: UIImage
     private let fetchMyFiltersUsecase: FetchMyFiltersUsecase
+    private let mode: ApplyFilterFlowMode
+    private let backgroundFilterExportManager: BackgroundFilterExportManager
     private let filterEngine: FilterEngine
 
     private let filtersSubject = CurrentValueSubject<[FilterDetail], Never>([])
     private let saveCompletedSubject = PassthroughSubject<FilteredImageResult, Never>()
+    private let exportQueuedSubject = PassthroughSubject<Void, Never>()
     private let errorSubject = CurrentValueSubject<String?, Never>(nil)
 
     private var currentFilter: FilterDetail?
@@ -51,10 +60,14 @@ final class ApplyFilterViewModel {
 
     init(
         originalImage: UIImage,
-        fetchMyFiltersUsecase: FetchMyFiltersUsecase
+        fetchMyFiltersUsecase: FetchMyFiltersUsecase,
+        mode: ApplyFilterFlowMode = .applyToPost,
+        backgroundFilterExportManager: BackgroundFilterExportManager = .shared
     ) {
         self.originalImage = originalImage
         self.fetchMyFiltersUsecase = fetchMyFiltersUsecase
+        self.mode = mode
+        self.backgroundFilterExportManager = backgroundFilterExportManager
         self.filterEngine = FilterEngine()
 
         // 필터 엔진에 원본 이미지 설정
@@ -78,7 +91,7 @@ final class ApplyFilterViewModel {
 
         input.saveButtonTapped
             .sink { [weak self] in
-                self?.saveFilteredImage()
+                self?.handleSaveAction()
             }
             .store(in: &cancellables)
 
@@ -86,6 +99,7 @@ final class ApplyFilterViewModel {
             filters: filtersSubject.eraseToAnyPublisher(),
             currentFilteredImage: filterEngine.$previewImage.eraseToAnyPublisher(),
             saveCompleted: saveCompletedSubject.eraseToAnyPublisher(),
+            exportQueued: exportQueuedSubject.eraseToAnyPublisher(),
             error: errorSubject.eraseToAnyPublisher()
         )
     }
@@ -163,7 +177,27 @@ final class ApplyFilterViewModel {
         filterEngine.filterValuesSubject.send(filterValues)
     }
 
-    private func saveFilteredImage() {
+    private func handleSaveAction() {
+        switch mode {
+        case .applyToPost:
+            saveFilteredImageForPost()
+        case .exportToPhotoLibrary:
+            enqueuePhotoLibraryExport()
+        }
+    }
+
+    private func enqueuePhotoLibraryExport() {
+        let exportRequest = BackgroundFilterExportRequest(
+            originalImage: originalImage,
+            filterValues: filterEngine.filterValuesSubject.value,
+            appliedFilter: currentFilter
+        )
+
+        backgroundFilterExportManager.export(request: exportRequest)
+        exportQueuedSubject.send(())
+    }
+
+    private func saveFilteredImageForPost() {
         // FilterEngine에서 고화질 이미지 저장
         guard let finalImage = filterEngine.saveOriginalImage() else {
             errorSubject.send("이미지 저장에 실패했습니다.")

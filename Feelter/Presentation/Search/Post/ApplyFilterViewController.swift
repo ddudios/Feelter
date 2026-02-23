@@ -22,6 +22,7 @@ final class ApplyFilterViewController: BaseViewController {
 
     private var filters: [FilterDetail] = []
     private var originalImage: UIImage?
+    private var isSaveInProgress = false
     var onFilterApplied: ((UIImage, FilterDetail?) -> Void)?
 
     // MARK: - Layout Constants
@@ -199,8 +200,20 @@ final class ApplyFilterViewController: BaseViewController {
         output.saveCompleted
             .receive(on: DispatchQueue.main)
             .sink { [weak self] result in
+                self?.isSaveInProgress = false
                 self?.onFilterApplied?(result.image, result.appliedFilter)
                 self?.navigationController?.popViewController(animated: true)
+            }
+            .store(in: &cancellables)
+
+        output.exportQueued
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                guard let self else { return }
+                self.isSaveInProgress = true
+                self.navigationItem.rightBarButtonItem?.isEnabled = false
+                GlobalToastPresenter.shared.show(message: "필터 적용중", duration: 3)
+                self.navigationController?.popViewController(animated: true)
             }
             .store(in: &cancellables)
 
@@ -208,6 +221,8 @@ final class ApplyFilterViewController: BaseViewController {
             .receive(on: DispatchQueue.main)
             .compactMap { $0 }
             .sink { [weak self] error in
+                self?.isSaveInProgress = false
+                self?.navigationItem.rightBarButtonItem?.isEnabled = true
                 self?.showAlert(message: error)
             }
             .store(in: &cancellables)
@@ -216,6 +231,9 @@ final class ApplyFilterViewController: BaseViewController {
     // MARK: - Actions
 
     @objc private func saveButtonTapped() {
+        guard !isSaveInProgress else { return }
+        isSaveInProgress = true
+        navigationItem.rightBarButtonItem?.isEnabled = false
         saveButtonTappedSubject.send()
     }
 
