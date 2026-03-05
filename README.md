@@ -22,7 +22,8 @@
 - 필터 생성/편집 및 필터 상세 조회
 - 이미지 기반 필터 적용 후 게시글 업로드
 - 홈/랭킹/영상 피드 탐색
-- CoreData + Socket.IO 기반 1:1 채팅
+- WKWebView 출석 페이지와 앱을 WebBridge로 연결
+- CoreData + Socket.IO + RestAPI 기반 채팅
 - 동영상 스트리밍(재생/자막/좋아요)
 - PG 결제 및 서버 검증
 - Firebase Messaging 기반 푸시 알림/딥링크 이동
@@ -72,7 +73,7 @@
 
 - 이메일/비밀번호 로그인 및 입력 유효성 검증
 - Kakao 로그인, Sign in with Apple 지원
-- Access/Refresh/User ID를 Keychain에 안전하게 저장
+- Access/Refresh Token을 Keychain에 안전하게 저장
 - 토큰 만료(401/419) 시 자동 갱신 후 요청 재시도, 실패 시 인증 상태 정리
 
 ### 홈 피드
@@ -83,15 +84,14 @@
 - 배너/오늘의 필터/작가 피드 구성
 - 좋아요 등 상호작용 반영
 - 현재 위치 기반 지도 탐색 및 위치 정보 기반 콘텐츠 탐색
-- 썸네일 이미지 로딩 최적화(Kingfisher)
+- 썸네일 이미지 로딩 최적화
 
 ### 랭킹
 
-|<img width="200" alt="RANKING_1" src="https://github.com/user-attachments/assets/4d7d077b-cd9c-40bc-bd98-7f481b1b7e98" />|<img width="200" alt="RANKING_2" src="https://github.com/user-attachments/assets/c2a7c721-49da-437b-8ed7-a8b606f3be5b" />|
+|<img width="200" alt="IMG_3741" src="https://github.com/user-attachments/assets/6df89435-2495-4484-8c04-665e896e4bb8" />|<img width="200" alt="IMG_3628" src="https://github.com/user-attachments/assets/5c2a8893-e5ab-4d1c-8008-e33019295736" />|
 |:-:|:-:|
 
 - 카테고리 기반 필터 랭킹 리스트 제공
-- 랭킹 셀에서 상세 화면으로 자연스럽게 진입
 - 홈 피드와 연계된 탐색 흐름으로 빠른 콘텐츠 탐색 지원
 
 ### 필터
