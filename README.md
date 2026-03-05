@@ -1,6 +1,5 @@
-<p align="center">
-  <img width="100" src="https://github.com/user-attachments/assets/15d03bad-a57a-47d3-8a36-96dc3a703c0b"/>
-</p>
+<img width="132" height="132" alt="Feelter" src="https://github.com/user-attachments/assets/2cb8dd96-f42f-4fe4-889c-20350ce80637" />
+
 
 # Feelter
 
@@ -8,7 +7,7 @@
 
 ## 앱 미리보기
 
-|  |  |  |  |
+|<img width="200" alt="IMG_3734" src="https://github.com/user-attachments/assets/aca759ee-121a-44ee-aefe-58a5704525aa" />|<img width="200" alt="IMG_3740" src="https://github.com/user-attachments/assets/4d7d077b-cd9c-40bc-bd98-7f481b1b7e98" />|<img width="200" alt="IMG_3725" src="https://github.com/user-attachments/assets/4f97daa1-f269-4445-86db-99e07bf131b1" />|<img width="200" alt="IMG_3640" src="https://github.com/user-attachments/assets/c2a7c721-49da-437b-8ed7-a8b606f3be5b" />|
 |:-:|:-:|:-:|:-:|
 
 |구분|내용|
@@ -71,7 +70,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 채팅
 
-|  |  |
+|<img width="200" alt="IMG_3823" src="https://github.com/user-attachments/assets/c461ca4c-7b9c-4e31-9857-85b39c1465ee" />|<img width="200" alt="IMG_3818" src="https://github.com/user-attachments/assets/e745dc54-13f9-4553-8d13-99c61f0b4577" />|
 |:-:|:-:|
 
 - 오프라인 상태에서도 이전 채팅 내역 조회
@@ -80,7 +79,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 홈 피드
 
-|  |  |
+|<img width="200" alt="IMG_3734" src="https://github.com/user-attachments/assets/a9f503cd-81c6-49e7-b229-871293a76557" />|<img width="200" alt="IMG_3737" src="https://github.com/user-attachments/assets/c50c405f-64ea-4083-9c95-e562290e25fa" />|
 |:-:|:-:|
 
 - 배너/오늘의 필터/작가/카테고리 랭킹 구성
@@ -89,7 +88,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 지도 검색
 
-|  |  |
+|<img width="200" alt="IMG_3799" src="https://github.com/user-attachments/assets/c43e8788-bc0d-493d-b8e7-ee777e8d04cc" />|<img width="200" alt="IMG_3795" src="https://github.com/user-attachments/assets/500ef6ef-f048-4a18-9cf9-66afc47e608f" />|
 |:-:|:-:|
 
 - 현재 위치 기반 게시글 탐색
@@ -97,7 +96,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 게시글/필터 업로드
 
-|  |  |
+|<img width="200" alt="Screenshot 2026-02-09 at 9 30 58 AM" src="https://github.com/user-attachments/assets/e37ff535-a903-4620-b71a-0fc4f166b051" />|<img width="200" alt="IMG_3790" src="https://github.com/user-attachments/assets/f3c5c50b-b360-45f4-8ef5-e795e8030ee2" />|
 |:-:|:-:|
 
 - 필터 생성/편집
@@ -106,7 +105,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 필터 상세/결제
 
-|  |  |
+|<img width="200" alt="IMG_3727" src="https://github.com/user-attachments/assets/30b57845-b613-4250-9cc1-21b1b0f57a18" />|<img width="200" alt="IMG_3730" src="https://github.com/user-attachments/assets/f3af9f64-fa41-41f7-a8ad-987af0a42903" />|
 |:-:|:-:|
 
 - 필터 상세 정보/프리셋 확인
@@ -115,7 +114,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 프로필
 
-|  |  |
+|<img width="200" alt="IMG_3449" src="https://github.com/user-attachments/assets/e8da00a3-8211-4149-b90c-b4db22699424" />|<img width="200" alt="프로필" src="https://github.com/user-attachments/assets/eb608dbc-c7e6-4af0-8772-fc093bdbb26f" />|
 |:-:|:-:|
 
 - 프로필 조회/수정
