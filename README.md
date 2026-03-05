@@ -80,10 +80,19 @@
 |<img width="200" alt="IMG_3734" src="https://github.com/user-attachments/assets/a9f503cd-81c6-49e7-b229-871293a76557" />|<img width="200" alt="IMG_3737" src="https://github.com/user-attachments/assets/c50c405f-64ea-4083-9c95-e562290e25fa" />|
 |:-:|:-:|
 
-- 배너/오늘의 필터/작가/카테고리 랭킹 구성
+- 배너/오늘의 필터/작가 피드 구성
 - 좋아요 등 상호작용 반영
 - 현재 위치 기반 지도 탐색 및 위치 정보 기반 콘텐츠 탐색
 - 썸네일 이미지 로딩 최적화(Kingfisher)
+
+### 랭킹
+
+|<img width="200" alt="RANKING_1" src="https://github.com/user-attachments/assets/4d7d077b-cd9c-40bc-bd98-7f481b1b7e98" />|<img width="200" alt="RANKING_2" src="https://github.com/user-attachments/assets/c2a7c721-49da-437b-8ed7-a8b606f3be5b" />|
+|:-:|:-:|
+
+- 카테고리 기반 필터 랭킹 리스트 제공
+- 랭킹 셀에서 상세 화면으로 자연스럽게 진입
+- 홈 피드와 연계된 탐색 흐름으로 빠른 콘텐츠 탐색 지원
 
 ### 필터
 
