@@ -68,7 +68,7 @@
 
 ### 인증
 
-|<img width="200" alt="AUTH_1" src="https://github.com/user-attachments/assets/e8da00a3-8211-4149-b90c-b4db22699424" />|<img width="200" alt="AUTH_2" src="https://github.com/user-attachments/assets/eb608dbc-c7e6-4af0-8772-fc093bdbb26f" />|
+|<img width="200" alt="AUTH_1" src="https://github.com/user-attachments/assets/e8da00a3-8211-4149-b90c-b4db22699424" />|<img width="200" alt="IMG_3467" src="https://github.com/user-attachments/assets/919ae0f0-f0fe-47e2-b498-505d9cef5b93" />|
 |:-:|:-:|
 
 - 이메일/비밀번호 로그인 및 입력 유효성 검증
