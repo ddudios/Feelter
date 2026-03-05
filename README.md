@@ -1,4 +1,4 @@
-<img width="132" height="132" alt="Feelter" src="https://github.com/user-attachments/assets/2cb8dd96-f42f-4fe4-889c-20350ce80637" />
+<img width="100" height="132" alt="Feelter" src="https://github.com/user-attachments/assets/2cb8dd96-f42f-4fe4-889c-20350ce80637" />
 
 
 # Feelter
@@ -48,13 +48,8 @@
 
 ### Clean Architecture
 
-```text
-Presentation (ViewController / ViewModel / Coordinator)
-        ↓
-Domain (Entity / Usecase / RepositoryProtocol)
-        ↓
-Data (Repository / Network / Local(CoreData))
-```
+<img width="719" height="435" alt="스크린샷 2026-03-05 오후 4 54 58" src="https://github.com/user-attachments/assets/63cb492a-61bb-4dc1-b0b6-c8de08c88b84" />
+
 
 - 비즈니스 로직은 `Usecase`에서 처리
 - 화면 상태/이벤트 바인딩은 `ViewModel(Input/Output)`으로 처리
@@ -92,7 +87,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 필터
 
-|<img width="200" alt="FILTER_1" src="https://github.com/user-attachments/assets/e37ff535-a903-4620-b71a-0fc4f166b051" />|<img width="200" alt="FILTER_2" src="https://github.com/user-attachments/assets/f3c5c50b-b360-45f4-8ef5-e795e8030ee2" />|
+|<img width="200" alt="원본" src="https://github.com/user-attachments/assets/80fbdc7f-9aa2-43aa-a5e0-c8cded923826" />|<img width="200" height="1266" alt="2Contrast" src="https://github.com/user-attachments/assets/94dba2dd-d9d1-4d9e-a531-dc47e911e043" />|
 |:-:|:-:|
 
 - 필터 생성(제목/카테고리/설명/가격/메타데이터 입력) 지원
@@ -131,7 +126,7 @@ Data (Repository / Network / Local(CoreData))
 
 ### 스트리밍
 
-|<img width="200" alt="STREAMING_1" src="https://github.com/user-attachments/assets/aca759ee-121a-44ee-aefe-58a5704525aa" />|<img width="200" alt="STREAMING_2" src="https://github.com/user-attachments/assets/4f97daa1-f269-4445-86db-99e07bf131b1" />|
+|<img width="200" alt="IMG_3524" src="https://github.com/user-attachments/assets/f49f0de6-fbf7-49eb-85b3-b9f84704d9f5" />|<img width="200" height="1266" alt="IMG_3526" src="https://github.com/user-attachments/assets/c410c291-1b5b-46af-ae8e-ba6b00cabfd0" />|
 |:-:|:-:|
 
 - 영상 목록 조회 및 커서 기반 페이징 로드
