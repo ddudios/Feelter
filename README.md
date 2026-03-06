@@ -5,8 +5,6 @@
 
 필터 제작부터 공유, 탐색, 결제, 채팅까지 하나의 흐름으로 연결한 앱입니다.
 
-## 앱 미리보기
-
 |<img width="200" alt="IMG_3734" src="https://github.com/user-attachments/assets/aca759ee-121a-44ee-aefe-58a5704525aa" />|<img width="200" alt="IMG_3740" src="https://github.com/user-attachments/assets/4d7d077b-cd9c-40bc-bd98-7f481b1b7e98" />|<img width="200" alt="IMG_3725" src="https://github.com/user-attachments/assets/4f97daa1-f269-4445-86db-99e07bf131b1" />|<img width="200" alt="IMG_3640" src="https://github.com/user-attachments/assets/c2a7c721-49da-437b-8ed7-a8b606f3be5b" />|
 |:-:|:-:|:-:|:-:|
 
