@@ -1,4 +1,4 @@
-<img width="100" height="132" alt="Feelter" src="https://github.com/user-attachments/assets/2cb8dd96-f42f-4fe4-889c-20350ce80637" />
+<img width="100" height="100" alt="Feelter" src="https://github.com/user-attachments/assets/2cb8dd96-f42f-4fe4-889c-20350ce80637" />
 
 
 # Feelter
